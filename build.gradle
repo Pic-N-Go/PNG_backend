@@ -39,6 +39,9 @@ dependencies {
 	// Swagger UI (API 문서화)
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
 
+	//SMTP
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 
