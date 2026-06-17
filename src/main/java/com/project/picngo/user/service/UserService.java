@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -31,6 +33,10 @@ public class UserService {
 
 	public boolean existsByNickname(String nickname) {
 		return userRepository.existsByNickname(nickname);
+	}
+
+	public Optional<User> findByEmail(String email){
+		return userRepository.findByEmail(email);
 	}
 
 	public UserResponse getMyInfo(Long userId) {

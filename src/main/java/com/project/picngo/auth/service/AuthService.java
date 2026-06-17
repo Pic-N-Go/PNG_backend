@@ -43,7 +43,8 @@ public class AuthService {
 	}
 
 	public TokenResponse login(LoginRequest request) {
-		User user = userService.getByEmail(request.email());
+		User user = userService.findByEmail(request.email())
+				.orElseThrow(() -> new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다."));
 
 		if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
 			throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
