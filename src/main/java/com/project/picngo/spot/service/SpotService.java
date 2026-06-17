@@ -1,7 +1,9 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
+import com.project.picngo.spot.dto.SpotSummaryResponse;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -10,6 +12,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +49,48 @@ public class SpotService {
                 .map(SpotResponse::from);
     }
 
+    public List<SpotResponse> getPopularSpots(String category, int size) {
+        SpotCategory spotCategory = parseCategory(category);
+        Pageable pageable = createPageable(0, size, "popular");
+
+        if (spotCategory == null) {
+            return spotRepository.findAllByIsActiveTrue(pageable).stream()
+                    .map(SpotResponse::from)
+                    .toList();
+        }
+
+        return spotRepository.findAllByCategoryAndIsActiveTrue(spotCategory, pageable).stream()
+                .map(SpotResponse::from)
+                .toList();
+    }
+
+    public List<SpotMapResponse> getMapSpots(
+            Double southWestLat,
+            Double southWestLng,
+            Double northEastLat,
+            Double northEastLng,
+            String category
+    ) {
+        validateMapBounds(southWestLat, southWestLng, northEastLat, northEastLng);
+
+        SpotCategory spotCategory = parseCategory(category);
+        return spotRepository.findSpotsInMapBounds(
+                        southWestLat,
+                        southWestLng,
+                        northEastLat,
+                        northEastLng,
+                        spotCategory
+                ).stream()
+                .map(SpotMapResponse::from)
+                .toList();
+    }
+
+    public SpotSummaryResponse getSpotSummary(Long id) {
+        return spotRepository.findByIdAndIsActiveTrue(id)
+                .map(SpotSummaryResponse::from)
+                .orElseThrow(() -> new IllegalArgumentException("스팟을 찾을 수 없습니다."));
+    }
+
     private Pageable createPageable(int page, int size, String sort) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
@@ -74,6 +120,21 @@ public class SpotService {
             return SpotCategory.valueOf(category.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("지원하지 않는 스팟 카테고리입니다.");
+        }
+    }
+
+    private void validateMapBounds(
+            Double southWestLat,
+            Double southWestLng,
+            Double northEastLat,
+            Double northEastLng
+    ) {
+        if (southWestLat == null || southWestLng == null || northEastLat == null || northEastLng == null) {
+            throw new IllegalArgumentException("지도 영역 좌표를 모두 입력해주세요.");
+        }
+
+        if (southWestLat > northEastLat || southWestLng > northEastLng) {
+            throw new IllegalArgumentException("지도 영역 좌표가 올바르지 않습니다.");
         }
     }
 }
