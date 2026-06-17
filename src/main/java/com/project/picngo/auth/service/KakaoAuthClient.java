@@ -1,7 +1,6 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.auth.dto.KakaoProfile;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -14,10 +13,13 @@ import org.springframework.web.client.RestClient;
 import java.util.Map;
 
 @Component
-@RequiredArgsConstructor
 public class KakaoAuthClient {
 
-	private final RestClient.Builder restClientBuilder;
+	private final RestClient restClient;
+
+	public KakaoAuthClient(RestClient.Builder restClientBuilder) {
+		this.restClient = restClientBuilder.build();
+	}
 
 	@Value("${kakao.auth.token-url}")
 	private String tokenUrl;
@@ -52,7 +54,7 @@ public class KakaoAuthClient {
 			form.add("client_secret", clientSecret);
 		}
 
-		Map<String, Object> response = restClientBuilder.build()
+		Map<String, Object> response = restClient
 			.post()
 			.uri(tokenUrl)
 			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -70,7 +72,7 @@ public class KakaoAuthClient {
 
 	@SuppressWarnings("unchecked")
 	private KakaoProfile requestProfile(String accessToken) {
-		Map<String, Object> response = restClientBuilder.build()
+		Map<String, Object> response = restClient
 			.get()
 			.uri(userInfoUrl)
 			.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
