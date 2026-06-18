@@ -6,6 +6,8 @@ import com.project.picngo.wishlist.domain.WishlistItem;
 import com.project.picngo.wishlist.dto.*;
 import com.project.picngo.wishlist.repository.WishlistItemRepository;
 import com.project.picngo.wishlist.repository.WishlistRepository;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.WishlistErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +46,7 @@ public class WishlistService {
     public WishlistResponse getWishlistDetail(Long id, Long userId) {
         Wishlist wishlist = wishlistRepository.findById(id)
                 .filter(w -> w.getUserId().equals(userId))
-                .orElseThrow(() -> new IllegalArgumentException("위시리스트를 찾을 수 없거나 권한이 없습니다."));
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         return WishlistResponse.from(wishlist);
     }
 
@@ -52,7 +54,7 @@ public class WishlistService {
     public WishlistResponse updateWishlist(Long id, Long userId, WishlistUpdateRequest request) {
         Wishlist wishlist = wishlistRepository.findById(id)
                 .filter(w -> w.getUserId().equals(userId))
-                .orElseThrow(() -> new IllegalArgumentException("위시리스트를 찾을 수 없거나 권한이 없습니다."));
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         
         wishlist.updateName(request.name());
         return WishlistResponse.from(wishlist);
@@ -62,7 +64,7 @@ public class WishlistService {
     public void deleteWishlist(Long id, Long userId) {
         Wishlist wishlist = wishlistRepository.findById(id)
                 .filter(w -> w.getUserId().equals(userId))
-                .orElseThrow(() -> new IllegalArgumentException("위시리스트를 찾을 수 없거나 권한이 없습니다."));
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         wishlistRepository.delete(wishlist);
     }
 
@@ -70,7 +72,7 @@ public class WishlistService {
     public WishlistItemResponse addItemToWishlist(Long id, Long userId, WishlistItemRequest request) {
         Wishlist wishlist = wishlistRepository.findById(id)
                 .filter(w -> w.getUserId().equals(userId))
-                .orElseThrow(() -> new IllegalArgumentException("위시리스트를 찾을 수 없거나 권한이 없습니다."));
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
 
         WishlistItem item = WishlistItem.builder()
                 .wishlist(wishlist)
@@ -89,11 +91,11 @@ public class WishlistService {
     public void removeItemFromWishlist(Long id, Long itemId, Long userId) {
         Wishlist wishlist = wishlistRepository.findById(id)
                 .filter(w -> w.getUserId().equals(userId))
-                .orElseThrow(() -> new IllegalArgumentException("위시리스트를 찾을 수 없거나 권한이 없습니다."));
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
 
         WishlistItem item = wishlistItemRepository.findById(itemId)
                 .filter(i -> i.getWishlist().getId().equals(wishlist.getId()))
-                .orElseThrow(() -> new IllegalArgumentException("아이템을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_ITEM_NOT_FOUND));
 
         wishlist.getItems().remove(item);
     }

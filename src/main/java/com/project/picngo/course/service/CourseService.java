@@ -8,6 +8,8 @@ import com.project.picngo.course.repository.CourseChecklistRepository;
 import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.course.repository.CourseSpotRepository;
 import com.project.picngo.external.DirectionsClient;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.CourseErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -131,7 +133,7 @@ public class CourseService {
 
     private Course findCourseOrThrow(Long courseId) {
         return courseRepository.findById(courseId)
-                .orElseThrow(() -> new IllegalArgumentException("코스를 찾을 수 없습니다. id=" + courseId));
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
     }
 
     /**
