@@ -2,6 +2,18 @@ spring:
   application:
     name: picngo
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL}
@@ -24,6 +36,17 @@ kakao:
   rest:
     api:
       key: ${KAKAO_REST_API_KEY}
+  auth:
+    token-url: https://kauth.kakao.com/oauth/token
+    user-info-url: https://kapi.kakao.com/v2/user/me
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-seconds: ${JWT_ACCESS_TOKEN_EXPIRATION_SECONDS:3600}
+
 
 firebase:
   config:
