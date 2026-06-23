@@ -20,6 +20,8 @@ public class NotificationSetting {
     @Column(nullable = false, unique = true)
     private Long userId;
 
+    private String fcmToken;
+
     @Column(nullable = false)
     private Boolean isAllPushEnabled = true;
 
@@ -28,9 +30,14 @@ public class NotificationSetting {
     private LocalTime dndEndTime;
 
     @Builder
-    public NotificationSetting(Long userId) {
+    public NotificationSetting(Long userId, String fcmToken) {
         this.userId = userId;
+        this.fcmToken = fcmToken;
         this.isAllPushEnabled = true;
+    }
+
+    public void updateFcmToken(String fcmToken) {
+        this.fcmToken = fcmToken;
     }
 
     public void updateSettings(Boolean isAllPushEnabled, LocalTime dndStartTime, LocalTime dndEndTime) {

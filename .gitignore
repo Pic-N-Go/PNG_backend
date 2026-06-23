@@ -36,6 +36,7 @@ out/
 ### VS Code ###
 .vscode/
 
-# 환경변수 (API 키 등 민감 정보)
+# 환경변수 및 민감한 키 파일
 .env
+firebase-key.json
 
