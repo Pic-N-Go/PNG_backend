@@ -3,6 +3,8 @@ package com.project.picngo.notification.service;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.NotificationErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,7 +19,7 @@ public class FcmService {
     public void sendMessage(String targetToken, String title, String body, String deepLink) {
         if (targetToken == null || targetToken.isEmpty()) {
             log.warn("FCM Token이 없어 알림을 보낼 수 없습니다.");
-            return;
+            throw new CustomException(NotificationErrorCode.FCM_TOKEN_NOT_FOUND);
         }
 
         Notification notification = Notification.builder()
@@ -38,6 +40,7 @@ public class FcmService {
             log.info("FCM 알림 발송 성공: {}", response);
         } catch (Exception e) {
             log.error("FCM 알림 발송 실패", e);
+            throw new CustomException(NotificationErrorCode.FCM_SEND_FAILED);
         }
     }
 }

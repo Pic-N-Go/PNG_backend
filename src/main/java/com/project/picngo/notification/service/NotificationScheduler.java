@@ -36,8 +36,12 @@ public class NotificationScheduler {
             String title = "오늘의 추천 여행지 알림 ☀️";
             String body = "회원님의 위시리스트 날씨 조건과 완벽하게 일치하는 날입니다!";
             
-            fcmService.sendMessage(token, title, body, null);
-            log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료", setting.getUserId());
+            try {
+                fcmService.sendMessage(token, title, body, null);
+                log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료", setting.getUserId());
+            } catch (Exception e) {
+                log.error("유저 {} 에게 스케줄러 푸시 알림 발송 중 오류 발생", setting.getUserId(), e);
+            }
         }
         
         log.info("매일 아침 7시 알림 스케줄러 실행 종료.");

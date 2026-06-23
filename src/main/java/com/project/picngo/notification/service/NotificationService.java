@@ -1,8 +1,11 @@
 package com.project.picngo.notification.service;
 
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.NotificationErrorCode;
+import com.project.picngo.notification.domain.Notification;
+import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.dto.NotificationResponse;
 import com.project.picngo.notification.dto.NotificationSettingUpdateRequest;
-import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationRepository;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,9 +37,14 @@ public class NotificationService {
 
     @Transactional
     public void markAsRead(Long id, Long userId) {
-        notificationRepository.findById(id)
-                .filter(n -> n.getUserId().equals(userId))
-                .ifPresent(com.project.picngo.notification.domain.Notification::markAsRead);
+        Notification notification = notificationRepository.findById(id)
+                .orElseThrow(() -> new CustomException(NotificationErrorCode.NOTIFICATION_NOT_FOUND));
+
+        if (!notification.getUserId().equals(userId)) {
+            throw new CustomException(NotificationErrorCode.UNAUTHORIZED_NOTIFICATION_ACCESS);
+        }
+
+        notification.markAsRead();
     }
 
     @Transactional
