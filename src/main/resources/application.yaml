@@ -32,6 +32,10 @@ weather:
   api:
     key: ${WEATHER_SERVICE_KEY}
 
+tour:
+  api:
+    key: ${TOUR_API_KEY}
+
 kakao:
   rest:
     api:

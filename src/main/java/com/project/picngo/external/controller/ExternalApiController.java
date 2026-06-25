@@ -5,6 +5,7 @@ import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import com.project.picngo.spot.service.TourApiSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
 
     private final WeatherClient weatherClient;
     private final DirectionsClient directionsClient;
+    private final TourApiSyncService tourApiSyncService;
 
     // 1. 길찾기 API (바로 출발 시 호출)
     @GetMapping("/directions")
@@ -39,7 +41,21 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         return ResponseEntity.ok(weatherClient.getForecast(lat, lng, date));
     }
 
-    // 3. 골든아워 조회 (스팟별/홈 화면)
+    // 3. TourAPI 특정 지역 동기화
+    @PostMapping("/tour-api/sync")
+    public ResponseEntity<String> syncSpots(@RequestParam int areaCode) {
+        int saved = tourApiSyncService.sync(areaCode);
+        return ResponseEntity.ok(saved + "건 저장 완료");
+    }
+
+    // 4. TourAPI 전체 지역 동기화
+    @PostMapping("/tour-api/sync/all")
+    public ResponseEntity<String> syncAll() {
+        int saved = tourApiSyncService.syncAll();
+        return ResponseEntity.ok("전체 지역 동기화 완료: " + saved + "건 저장");
+    }
+
+    // 5. 골든아워 조회 (스팟별/홈 화면)
     @GetMapping("/spots/{id}/golden-hour")
     public ResponseEntity<GoldenHourResponse> getSpotGoldenHour(
             @PathVariable Long id,
