@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 @Entity
@@ -48,6 +50,15 @@ public class User {
 	@Column(name = "provider_id", length = 100)
 	private String providerId;
 
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(
+			name = "user_interest_themes",
+			joinColumns = @JoinColumn(name = "user_id")
+	)
+	@Enumerated(EnumType.STRING)
+	@Column(name = "theme", length = 50)
+	private Set<InterestTheme> interestThemes = new HashSet<>();
+
 	@Column(nullable = false)
 	private LocalDateTime createdAt;
 
@@ -73,14 +84,30 @@ public class User {
 		this.providerId = providerId;
 	}
 
-	public static User createLocalUser(String email, String encodedPassword, String nickname) {
-		return User.builder()
-			.email(email)
-			.password(encodedPassword)
-			.nickname(nickname)
-			.role(Role.USER)
-			.provider(SocialProvider.LOCAL)
-			.build();
+	public static User createLocalUser(
+			String email,
+			String encodedPassword,
+			String nickname,
+			Set<InterestTheme> interestThemes
+	) {
+		User user = User.builder()
+				.email(email)
+				.password(encodedPassword)
+				.nickname(nickname)
+				.role(Role.USER)
+				.provider(SocialProvider.LOCAL)
+				.build();
+
+		user.updateInterestThemes(interestThemes);
+		return user;
+	}
+
+	public void updateInterestThemes(Set<InterestTheme> interestThemes) {
+		this.interestThemes.clear();
+
+		if (interestThemes != null) {
+			this.interestThemes.addAll(interestThemes);
+		}
 	}
 
 	public static User createSocialUser(
@@ -115,5 +142,9 @@ public class User {
 	@PreUpdate
 	protected void onUpdate() {
 		this.updatedAt = LocalDateTime.now();
+	}
+
+	public void updatePassword(String encodedPassword) {
+		this.password = encodedPassword;
 	}
 }
