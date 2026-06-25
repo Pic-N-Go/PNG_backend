@@ -1,8 +1,11 @@
 package com.project.picngo.user.dto;
 
+import com.project.picngo.user.domain.InterestTheme;
 import com.project.picngo.user.domain.Role;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
+
+import java.util.Set;
 
 public record UserResponse(
 	Long id,
@@ -10,7 +13,8 @@ public record UserResponse(
 	String nickname,
 	String profileImageUrl,
 	Role role,
-	SocialProvider provider
+	SocialProvider provider,
+	Set<InterestTheme> interestThemes
 ) {
 
 	public static UserResponse from(User user) {
@@ -20,7 +24,8 @@ public record UserResponse(
 			user.getNickname(),
 			user.getProfileImageUrl(),
 			user.getRole(),
-			user.getProvider()
+			user.getProvider(),
+				user.getInterestThemes()
 		);
 	}
 }
