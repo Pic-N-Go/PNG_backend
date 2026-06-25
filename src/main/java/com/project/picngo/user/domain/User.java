@@ -1,12 +1,11 @@
 package com.project.picngo.user.domain;
 
+import com.project.picngo.common.domain.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -21,7 +20,7 @@ import java.util.Set;
 	}
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User {
+public class User extends BaseTimeEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,12 +57,6 @@ public class User {
 	@Enumerated(EnumType.STRING)
 	@Column(name = "theme", length = 50)
 	private Set<InterestTheme> interestThemes = new HashSet<>();
-
-	@Column(nullable = false)
-	private LocalDateTime createdAt;
-
-	@Column(nullable = false)
-	private LocalDateTime updatedAt;
 
 	@Builder
 	private User(
@@ -130,18 +123,6 @@ public class User {
 	public void updateSocialProfile(String nickname, String profileImageUrl) {
 		this.nickname = nickname;
 		this.profileImageUrl = profileImageUrl;
-	}
-
-	@PrePersist
-	protected void onCreate() {
-		LocalDateTime now = LocalDateTime.now();
-		this.createdAt = now;
-		this.updatedAt = now;
-	}
-
-	@PreUpdate
-	protected void onUpdate() {
-		this.updatedAt = LocalDateTime.now();
 	}
 
 	public void updatePassword(String encodedPassword) {
