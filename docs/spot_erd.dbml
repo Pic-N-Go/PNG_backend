@@ -1,0 +1,100 @@
+erDiagram
+    SPOT {
+        BIGINT id PK
+        VARCHAR name
+        VARCHAR address
+        VARCHAR zipcode "우편번호. TourAPI: zipcode"
+        VARCHAR overview "스팟 개요. TourAPI: description"
+        DOUBLE latitude
+        DOUBLE longitude
+        ENUM category
+        VARCHAR source "TOUR_API | USER"
+        BOOLEAN badge "관광공사 인증 여부"
+        VARCHAR tour_content_id "TourAPI contentId (nullable)"
+        VARCHAR image_url "대표 이미지 원본. TourAPI: firstimage"
+        VARCHAR thumbnail_url "대표 이미지 썸네일. TourAPI: firstimage2"
+        VARCHAR status "PENDING | APPROVED | REJECTED"
+        VARCHAR usetime "이용시간"
+        VARCHAR restdate "쉬는날/휴무일"
+        VARCHAR infocenter "문의 전화"
+        VARCHAR parking "주차 안내"
+        VARCHAR wheelchair_access "장애인 시설"
+        VARCHAR stroller_access "유모차 대여"
+        VARCHAR pet_friendly "반려동물 동반"
+        VARCHAR subway_access "도보 10분"
+        DATETIME created_at
+        DATETIME updated_at
+        INT bookmark_count
+        INT review_count
+        INT photogenic_score
+        BOOLEAN is_active
+        DOUBLE review_average
+        BOOLEAN toilet
+
+    }
+
+    SPOT_TAG {
+        BIGINT id PK
+        BIGINT spot_id FK
+        VARCHAR tag
+    }
+
+    SPOT_PHOTO {
+        BIGINT id PK
+        BIGINT spot_id FK
+        BIGINT user_id "nullable (TourAPI 사진은 null)"
+        VARCHAR photo_url
+        DATETIME created_at
+    }
+
+    CHECKLIST_ITEM {
+        BIGINT id PK
+        BIGINT spot_id FK
+        VARCHAR content
+        INT order_index
+    }
+
+    REVIEW {
+        BIGINT id PK
+        BIGINT spot_id FK
+        BIGINT user_id
+        INT rating "1~5"
+        TEXT content
+        VARCHAR equipment_info "촬영 기기 정보"
+        DATE visited_at "nullable, 사용자 입력"
+        DATETIME created_at
+        DATETIME updated_at
+    }
+
+    REVIEW_PHOTO {
+        BIGINT id PK
+        BIGINT review_id FK
+        VARCHAR photo_url
+    }
+
+    BOOKMARK {
+        BIGINT id PK
+        BIGINT spot_id FK
+        BIGINT user_id
+        UNIQUE spot_id_user_id UK
+        DATETIME created_at
+    }
+
+    SEASON_EVENT {
+        BIGINT id PK
+        VARCHAR name "시즌 이벤트명 (벚꽃 시즌 등)"
+        VARCHAR month_day_start "시작 월일 MM-DD"
+        VARCHAR month_day_peak_start "피크 시작 MM-DD"
+        VARCHAR month_day_peak_end "피크 종료 MM-DD"
+        VARCHAR month_day_end "종료 월일 MM-DD"
+        VARCHAR region "null=전국, 지역명=지역 한정"
+        INT max_score "최대 기여 점수"
+        BOOLEAN is_active
+    }
+
+    SPOT ||--o{ SPOT_TAG : "has"
+    SPOT ||--o{ SPOT_PHOTO : "has"
+    SPOT ||--o{ CHECKLIST_ITEM : "has"
+    SPOT ||--o{ REVIEW : "has"
+    SPOT ||--o{ BOOKMARK : "has"
+    REVIEW ||--o{ REVIEW_PHOTO : "has"
