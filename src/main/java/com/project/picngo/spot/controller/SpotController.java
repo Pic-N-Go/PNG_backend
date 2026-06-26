@@ -1,11 +1,12 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.dto.BookmarkResponse;
+import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
-import com.project.picngo.spot.dto.PhotogenicResponse;
+import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.service.BookmarkService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
@@ -54,6 +55,11 @@ public class SpotController implements SpotControllerApiSpec {
     @PostMapping("/{id}/bookmark")
     public ResponseEntity<BookmarkResponse> toggleBookmark(@PathVariable Long id) {
         return ResponseEntity.ok(bookmarkService.toggle(id));
+    }
+
+    @GetMapping("/{id}/photos")
+    public ResponseEntity<SpotPhotoResponse> getSpotPhotos(@PathVariable Long id) {
+        return ResponseEntity.ok(spotService.getSpotPhotos(id));
     }
 
     @PostMapping("/{id}/reviews")

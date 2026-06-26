@@ -1,5 +1,7 @@
 package com.project.picngo.external;
 
+import com.project.picngo.external.dto.TourApiImageResponse;
+import com.project.picngo.external.dto.TourApiImageResponse.ImageItem;
 import com.project.picngo.external.dto.TourApiIntroResponse;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse;
@@ -21,7 +23,7 @@ public class TourApiClient {
     private final WebClient webClient;
     private final String serviceKey;
 
-    public TourApiClient(WebClient.Builder builder, @Value("${tour.api.key}") String serviceKey) {
+    public TourApiClient(WebClient.Builder builder, @Value("${tour.api.key}") String serviceKey) { // ponytail: tour.api.key → PUBLIC_DATA_SERVICE_KEY 경유
         this.webClient = builder.baseUrl(BASE_URL).build();
         this.serviceKey = serviceKey;
     }
@@ -48,17 +50,6 @@ public class TourApiClient {
         return null;
     }
 
-    public List<Item> getAreaBasedList(int areaCode, int pageNo, int numOfRows) {
-        TourApiResponse response = getAreaBasedListRaw(areaCode, pageNo, numOfRows);
-        if (response != null && response.response() != null
-                && response.response().body() != null
-                && response.response().body().items() != null) {
-            List<Item> items = response.response().body().items().item();
-            return items != null ? items : Collections.emptyList();
-        }
-        return Collections.emptyList();
-    }
-
     public Item getDetailCommon(String contentId) {
         try {
             TourApiResponse response = webClient.get()
@@ -68,8 +59,6 @@ public class TourApiClient {
                             .queryParam("MobileApp", "picngo")
                             .queryParam("_type", "json")
                             .queryParam("contentId", contentId)
-                            .queryParam("defaultYN", "Y")
-                            .queryParam("overviewYN", "Y")
                             .build())
                     .retrieve()
                     .bodyToMono(TourApiResponse.class)
@@ -112,5 +101,32 @@ public class TourApiClient {
             log.error("TourAPI detailIntro 호출 실패 contentId={}", contentId, e);
         }
         return null;
+    }
+
+    public List<ImageItem> getDetailImages(String contentId) {
+        try {
+            TourApiImageResponse response = webClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/detailImage2")
+                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("MobileOS", "ETC")
+                            .queryParam("MobileApp", "picngo")
+                            .queryParam("_type", "json")
+                            .queryParam("contentId", contentId)
+                            .queryParam("imageYN", "Y")
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TourApiImageResponse.class)
+                    .block();
+
+            if (response != null && response.response() != null
+                    && response.response().body() != null
+                    && response.response().body().items() != null) {
+                List<ImageItem> items = response.response().body().items().item();
+                return items != null ? items : Collections.emptyList();
+            }
+        } catch (Exception e) {
+            log.error("TourAPI detailImage 호출 실패 contentId={}", contentId, e);
+        }
+        return Collections.emptyList();
     }
 }

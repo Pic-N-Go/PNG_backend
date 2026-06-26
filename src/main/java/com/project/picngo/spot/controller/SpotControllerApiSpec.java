@@ -6,6 +6,7 @@ import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
+import com.project.picngo.spot.dto.SpotPhotoResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +38,11 @@ public interface SpotControllerApiSpec {
 
     @Operation(summary = "북마크 토글", description = "북마크를 추가하거나 취소합니다. isBookmarked: true면 추가됨, false면 취소됨.")
     ResponseEntity<BookmarkResponse> toggleBookmark(
+            @Parameter(description = "스팟 ID") @PathVariable Long id
+    );
+
+    @Operation(summary = "스팟 사진 목록 조회", description = "한국관광공사 TourAPI에서 스팟 공식 사진 목록을 실시간 조회합니다. 사용자 등록 스팟은 빈 배열 반환.")
+    ResponseEntity<SpotPhotoResponse> getSpotPhotos(
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
