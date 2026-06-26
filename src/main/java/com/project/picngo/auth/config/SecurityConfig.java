@@ -28,7 +28,6 @@ public class SecurityConfig {
 		"/categories",
 		"/spots/**",
 		"/reviews/**",
-		"/tour-api/**",
 		"/swagger-ui/**",
 		"/v3/api-docs/**",
 		"/swagger-resources/**"
@@ -46,6 +45,7 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
 				.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+				.requestMatchers("/tour-api/**").permitAll() // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
 				.anyRequest().authenticated()
 			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

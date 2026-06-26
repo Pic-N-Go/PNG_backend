@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Map;
 
 @Service
@@ -46,8 +47,8 @@ public class ReviewService {
         Pageable pageable = PageRequest.of(page, size, toSort(sort));
         Page<Review> reviewPage = reviewRepository.findBySpotId(spotId, pageable);
 
-        Double avgRating = reviewRepository.findAvgRatingBySpotId(spotId);
-        long totalCount = reviewRepository.countBySpotId(spotId);
+        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId);
+        Double avgRating = (Double) avgAndCount[0];
         Map<Integer, Long> distribution = buildDistribution(spotId);
 
         List<Review> reviews = reviewPage.getContent();
@@ -55,9 +56,9 @@ public class ReviewService {
         List<Long> userIds = reviews.stream().map(Review::getUserId).toList();
 
         Map<Long, String> nicknameMap = userRepository.findByIdIn(userIds).stream()
-                .collect(java.util.stream.Collectors.toMap(u -> u.getId(), u -> u.getNickname()));
+                .collect(Collectors.toMap(u -> u.getId(), u -> u.getNickname()));
         Map<Long, List<ReviewPhoto>> photoMap = reviewPhotoRepository.findByReview_IdIn(reviewIds).stream()
-                .collect(java.util.stream.Collectors.groupingBy(p -> p.getReview().getId()));
+                .collect(Collectors.groupingBy(p -> p.getReview().getId()));
 
         List<ReviewListResponse.ReviewInfo> reviewInfos = reviews.stream()
                 .map(review -> ReviewListResponse.ReviewInfo.of(
@@ -70,7 +71,7 @@ public class ReviewService {
         return new ReviewListResponse(
                 new ReviewListResponse.SummaryInfo(
                         avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
-                        totalCount,
+                        reviewPage.getTotalElements(),
                         distribution
                 ),
                 new ReviewListResponse.PageInfo(

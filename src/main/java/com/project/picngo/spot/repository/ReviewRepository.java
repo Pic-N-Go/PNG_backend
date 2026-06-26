@@ -11,10 +11,8 @@ import java.util.List;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
-    long countBySpotId(Long spotId);
-
-    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.spot.id = :spotId")
-    Double findAvgRatingBySpotId(@Param("spotId") Long spotId);
+    @Query("SELECT AVG(r.rating), COUNT(r) FROM Review r WHERE r.spot.id = :spotId")
+    Object[] findAvgAndCountBySpotId(@Param("spotId") Long spotId);
 
     Page<Review> findBySpotId(Long spotId, Pageable pageable);
 
