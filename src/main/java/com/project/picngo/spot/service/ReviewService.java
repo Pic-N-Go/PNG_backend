@@ -44,7 +44,7 @@ public class ReviewService {
             throw new CustomException(SpotErrorCode.SPOT_NOT_FOUND);
         }
 
-        Pageable pageable = PageRequest.of(page, size, toSort(sort));
+        Pageable pageable = PageRequest.of(page, Math.min(size, 100), toSort(sort));
         Page<Review> reviewPage = reviewRepository.findBySpotId(spotId, pageable);
 
         Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId);
