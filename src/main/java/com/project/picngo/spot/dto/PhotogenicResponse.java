@@ -5,6 +5,7 @@ public record PhotogenicResponse(
         String grade,
         FactorInfo weather,
         FactorInfo fineDust,
+        FactorInfo ozone,
         FactorInfo season,
         FactorInfo goldenHour
 ) {

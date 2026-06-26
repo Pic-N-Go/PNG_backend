@@ -34,7 +34,11 @@ weather:
 
 tour:
   api:
-    key: ${TOUR_API_KEY}
+    key: ${PUBLIC_DATA_SERVICE_KEY}
+
+air:
+  quality:
+    key: ${PUBLIC_DATA_SERVICE_KEY}
 
 kakao:
   rest:
