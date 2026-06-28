@@ -8,5 +8,5 @@ import java.util.List;
 
 @Repository
 public interface WishlistItemRepository extends JpaRepository<WishlistItem, Long> {
-    List<WishlistItem> findAllByIsActiveTrue();
+    List<WishlistItem> findAllByWishlist_UserIdAndIsActiveTrue(Long userId);
 }
