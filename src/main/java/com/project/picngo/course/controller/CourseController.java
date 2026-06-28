@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.project.picngo.auth.service.CustomUserDetails;
 import java.util.List;
 
 @RestController
@@ -15,17 +17,14 @@ public class CourseController implements CourseControllerApiSpec {
 
     private final CourseService courseService;
 
-    // TODO: 추후 Spring Security 연동 시 인증된 사용자 ID를 자동으로 가져오도록 변경
-    private static final Long TEMP_USER_ID = 1L;
-
     @GetMapping
-    public ResponseEntity<List<CourseResponse>> getCourses() {
-        return ResponseEntity.ok(courseService.getCourses(TEMP_USER_ID));
+    public ResponseEntity<List<CourseResponse>> getCourses(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(courseService.getCourses(userDetails.getId()));
     }
 
     @PostMapping
-    public ResponseEntity<CourseResponse> createCourse(@RequestBody CourseCreateRequest request) {
-        return ResponseEntity.ok(courseService.createCourse(TEMP_USER_ID, request));
+    public ResponseEntity<CourseResponse> createCourse(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody CourseCreateRequest request) {
+        return ResponseEntity.ok(courseService.createCourse(userDetails.getId(), request));
     }
 
     @GetMapping("/{id}")

@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.project.picngo.auth.service.CustomUserDetails;
 import java.util.List;
 
 @RestController
@@ -18,31 +20,31 @@ public class NotificationController implements NotificationControllerApiSpec {
     private final NotificationService notificationService;
 
     @GetMapping
-    public ResponseEntity<List<NotificationResponse>> getNotifications(@RequestParam Long userId) {
-        return ResponseEntity.ok(notificationService.getNotifications(userId));
+    public ResponseEntity<List<NotificationResponse>> getNotifications(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(notificationService.getNotifications(userDetails.getId()));
     }
 
     @PostMapping("/token")
-    public ResponseEntity<Void> updateFcmToken(@RequestParam Long userId, @RequestBody FcmTokenRequest request) {
-        notificationService.updateFcmToken(userId, request.token());
+    public ResponseEntity<Void> updateFcmToken(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody FcmTokenRequest request) {
+        notificationService.updateFcmToken(userDetails.getId(), request.token());
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}/read")
-    public ResponseEntity<Void> markAsRead(@RequestParam Long userId, @PathVariable Long id) {
-        notificationService.markAsRead(id, userId);
+    public ResponseEntity<Void> markAsRead(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
+        notificationService.markAsRead(id, userDetails.getId());
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/read-all")
-    public ResponseEntity<Void> markAllAsRead(@RequestParam Long userId) {
-        notificationService.markAllAsRead(userId);
+    public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        notificationService.markAllAsRead(userDetails.getId());
         return ResponseEntity.ok().build();
     }
 
     @PutMapping("/settings")
-    public ResponseEntity<Void> updateSettings(@RequestParam Long userId, @RequestBody NotificationSettingUpdateRequest request) {
-        notificationService.updateSettings(userId, request);
+    public ResponseEntity<Void> updateSettings(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody NotificationSettingUpdateRequest request) {
+        notificationService.updateSettings(userDetails.getId(), request);
         return ResponseEntity.ok().build();
     }
 }
