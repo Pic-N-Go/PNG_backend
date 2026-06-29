@@ -42,36 +42,46 @@ public class TourApiSyncService {
             if (items == null || items.isEmpty()) break;
 
             for (Item item : items) {
-                if (spotRepository.existsByTourContentId(item.contentid())) continue;
-
                 Item detail = tourApiClient.getDetailCommon(item.contentid());
                 sleep(500);
                 IntroItem intro = tourApiClient.getDetailIntro(item.contentid());
                 sleep(500);
 
-                spotRepository.save(Spot.builder()
-                        .name(item.title())
-                        .address(trim(item.addr1()) + (item.addr2() != null ? " " + item.addr2().trim() : ""))
-                        .zipcode(item.zipcode())
-                        .overview(detail != null ? detail.overview() : null)
-                        .latitude(parseDouble(item.mapy()))
-                        .longitude(parseDouble(item.mapx()))
-                        .category(item.cat1())
-                        .cat3(item.cat3())
-                        .source(SpotSource.TOUR_API)
-                        .badge(true)
-                        .tourContentId(item.contentid())
-                        .imageUrl(item.firstimage())
-                        .thumbnailUrl(item.firstimage2())
-                        .status(SpotStatus.APPROVED)
-                        .parking(intro != null ? intro.parking() : null)
-                        .usetime(intro != null ? intro.usetime() : null)
-                        .restdate(intro != null ? intro.restdate() : null)
-                        .infocenter(intro != null ? intro.infocenter() : null)
-                        .strollerAccess(intro != null ? intro.chkbabycarriage() : null)
-                        .petFriendly(intro != null ? intro.chkpet() : null)
-                        .wheelchairAccess(intro != null ? intro.chkhandicap() : null)
-                        .build());
+                spotRepository.findByTourContentId(item.contentid()).ifPresentOrElse(
+                        spot -> spot.updateFromTourApi(
+                                detail != null ? detail.overview() : null,
+                                intro != null ? intro.parking() : null,
+                                intro != null ? intro.usetime() : null,
+                                intro != null ? intro.restdate() : null,
+                                intro != null ? intro.infocenter() : null,
+                                intro != null ? intro.chkhandicap() : null,
+                                intro != null ? intro.chkbabycarriage() : null,
+                                intro != null ? intro.chkpet() : null
+                        ),
+                        () -> spotRepository.save(Spot.builder()
+                                .name(item.title())
+                                .address(trim(item.addr1()) + (item.addr2() != null ? " " + item.addr2().trim() : ""))
+                                .zipcode(item.zipcode())
+                                .overview(detail != null ? detail.overview() : null)
+                                .latitude(parseDouble(item.mapy()))
+                                .longitude(parseDouble(item.mapx()))
+                                .category(item.cat1())
+                                .cat3(item.cat3())
+                                .source(SpotSource.TOUR_API)
+                                .badge(true)
+                                .tourContentId(item.contentid())
+                                .imageUrl(item.firstimage())
+                                .thumbnailUrl(item.firstimage2())
+                                .status(SpotStatus.APPROVED)
+                                .parking(intro != null ? intro.parking() : null)
+                                .usetime(intro != null ? intro.usetime() : null)
+                                .restdate(intro != null ? intro.restdate() : null)
+                                .infocenter(intro != null ? intro.infocenter() : null)
+                                .strollerAccess(intro != null ? intro.chkbabycarriage() : null)
+                                .petFriendly(intro != null ? intro.chkpet() : null)
+                                .wheelchairAccess(intro != null ? intro.chkhandicap() : null)
+                                .build())
+                );
                 saved++;
             }
 

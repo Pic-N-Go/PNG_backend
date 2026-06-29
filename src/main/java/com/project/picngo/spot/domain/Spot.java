@@ -134,8 +134,17 @@ public class Spot extends BaseTimeEntity {
     @Column(nullable = false)
     private Boolean toilet = false;
 
-    public void updateOverview(String overview) {
+    public void updateFromTourApi(String overview, String parking, String usetime,
+                                   String restdate, String infocenter,
+                                   String wheelchairAccess, String strollerAccess, String petFriendly) {
         this.overview = overview;
+        this.parking = parking;
+        this.usetime = usetime;
+        this.restdate = restdate;
+        this.infocenter = infocenter;
+        this.wheelchairAccess = wheelchairAccess;
+        this.strollerAccess = strollerAccess;
+        this.petFriendly = petFriendly;
     }
 
     @Builder
