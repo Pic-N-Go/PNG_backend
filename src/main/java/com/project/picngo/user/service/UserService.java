@@ -3,7 +3,7 @@ package com.project.picngo.user.service;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
-import com.project.picngo.user.domain.InterestTheme;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.UserResponse;
@@ -49,7 +49,7 @@ public class UserService {
 	}
 
 	@Transactional
-	public User createLocalUser(String email, String encodedPassword, String nickname, Set<InterestTheme> interestThemes) {
+	public User createLocalUser(String email, String encodedPassword, String nickname, Set<SpotCategory> spotCategories) {
 		if (userRepository.existsByEmail(email)) {
 			throw new CustomException(UserErrorCode.EMAIL_ALREADY_EXISTS);
 		}
@@ -58,7 +58,7 @@ public class UserService {
 			throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
 		}
 
-		User user = User.createLocalUser(email, encodedPassword, nickname, interestThemes);
+		User user = User.createLocalUser(email, encodedPassword, nickname, spotCategories);
 		return userRepository.save(user);
 	}
 
@@ -85,9 +85,9 @@ public class UserService {
 	}
 
 	@Transactional
-	public UserResponse updateInterestTheme(Long userId, Set<InterestTheme> interestThemes) {
+	public UserResponse updateUserSpotCategories(Long userId, Set<SpotCategory> spotCategories) {
 		User user = getById(userId);
-		user.updateInterestThemes(interestThemes);
+		user.updateSpotCategories(spotCategories);
 		return UserResponse.from(user);
 	}
 }

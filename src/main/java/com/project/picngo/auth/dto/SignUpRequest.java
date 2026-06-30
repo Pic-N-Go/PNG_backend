@@ -1,6 +1,6 @@
 package com.project.picngo.auth.dto;
 
-import com.project.picngo.user.domain.InterestTheme;
+import com.project.picngo.common.domain.SpotCategory;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -20,6 +20,6 @@ public record SignUpRequest(
 	@Size(max = 50)
 	String nickname,
 
-	Set<InterestTheme> interestThemes
+	Set<SpotCategory> spotCategories
 ) {
 }

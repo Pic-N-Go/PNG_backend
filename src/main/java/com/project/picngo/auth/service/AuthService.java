@@ -32,7 +32,7 @@ public class AuthService {
 			request.email(),
 			passwordEncoder.encode(request.password()),
 			request.nickname(),
-				request.interestThemes()
+				request.spotCategories()
 		);
 
 		return createTokenResponse(user);

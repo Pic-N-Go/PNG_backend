@@ -1,6 +1,7 @@
 package com.project.picngo.user.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.common.domain.SpotCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -51,12 +52,12 @@ public class User extends BaseTimeEntity {
 
 	@ElementCollection(fetch = FetchType.LAZY)
 	@CollectionTable(
-			name = "user_interest_themes",
+			name = "user_spot_categories",
 			joinColumns = @JoinColumn(name = "user_id")
 	)
 	@Enumerated(EnumType.STRING)
-	@Column(name = "theme", length = 50)
-	private Set<InterestTheme> interestThemes = new HashSet<>();
+	@Column(name = "category", length = 50)
+	private Set<SpotCategory> spotCategories = new HashSet<>();
 
 	@Builder
 	private User(
@@ -81,7 +82,7 @@ public class User extends BaseTimeEntity {
 			String email,
 			String encodedPassword,
 			String nickname,
-			Set<InterestTheme> interestThemes
+			Set<SpotCategory> spotCategories
 	) {
 		User user = User.builder()
 				.email(email)
@@ -91,15 +92,15 @@ public class User extends BaseTimeEntity {
 				.provider(SocialProvider.LOCAL)
 				.build();
 
-		user.updateInterestThemes(interestThemes);
+		user.updateSpotCategories(spotCategories);
 		return user;
 	}
 
-	public void updateInterestThemes(Set<InterestTheme> interestThemes) {
-		this.interestThemes.clear();
+	public void updateSpotCategories(Set<SpotCategory> spotCategories) {
+		this.spotCategories.clear();
 
-		if (interestThemes != null) {
-			this.interestThemes.addAll(interestThemes);
+		if (spotCategories != null) {
+			this.spotCategories.addAll(spotCategories);
 		}
 	}
 

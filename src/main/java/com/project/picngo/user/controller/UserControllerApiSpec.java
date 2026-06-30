@@ -1,8 +1,8 @@
 package com.project.picngo.user.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
-import com.project.picngo.user.dto.InterestThemeUpdateRequest;
 import com.project.picngo.user.dto.UserResponse;
+import com.project.picngo.user.dto.UserSpotCategoryUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,8 +19,8 @@ public interface UserControllerApiSpec {
 	);
 
 	@Operation(summary = "내 관심테마 수정", description = "현재 인증된 사용자의 관심 테마를 수정합니다.")
-	ResponseEntity<UserResponse> updateInterestThemes(
+	ResponseEntity<UserResponse> updateSpotCategories(
 			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-			@RequestBody InterestThemeUpdateRequest request
+			@RequestBody UserSpotCategoryUpdateRequest request
 	);
 }
