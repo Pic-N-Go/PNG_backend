@@ -1,13 +1,6 @@
 package com.project.picngo.auth.controller;
 
-import com.project.picngo.auth.dto.EmailConfirmRequest;
-import com.project.picngo.auth.dto.EmailVerificationRequest;
-import com.project.picngo.auth.dto.EmailVerificationResponse;
-import com.project.picngo.auth.dto.KakaoLoginRequest;
-import com.project.picngo.auth.dto.LoginRequest;
-import com.project.picngo.auth.dto.NicknameCheckResponse;
-import com.project.picngo.auth.dto.SignUpRequest;
-import com.project.picngo.auth.dto.TokenResponse;
+import com.project.picngo.auth.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,5 +30,15 @@ public interface AuthControllerApiSpec {
 	@Operation(summary = "닉네임 중복 확인", description = "요청한 닉네임을 사용할 수 있는지 확인합니다.")
 	ResponseEntity<NicknameCheckResponse> checkNickname(
 		@Parameter(description = "중복 확인할 닉네임") @RequestParam String value
+	);
+
+	@Operation(summary = "비밀번호 재설정 인증 코드 발송", description = "가입된 이메일로 비밀번호 재설정 인증 코드를 발송합니다.")
+	ResponseEntity<EmailVerificationResponse> sendPasswordResetCode(
+			@Valid @RequestBody PasswordResetCodeRequest request
+	);
+
+	@Operation(summary = "비밀번호 재설정", description = "이메일과 인증 코드, 새 비밀번호를 검증하여 비밀번호를 변경합니다.")
+	ResponseEntity<Void> resetPassword(
+			@Valid @RequestBody PasswordResetRequest request
 	);
 }

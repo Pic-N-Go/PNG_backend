@@ -1,5 +1,9 @@
 package com.project.picngo.user.service;
 
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.AuthErrorCode;
+import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.UserResponse;
@@ -9,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -19,12 +24,12 @@ public class UserService {
 
 	public User getByEmail(String email) {
 		return userRepository.findByEmail(email)
-			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 	}
 
 	public User getById(Long userId) {
 		return userRepository.findById(userId)
-			.orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+			.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 	}
 
 	public boolean existsByEmail(String email) {
@@ -44,16 +49,16 @@ public class UserService {
 	}
 
 	@Transactional
-	public User createLocalUser(String email, String encodedPassword, String nickname) {
+	public User createLocalUser(String email, String encodedPassword, String nickname, Set<SpotCategory> spotCategories) {
 		if (userRepository.existsByEmail(email)) {
-			throw new IllegalArgumentException("이미 가입된 이메일입니다.");
+			throw new CustomException(UserErrorCode.EMAIL_ALREADY_EXISTS);
 		}
 
 		if (userRepository.existsByNickname(nickname)) {
-			throw new IllegalArgumentException("이미 사용 중인 닉네임입니다.");
+			throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
 		}
 
-		User user = User.createLocalUser(email, encodedPassword, nickname);
+		User user = User.createLocalUser(email, encodedPassword, nickname, spotCategories);
 		return userRepository.save(user);
 	}
 
@@ -72,10 +77,17 @@ public class UserService {
 			})
 			.orElseGet(() -> {
 				if (userRepository.existsByEmail(email)) {
-					throw new IllegalArgumentException("이미 다른 로그인 방식으로 가입된 이메일입니다.");
+					throw new CustomException(AuthErrorCode.SOCIAL_EMAIL_ALREADY_EXISTS);
 				}
 
 				return userRepository.save(User.createSocialUser(email, nickname, profileImageUrl, provider, providerId));
 			});
+	}
+
+	@Transactional
+	public UserResponse updateUserSpotCategories(Long userId, Set<SpotCategory> spotCategories) {
+		User user = getById(userId);
+		user.updateSpotCategories(spotCategories);
+		return UserResponse.from(user);
 	}
 }
