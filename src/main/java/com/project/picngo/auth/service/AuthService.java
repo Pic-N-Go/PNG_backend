@@ -1,14 +1,9 @@
 package com.project.picngo.auth.service;
 
-import com.project.picngo.auth.dto.EmailConfirmRequest;
-import com.project.picngo.auth.dto.EmailVerificationRequest;
-import com.project.picngo.auth.dto.EmailVerificationResponse;
-import com.project.picngo.auth.dto.KakaoLoginRequest;
-import com.project.picngo.auth.dto.KakaoProfile;
-import com.project.picngo.auth.dto.LoginRequest;
-import com.project.picngo.auth.dto.NicknameCheckResponse;
-import com.project.picngo.auth.dto.SignUpRequest;
-import com.project.picngo.auth.dto.TokenResponse;
+import com.project.picngo.auth.domain.EmailVerificationPurpose;
+import com.project.picngo.auth.dto.*;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.UserResponse;
@@ -36,7 +31,8 @@ public class AuthService {
 		User user = userService.createLocalUser(
 			request.email(),
 			passwordEncoder.encode(request.password()),
-			request.nickname()
+			request.nickname(),
+				request.spotCategories()
 		);
 
 		return createTokenResponse(user);
@@ -44,10 +40,10 @@ public class AuthService {
 
 	public TokenResponse login(LoginRequest request) {
 		User user = userService.findByEmail(request.email())
-				.orElseThrow(() -> new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다."));
+				.orElseThrow(() -> new CustomException(AuthErrorCode.INVALID_LOGIN));
 
 		if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
-			throw new IllegalArgumentException("이메일 또는 비밀번호가 올바르지 않습니다.");
+			throw new CustomException(AuthErrorCode.INVALID_LOGIN);
 		}
 
 		return createTokenResponse(user);
@@ -69,10 +65,10 @@ public class AuthService {
 
 	public EmailVerificationResponse sendEmailVerificationCode(EmailVerificationRequest request) {
 		if (userService.existsByEmail(request.email())) {
-			throw new IllegalArgumentException("이미 가입된 이메일입니다.");
+			throw new CustomException(AuthErrorCode.EMAIL_ALREADY_EXISTS);
 		}
 
-		return emailVerificationService.issueCode(request.email());
+		return emailVerificationService.issueCode(request.email(), EmailVerificationPurpose.SIGN_UP);
 	}
 
 	public EmailVerificationResponse confirmEmailVerificationCode(EmailConfirmRequest request) {
@@ -91,4 +87,18 @@ public class AuthService {
 			UserResponse.from(user)
 		);
 	}
+
+	public EmailVerificationResponse sendPasswordResetCode(PasswordResetCodeRequest request) {
+		userService.getByEmail(request.email());
+		return emailVerificationService.issueCode(request.email(), EmailVerificationPurpose.PASSWORD_RESET);
+	}
+
+	@Transactional
+	public void resetPassword(PasswordResetRequest request) {
+		emailVerificationService.confirmCode(request.email(), request.code());
+
+		User user = userService.getByEmail(request.email());
+		user.updatePassword(passwordEncoder.encode(request.newPassword()));
+	}
+
 }

@@ -20,13 +20,13 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
     private final FcmService fcmService;
 
+    @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
         return notificationRepository.findAllByUserId(userId).stream()
                 .map(NotificationResponse::from)
@@ -66,10 +66,9 @@ public class NotificationService {
     }
 
 
-    @Transactional
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
         notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
-            if (setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
+            if (Boolean.TRUE.equals(setting.getIsAllPushEnabled()) && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
                 try {
                     fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink);
                 } catch (Exception e) {
@@ -88,11 +87,17 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    @Transactional
     @Scheduled(cron = "0 0 3 * * *")
     public void deleteOldNotifications() {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
-        notificationRepository.deleteByCreatedAtBefore(cutoff);
-        log.info("Old notifications before {} have been deleted.", cutoff);
+        int deletedCount;
+        int totalDeleted = 0;
+        
+        do {
+            deletedCount = notificationRepository.deleteByCreatedAtBeforeWithLimit(cutoff, 1000);
+            totalDeleted += deletedCount;
+        } while (deletedCount == 1000);
+        
+        log.info("Old notifications before {} have been deleted. Total deleted: {}", cutoff, totalDeleted);
     }
 }

@@ -1,6 +1,8 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.auth.dto.KakaoProfile;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.AuthErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -64,7 +66,7 @@ public class KakaoAuthClient {
 			});
 
 		if (response == null || response.get("access_token") == null) {
-			throw new IllegalStateException("카카오 액세스 토큰을 발급받지 못했습니다.");
+			throw new CustomException(AuthErrorCode.KAKAO_TOKEN_ISSUE_FAILED);
 		}
 
 		return response.get("access_token").toString();
@@ -81,7 +83,7 @@ public class KakaoAuthClient {
 			});
 
 		if (response == null || response.get("id") == null) {
-			throw new IllegalStateException("카카오 사용자 정보를 조회하지 못했습니다.");
+			throw new CustomException(AuthErrorCode.KAKAO_PROFILE_FETCH_FAILED);
 		}
 
 		String providerId = response.get("id").toString();
@@ -97,7 +99,7 @@ public class KakaoAuthClient {
 
 	private void validateKakaoProperties() {
 		if (clientId.isBlank() || redirectUri.isBlank()) {
-			throw new IllegalStateException("카카오 로그인 설정이 필요합니다.");
+			throw new CustomException(AuthErrorCode.KAKAO_LOGIN_CONFIG_REQUIRED);
 		}
 	}
 

@@ -1,24 +1,12 @@
 package com.project.picngo.auth.controller;
 
-import com.project.picngo.auth.dto.EmailConfirmRequest;
-import com.project.picngo.auth.dto.EmailVerificationRequest;
-import com.project.picngo.auth.dto.EmailVerificationResponse;
-import com.project.picngo.auth.dto.KakaoLoginRequest;
-import com.project.picngo.auth.dto.LoginRequest;
-import com.project.picngo.auth.dto.NicknameCheckResponse;
-import com.project.picngo.auth.dto.SignUpRequest;
-import com.project.picngo.auth.dto.TokenResponse;
+import com.project.picngo.auth.dto.*;
 import com.project.picngo.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -57,5 +45,19 @@ public class AuthController implements AuthControllerApiSpec {
 	@GetMapping("/nickname/check")
 	public ResponseEntity<NicknameCheckResponse> checkNickname(@RequestParam String value) {
 		return ResponseEntity.ok(authService.checkNickname(value));
+	}
+
+	@PostMapping("/password/reset/code")
+	public ResponseEntity<EmailVerificationResponse> sendPasswordResetCode(
+			@Valid @RequestBody PasswordResetCodeRequest request) {
+		return ResponseEntity.ok(authService.sendPasswordResetCode(request));
+	}
+
+	@PostMapping("/password/reset")
+	public ResponseEntity<Void> resetPassword(
+			@Valid @RequestBody PasswordResetRequest request
+	){
+		authService.resetPassword(request);
+		return ResponseEntity.noContent().build();
 	}
 }

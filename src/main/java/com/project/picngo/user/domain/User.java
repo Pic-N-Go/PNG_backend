@@ -1,12 +1,14 @@
 package com.project.picngo.user.domain;
 
+import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.common.domain.SpotCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 @Entity
@@ -19,7 +21,7 @@ import java.time.LocalDateTime;
 	}
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class User {
+public class User extends BaseTimeEntity {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -48,11 +50,14 @@ public class User {
 	@Column(name = "provider_id", length = 100)
 	private String providerId;
 
-	@Column(nullable = false)
-	private LocalDateTime createdAt;
-
-	@Column(nullable = false)
-	private LocalDateTime updatedAt;
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(
+			name = "user_spot_categories",
+			joinColumns = @JoinColumn(name = "user_id")
+	)
+	@Enumerated(EnumType.STRING)
+	@Column(name = "category", length = 50)
+	private Set<SpotCategory> spotCategories = new HashSet<>();
 
 	@Builder
 	private User(
@@ -73,14 +78,30 @@ public class User {
 		this.providerId = providerId;
 	}
 
-	public static User createLocalUser(String email, String encodedPassword, String nickname) {
-		return User.builder()
-			.email(email)
-			.password(encodedPassword)
-			.nickname(nickname)
-			.role(Role.USER)
-			.provider(SocialProvider.LOCAL)
-			.build();
+	public static User createLocalUser(
+			String email,
+			String encodedPassword,
+			String nickname,
+			Set<SpotCategory> spotCategories
+	) {
+		User user = User.builder()
+				.email(email)
+				.password(encodedPassword)
+				.nickname(nickname)
+				.role(Role.USER)
+				.provider(SocialProvider.LOCAL)
+				.build();
+
+		user.updateSpotCategories(spotCategories);
+		return user;
+	}
+
+	public void updateSpotCategories(Set<SpotCategory> spotCategories) {
+		this.spotCategories.clear();
+
+		if (spotCategories != null) {
+			this.spotCategories.addAll(spotCategories);
+		}
 	}
 
 	public static User createSocialUser(
@@ -105,15 +126,7 @@ public class User {
 		this.profileImageUrl = profileImageUrl;
 	}
 
-	@PrePersist
-	protected void onCreate() {
-		LocalDateTime now = LocalDateTime.now();
-		this.createdAt = now;
-		this.updatedAt = now;
-	}
-
-	@PreUpdate
-	protected void onUpdate() {
-		this.updatedAt = LocalDateTime.now();
+	public void updatePassword(String encodedPassword) {
+		this.password = encodedPassword;
 	}
 }

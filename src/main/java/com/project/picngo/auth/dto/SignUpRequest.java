@@ -1,8 +1,11 @@
 package com.project.picngo.auth.dto;
 
+import com.project.picngo.common.domain.SpotCategory;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+
+import java.util.Set;
 
 public record SignUpRequest(
 	@NotBlank
@@ -15,6 +18,8 @@ public record SignUpRequest(
 
 	@NotBlank
 	@Size(max = 50)
-	String nickname
+	String nickname,
+
+	Set<SpotCategory> spotCategories
 ) {
 }

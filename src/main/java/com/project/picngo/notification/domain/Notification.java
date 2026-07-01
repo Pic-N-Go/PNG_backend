@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
+@Table(indexes = @Index(name = "idx_notification_created_at", columnList = "createdAt"))
 public class Notification {
 
     @Id
