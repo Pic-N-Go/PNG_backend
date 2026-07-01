@@ -20,13 +20,13 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
     private final FcmService fcmService;
 
+    @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
         return notificationRepository.findAllByUserId(userId).stream()
                 .map(NotificationResponse::from)
@@ -66,10 +66,9 @@ public class NotificationService {
     }
 
 
-    @Transactional
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
         notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
-            if (setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
+            if (Boolean.TRUE.equals(setting.getIsAllPushEnabled()) && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
                 try {
                     fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink);
                 } catch (Exception e) {
