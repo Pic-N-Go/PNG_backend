@@ -13,7 +13,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Component
@@ -54,8 +56,32 @@ public class WeatherClient {
         }
 
         List<WeatherForecastResponse> result = new ArrayList<>();
-        if (apiResponse != null && apiResponse.response().body() != null) {
-            result.add(new WeatherForecastResponse(date, "1200", "CLEAR", 22.5));
+        if (apiResponse != null && apiResponse.response() != null && apiResponse.response().body() != null && apiResponse.response().body().items() != null) {
+            Map<String, Map<String, String>> groupedData = new HashMap<>();
+            
+            for (KmaWeatherApiResponse.Item item : apiResponse.response().body().items().item()) {
+                String key = item.fcstDate() + item.fcstTime();
+                groupedData.putIfAbsent(key, new HashMap<>());
+                groupedData.get(key).put(item.category(), item.fcstValue());
+            }
+
+            for (Map.Entry<String, Map<String, String>> entry : groupedData.entrySet()) {
+                String key = entry.getKey();
+                String fcstDate = key.substring(0, 8);
+                String fcstTime = key.substring(8);
+                Map<String, String> values = entry.getValue();
+
+                String pty = values.getOrDefault("PTY", "0");
+                String sky = values.getOrDefault("SKY", "1");
+                String tmpStr = values.getOrDefault("TMP", "0");
+                
+                String weatherStatus = "CLEAR";
+                if ("1".equals(pty) || "4".equals(pty)) weatherStatus = "RAINY";
+                else if ("2".equals(pty) || "3".equals(pty)) weatherStatus = "SNOWY";
+                else if ("3".equals(sky) || "4".equals(sky)) weatherStatus = "CLOUDY";
+
+                result.add(new WeatherForecastResponse(fcstDate, fcstTime, weatherStatus, Double.parseDouble(tmpStr)));
+            }
         }
         return result;
     }

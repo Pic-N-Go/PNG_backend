@@ -1,14 +1,22 @@
 package com.project.picngo.notification.service;
 
+import com.project.picngo.external.WeatherClient;
+import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
+import com.project.picngo.wishlist.domain.WishlistItem;
+import com.project.picngo.wishlist.domain.enums.TimeCondition;
+import com.project.picngo.wishlist.domain.enums.WeatherCondition;
+import com.project.picngo.wishlist.repository.WishlistItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Slf4j
@@ -17,7 +25,9 @@ import java.util.List;
 public class NotificationScheduler {
 
     private final NotificationSettingRepository notificationSettingRepository;
-    private final FcmService fcmService;
+    private final NotificationService notificationService;
+    private final WishlistItemRepository wishlistItemRepository;
+    private final WeatherClient weatherClient;
 
     // 매일 아침 7시에 실행
     @Scheduled(cron = "0 0 7 * * *")
@@ -28,19 +38,40 @@ public class NotificationScheduler {
                 .filter(setting -> !isDndActive(setting))
                 .toList();
 
+        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
         for (NotificationSetting setting : activeSettings) {
-            // TODO: 해당 유저의 위시리스트(WishlistItem) 좌표 및 날씨/일출 API(WeatherClient) 연동을 통한 조건 부합 여부 판단 로직
+            Long userId = setting.getUserId();
+            List<WishlistItem> userItems = wishlistItemRepository.findAllByWishlist_UserIdAndIsActiveTrue(userId);
             
-            // 임시 푸시 알림 발송 (테스트용)
-            String token = setting.getFcmToken();
-            String title = "오늘의 추천 여행지 알림 ☀️";
-            String body = "회원님의 위시리스트 날씨 조건과 완벽하게 일치하는 날입니다!";
-            
-            try {
-                fcmService.sendMessage(token, title, body, null);
-                log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료", setting.getUserId());
-            } catch (Exception e) {
-                log.error("유저 {} 에게 스케줄러 푸시 알림 발송 중 오류 발생", setting.getUserId(), e);
+            for (WishlistItem item : userItems) {
+                // 임시 하드코딩 위경도 (Spot 도메인 연동 전까지 서울 좌표 사용)
+                Double lat = 37.5665;
+                Double lng = 126.9780;
+
+                try {
+                    List<WeatherForecastResponse> forecasts = weatherClient.getForecast(lat, lng, today);
+                    
+                    // 조건 확인 (간단하게 첫 번째 예보와 유저의 weatherCondition이 맞는지 확인)
+                    if (!forecasts.isEmpty()) {
+                        WeatherForecastResponse forecast = forecasts.get(0);
+                        String apiWeather = forecast.weatherStatus();
+                        WeatherCondition userWeather = item.getWeatherCondition();
+                        
+                        boolean weatherMatch = userWeather == WeatherCondition.NONE || apiWeather.equals(userWeather.name());
+                        // TimeCondition (SUNRISE/SUNSET)은 현재 KMA에선 판단하기 어렵지만, 골든아워 API와 연동 로직 추가 가능
+                        
+                        if (weatherMatch) {
+                            String title = "오늘의 추천 여행지 알림 ☀️";
+                            String body = "회원님의 위시리스트 날씨 조건과 완벽하게 일치하는 장소가 있습니다!";
+                            notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, body, "/wishlist/" + item.getWishlist().getId());
+                            log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료 (SpotId: {})", userId, item.getSpotId());
+                            break; // 하루 한 번만 발송하도록 제어
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);
+                }
             }
         }
         
