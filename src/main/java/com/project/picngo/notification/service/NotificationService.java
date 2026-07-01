@@ -87,11 +87,17 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    @Transactional
     @Scheduled(cron = "0 0 3 * * *")
     public void deleteOldNotifications() {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
-        notificationRepository.deleteByCreatedAtBefore(cutoff);
-        log.info("Old notifications before {} have been deleted.", cutoff);
+        int deletedCount;
+        int totalDeleted = 0;
+        
+        do {
+            deletedCount = notificationRepository.deleteByCreatedAtBeforeWithLimit(cutoff, 1000);
+            totalDeleted += deletedCount;
+        } while (deletedCount == 1000);
+        
+        log.info("Old notifications before {} have been deleted. Total deleted: {}", cutoff, totalDeleted);
     }
 }

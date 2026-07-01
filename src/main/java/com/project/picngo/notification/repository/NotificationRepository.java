@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,7 +17,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.userId = :userId AND n.isRead = false")
     void markAllAsReadByUserId(@Param("userId") Long userId);
 
+    @Transactional
     @Modifying
-    @Query("DELETE FROM Notification n WHERE n.createdAt < :cutoff")
-    void deleteByCreatedAtBefore(@Param("cutoff") LocalDateTime cutoff);
+    @Query(value = "DELETE FROM notification WHERE created_at < :cutoff LIMIT :limit", nativeQuery = true)
+    int deleteByCreatedAtBeforeWithLimit(@Param("cutoff") LocalDateTime cutoff, @Param("limit") int limit);
 }
