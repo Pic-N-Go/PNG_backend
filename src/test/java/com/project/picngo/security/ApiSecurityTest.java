@@ -59,7 +59,7 @@ public class ApiSecurityTest {
     @Test
     @DisplayName("위시리스트 API - 토큰 없이 호출하면 차단된다")
     void 위시리스트_API_토큰_없이_호출시_차단() throws Exception {
-        mockMvc.perform(get("/wishlists"))
+        mockMvc.perform(get("/wishlist"))
                 .andExpect(status().is4xxClientError());
     }
 
