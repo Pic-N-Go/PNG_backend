@@ -1,14 +1,15 @@
 package com.project.picngo.user.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.user.dto.UserSpotCategoryUpdateRequest;
 import com.project.picngo.user.dto.UserResponse;
 import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+
 
 @RestController
 @RequiredArgsConstructor
@@ -20,5 +21,15 @@ public class UserController implements UserControllerApiSpec {
 	@GetMapping("/me")
 	public ResponseEntity<UserResponse> me(@AuthenticationPrincipal CustomUserDetails userDetails) {
 		return ResponseEntity.ok(userService.getMyInfo(userDetails.getId()));
+	}
+
+	@PatchMapping("/me/spot-categories")
+	public ResponseEntity<UserResponse> updateSpotCategories(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@RequestBody UserSpotCategoryUpdateRequest request
+			){
+		return ResponseEntity.ok(
+				userService.updateUserSpotCategories(userDetails.getId(), request.spotCategories())
+		);
 	}
 }

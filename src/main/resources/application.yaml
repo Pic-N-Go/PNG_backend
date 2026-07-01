@@ -1,4 +1,6 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: picngo
 
@@ -50,4 +52,4 @@ jwt:
 
 firebase:
   config:
-    path: ${FIREBASE_CONFIG_PATH}
+    path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
