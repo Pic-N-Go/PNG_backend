@@ -18,7 +18,7 @@ public interface AuthControllerApiSpec {
 	@Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 일반 회원을 인증하고 액세스 토큰을 반환합니다.")
 	ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request);
 
-	@Operation(summary = "카카오 로그인", description = "카카오 인가 코드로 사용자를 인증하고, 가입 이력이 없으면 소셜 회원을 생성한 뒤 액세스 토큰을 반환합니다.")
+	@Operation(summary = "카카오 로그인", description = "카카오 SDK에서 발급받은 accessToken으로 사용자를 인증하고, 가입 이력이 없으면 소셜 회원을 생성한 뒤 서비스 액세스 토큰을 반환합니다.")
 	ResponseEntity<TokenResponse> loginWithKakao(@Valid @RequestBody KakaoLoginRequest request);
 
 	@Operation(summary = "이메일 인증 코드 발송", description = "아직 가입되지 않은 이메일 주소로 인증 코드를 발송합니다.")

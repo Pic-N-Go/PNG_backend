@@ -6,10 +6,7 @@ import com.project.picngo.common.exception.code.AuthErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
@@ -23,53 +20,11 @@ public class KakaoAuthClient {
 		this.restClient = restClientBuilder.build();
 	}
 
-	@Value("${kakao.auth.token-url}")
-	private String tokenUrl;
-
 	@Value("${kakao.auth.user-info-url}")
 	private String userInfoUrl;
 
-	@Value("${kakao.auth.client-id}")
-	private String clientId;
-
-	@Value("${kakao.auth.client-secret}")
-	private String clientSecret;
-
-	@Value("${kakao.auth.redirect-uri}")
-	private String redirectUri;
-
-	public KakaoProfile getProfile(String authorizationCode) {
-		String accessToken = requestAccessToken(authorizationCode);
+	public KakaoProfile getProfile(String accessToken) {
 		return requestProfile(accessToken);
-	}
-
-	private String requestAccessToken(String authorizationCode) {
-		validateKakaoProperties();
-
-		MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-		form.add("grant_type", "authorization_code");
-		form.add("client_id", clientId);
-		form.add("redirect_uri", redirectUri);
-		form.add("code", authorizationCode);
-
-		if (!clientSecret.isBlank()) {
-			form.add("client_secret", clientSecret);
-		}
-
-		Map<String, Object> response = restClient
-			.post()
-			.uri(tokenUrl)
-			.contentType(MediaType.APPLICATION_FORM_URLENCODED)
-			.body(form)
-			.retrieve()
-			.body(new ParameterizedTypeReference<>() {
-			});
-
-		if (response == null || response.get("access_token") == null) {
-			throw new CustomException(AuthErrorCode.KAKAO_TOKEN_ISSUE_FAILED);
-		}
-
-		return response.get("access_token").toString();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -95,12 +50,6 @@ public class KakaoAuthClient {
 		String profileImageUrl = valueOrDefault(profile.get("profile_image_url"), null);
 
 		return new KakaoProfile(providerId, email, nickname, profileImageUrl);
-	}
-
-	private void validateKakaoProperties() {
-		if (clientId.isBlank() || redirectUri.isBlank()) {
-			throw new CustomException(AuthErrorCode.KAKAO_LOGIN_CONFIG_REQUIRED);
-		}
 	}
 
 	private String valueOrDefault(Object value, String defaultValue) {

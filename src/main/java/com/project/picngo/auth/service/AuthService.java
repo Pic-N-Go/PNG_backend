@@ -51,7 +51,7 @@ public class AuthService {
 
 	@Transactional
 	public TokenResponse loginWithKakao(KakaoLoginRequest request) {
-		KakaoProfile profile = kakaoAuthClient.getProfile(request.code());
+		KakaoProfile profile = kakaoAuthClient.getProfile(request.accessToken());
 		User user = userService.getOrCreateSocialUser(
 			profile.email(),
 			profile.nickname(),
