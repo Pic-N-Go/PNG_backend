@@ -102,6 +102,43 @@ class CourseFacadeTest {
     }
 
     @Test
+    @DisplayName("코스 스팟 중간 삽입 시 기존 스팟 순서(Shift) 검증")
+    void addCourseSpot_shiftsExistingOrders() {
+        // given
+        Course course = createCourseFixture();
+        CourseSpot spot1 = createSpotFixture(course, 1L, 1, 1);
+        CourseSpot spot2 = createSpotFixture(course, 2L, 1, 2);
+        course.getCourseSpots().addAll(new ArrayList<>(List.of(spot1, spot2)));
+
+        when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+        when(courseSpotRepository.save(any(CourseSpot.class))).thenAnswer(inv -> {
+            CourseSpot saved = inv.getArgument(0);
+            ReflectionTestUtils.setField(saved, "id", 3L);
+            return saved;
+        });
+        
+        // 1번 순서로 새 스팟을 삽입 (기존 1->2, 2->3 으로 밀려야 함)
+        CourseSpotAddRequest request = new CourseSpotAddRequest(300L, 1, 1, "중간 삽입 스팟");
+
+        // when
+        courseFacade.addCourseSpot(1L, request);
+
+        // then
+        assertThat(course.getCourseSpots()).hasSize(3);
+        
+        // 기존 스팟들의 순서가 +1씩 밀렸는지 검증
+        assertThat(spot1.getSequenceOrder()).isEqualTo(2);
+        assertThat(spot2.getSequenceOrder()).isEqualTo(3);
+        
+        // 새 스팟은 1번으로 들어갔는지 검증
+        CourseSpot newSpot = course.getCourseSpots().stream()
+                .filter(s -> s.getId().equals(3L))
+                .findFirst()
+                .get();
+        assertThat(newSpot.getSequenceOrder()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("코스 스팟 삭제 시 남은 동선 재계산 검증")
     void removeCourseSpot_recalculatesTravelTime() {
         // given

@@ -90,6 +90,12 @@ public class CourseService {
     public CourseSpotResponse addCourseSpotInternal(Long courseId, CourseSpotAddRequest request) {
         Course course = findCourseOrThrow(courseId);
 
+        // 중복 순서 방지(Shift) 로직: 같은 일차에서 추가되는 순서보다 크거나 같은 기존 스팟들의 순서를 +1씩 밀어줌
+        course.getCourseSpots().stream()
+                .filter(cs -> cs.getDayNumber().equals(request.dayNumber()))
+                .filter(cs -> cs.getSequenceOrder() >= request.sequenceOrder())
+                .forEach(cs -> cs.updateOrder(cs.getSequenceOrder() + 1));
+
         CourseSpot courseSpot = CourseSpot.builder()
                 .course(course)
                 .spotId(request.spotId())
