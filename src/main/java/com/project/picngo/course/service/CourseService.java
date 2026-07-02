@@ -102,7 +102,9 @@ public class CourseService {
         CourseSpot saved = courseSpotRepository.save(courseSpot);
         
         // 영속성 컨텍스트에 새 스팟을 추가한 뒤 해당 일차의 이동 시간 재계산
-        course.getCourseSpots().add(saved);
+        if (!course.getCourseSpots().contains(saved)) {
+            course.getCourseSpots().add(saved);
+        }
         recalculateTravelTimesForDay(course, request.dayNumber());
         
         return toCourseSpotResponse(saved);
