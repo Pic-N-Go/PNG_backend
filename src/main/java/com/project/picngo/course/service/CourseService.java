@@ -7,7 +7,7 @@ import com.project.picngo.course.domain.CourseSpot;
 import com.project.picngo.course.repository.CourseChecklistRepository;
 import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.course.repository.CourseSpotRepository;
-import com.project.picngo.external.DirectionsClient;
+
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CourseSpotRepository courseSpotRepository;
     private final CourseChecklistRepository courseChecklistRepository;
-    private final DirectionsClient directionsClient;
+
 
     // ==================== 코스 CRUD ====================
 
@@ -84,10 +84,10 @@ public class CourseService {
         courseRepository.delete(course);
     }
 
-    // ==================== 코스 스팟 관리 ====================
+    // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
 
     @Transactional
-    public CourseSpotResponse addCourseSpot(Long courseId, CourseSpotAddRequest request) {
+    public CourseSpotResponse addCourseSpotInternal(Long courseId, CourseSpotAddRequest request) {
         Course course = findCourseOrThrow(courseId);
 
         CourseSpot courseSpot = CourseSpot.builder()
@@ -96,42 +96,38 @@ public class CourseService {
                 .dayNumber(request.dayNumber())
                 .sequenceOrder(request.sequenceOrder())
                 .memo(request.memo())
-                .travelTimeMinutes(null) // 재계산 로직에서 채워짐
+                .travelTimeMinutes(null) // Facade에서 계산 후 업데이트
                 .build();
 
         CourseSpot saved = courseSpotRepository.save(courseSpot);
         
-        // 영속성 컨텍스트에 새 스팟을 추가한 뒤 해당 일차의 이동 시간 재계산
         if (!course.getCourseSpots().contains(saved)) {
             course.getCourseSpots().add(saved);
         }
-        recalculateTravelTimesForDay(course, request.dayNumber());
         
         return toCourseSpotResponse(saved);
     }
 
     @Transactional
-    public void removeCourseSpot(Long courseId, Long spotId) {
+    public Integer removeCourseSpotInternal(Long courseId, Long spotId) {
         Course course = findCourseOrThrow(courseId);
         
-        course.getCourseSpots().stream()
+        return course.getCourseSpots().stream()
                 .filter(cs -> cs.getId().equals(spotId))
                 .findFirst()
-                .ifPresent(spot -> {
+                .map(spot -> {
                     Integer dayNumber = spot.getDayNumber();
                     course.getCourseSpots().remove(spot);
                     courseSpotRepository.delete(spot);
-                    
-                    // 중간 장소가 빠졌으므로 동선 재계산
-                    recalculateTravelTimesForDay(course, dayNumber);
-                });
+                    return dayNumber;
+                })
+                .orElse(null);
     }
 
     @Transactional
-    public void updateSpotOrder(Long courseId, CourseSpotOrderUpdateRequest request) {
+    public Integer updateSpotOrderInternal(Long courseId, CourseSpotOrderUpdateRequest request) {
         Course course = findCourseOrThrow(courseId);
 
-        // spotId 리스트 순서대로 sequenceOrder를 재배정
         Map<Long, CourseSpot> spotMap = course.getCourseSpots().stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
@@ -146,11 +142,26 @@ public class CourseService {
                 }
             }
         }
-        
-        // 순서가 재배정된 해당 일차의 전체 소요시간 재계산
-        if (dayNumber != null) {
-            recalculateTravelTimesForDay(course, dayNumber);
-        }
+        return dayNumber;
+    }
+
+    public List<CourseSpotResponse> getDaySpots(Long courseId, Integer dayNumber) {
+        Course course = findCourseOrThrow(courseId);
+        return course.getCourseSpots().stream()
+                .filter(cs -> cs.getDayNumber().equals(dayNumber))
+                .sorted((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()))
+                .map(this::toCourseSpotResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void updateTravelTimes(Long courseId, Map<Long, Integer> travelTimeUpdates) {
+        Course course = findCourseOrThrow(courseId);
+        course.getCourseSpots().forEach(spot -> {
+            if (travelTimeUpdates.containsKey(spot.getId())) {
+                spot.updateTravelTime(travelTimeUpdates.get(spot.getId()));
+            }
+        });
     }
 
     // ==================== Private 헬퍼 메서드 ====================
@@ -158,42 +169,6 @@ public class CourseService {
     private Course findCourseOrThrow(Long courseId) {
         return courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
-    }
-
-    /**
-     * 특정 일차(dayNumber)의 모든 스팟을 순서대로 정렬한 뒤
-     * 처음부터 끝까지 전체 구간의 이동 시간을 동적으로 재계산합니다.
-     */
-    private void recalculateTravelTimesForDay(Course course, Integer dayNumber) {
-        List<CourseSpot> daySpots = course.getCourseSpots().stream()
-                .filter(cs -> cs.getDayNumber().equals(dayNumber))
-                .sorted((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()))
-                .toList();
-
-        if (daySpots.isEmpty()) return;
-
-        // 첫 번째 장소는 이동 시간이 없으므로 null 처리
-        daySpots.get(0).updateTravelTime(null);
-
-        // 두 번째 장소부터 앞 장소와의 이동 시간 계산
-        for (int i = 1; i < daySpots.size(); i++) {
-            CourseSpot currentSpot = daySpots.get(i);
-            
-            // TODO: 실제 Spot 엔티티에서 위경도를 가져와야 하나 현재는 도메인이 없으므로 안전한 좌표 하드코딩
-            // 서울역 -> 강남역 좌표 사용
-            Double startLat = 37.5546;
-            Double startLng = 126.9725;
-            Double goalLat = 37.4979;
-            Double goalLng = 127.0276;
-
-            try {
-                Integer travelTime = directionsClient.getTravelTimeMinutes(startLat, startLng, goalLat, goalLng);
-                currentSpot.updateTravelTime(travelTime);
-            } catch (Exception e) {
-                // 에러 발생 시 임의의 30분 처리로 기능 마비 방지
-                currentSpot.updateTravelTime(30);
-            }
-        }
     }
 
     // ==================== Entity → DTO 변환 ====================

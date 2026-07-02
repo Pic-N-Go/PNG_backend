@@ -5,13 +5,14 @@ import com.project.picngo.course.domain.CourseSpot;
 import com.project.picngo.course.dto.CourseSpotAddRequest;
 import com.project.picngo.course.dto.CourseSpotOrderUpdateRequest;
 import com.project.picngo.course.dto.CourseSpotResponse;
+import com.project.picngo.course.repository.CourseChecklistRepository;
 import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.course.repository.CourseSpotRepository;
 import com.project.picngo.external.DirectionsClient;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -26,10 +27,10 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class CourseServiceTest {
+class CourseFacadeTest {
 
-    @InjectMocks
     private CourseService courseService;
+    private CourseFacade courseFacade;
 
     @Mock
     private CourseRepository courseRepository;
@@ -38,7 +39,16 @@ class CourseServiceTest {
     private CourseSpotRepository courseSpotRepository;
 
     @Mock
+    private CourseChecklistRepository courseChecklistRepository;
+
+    @Mock
     private DirectionsClient directionsClient;
+
+    @BeforeEach
+    void setUp() {
+        courseService = new CourseService(courseRepository, courseSpotRepository, courseChecklistRepository);
+        courseFacade = new CourseFacade(courseService, directionsClient);
+    }
 
     private Course createCourseFixture() {
         Course course = Course.builder()
@@ -76,22 +86,18 @@ class CourseServiceTest {
             return saved;
         });
         when(directionsClient.getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(45); // 이동시간 45분으로 Mocking
+                .thenReturn(45);
 
         CourseSpotAddRequest request = new CourseSpotAddRequest(200L, 1, 2, "두번째 스팟");
 
         // when
-        CourseSpotResponse response = courseService.addCourseSpot(1L, request);
+        CourseSpotResponse response = courseFacade.addCourseSpot(1L, request);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(2);
-        
-        // 첫 번째 스팟은 이동시간이 없어야 함 (null)
         assertThat(course.getCourseSpots().get(0).getTravelTimeMinutes()).isNull();
-        // 두 번째 추가된 스팟은 이동시간이 45분으로 계산되어야 함
         assertThat(course.getCourseSpots().get(1).getTravelTimeMinutes()).isEqualTo(45);
         
-        // 길찾기 API가 1번 호출되었는지 검증 (첫번째 스팟은 null 처리되므로 두번째 스팟에서 1번만 호출됨)
         verify(directionsClient, times(1)).getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble());
     }
 
@@ -107,24 +113,21 @@ class CourseServiceTest {
 
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
         when(directionsClient.getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(60); // 재계산 시 이동시간 60분으로 Mocking
+                .thenReturn(60);
 
-        // when: 중간 스팟(spot2)을 삭제
-        courseService.removeCourseSpot(1L, 2L);
+        // when
+        courseFacade.removeCourseSpot(1L, 2L);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(2);
         verify(courseSpotRepository).delete(spot2);
 
-        // 삭제 후 첫번째 자리는 spot1 (이동시간 null)
         assertThat(course.getCourseSpots().get(0).getId()).isEqualTo(1L);
         assertThat(course.getCourseSpots().get(0).getTravelTimeMinutes()).isNull();
 
-        // 재계산 후 두번째 자리는 spot3 (이동시간 60분)
         assertThat(course.getCourseSpots().get(1).getId()).isEqualTo(3L);
         assertThat(course.getCourseSpots().get(1).getTravelTimeMinutes()).isEqualTo(60);
         
-        // 삭제 로직 안에서 남아있는 스팟(2개)에 대해 재계산이 일어나므로, API는 1번 호출됨
         verify(directionsClient, times(1)).getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble());
     }
 
@@ -140,28 +143,22 @@ class CourseServiceTest {
 
         when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
         when(directionsClient.getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(20); // 순서 변경 후 각 이동시간 20분으로 Mocking
+                .thenReturn(20);
 
-        // 역순(3 -> 2 -> 1)으로 순서 변경 요청
         CourseSpotOrderUpdateRequest request = new CourseSpotOrderUpdateRequest(List.of(3L, 2L, 1L));
 
         // when
-        courseService.updateSpotOrder(1L, request);
+        courseFacade.updateSpotOrder(1L, request);
 
         // then
-        // 1번 순서가 된 기존 spot3
-        // 2번 순서가 된 기존 spot2
-        // 3번 순서가 된 기존 spot1
         assertThat(spot3.getSequenceOrder()).isEqualTo(1);
         assertThat(spot2.getSequenceOrder()).isEqualTo(2);
         assertThat(spot1.getSequenceOrder()).isEqualTo(3);
 
-        // 재계산 결과, 첫 번째 스팟(spot3)은 null, 나머지는 20분이 되어야 함
         assertThat(spot3.getTravelTimeMinutes()).isNull();
         assertThat(spot2.getTravelTimeMinutes()).isEqualTo(20);
         assertThat(spot1.getTravelTimeMinutes()).isEqualTo(20);
 
-        // 3개의 스팟에 대해 재계산을 수행하므로 0번째 제외 총 2번의 API 호출이 있어야 함
         verify(directionsClient, times(2)).getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble());
     }
 
@@ -180,18 +177,16 @@ class CourseServiceTest {
             return saved;
         });
         
-        // 길찾기 API가 RuntimeException을 던지도록 설정
         when(directionsClient.getTravelTimeMinutes(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
                 .thenThrow(new RuntimeException("카카오 길찾기 API 장애 발생!"));
 
         CourseSpotAddRequest request = new CourseSpotAddRequest(200L, 1, 2, "새 스팟");
 
         // when
-        courseService.addCourseSpot(1L, request);
+        courseFacade.addCourseSpot(1L, request);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(2);
-        // 에러가 났어도 서버가 터지지 않고 Fallback 값인 30분이 저장되어야 함
         assertThat(course.getCourseSpots().get(1).getTravelTimeMinutes()).isEqualTo(30);
     }
 }
