@@ -12,6 +12,7 @@ import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.repository.ReviewPhotoRepository;
 import com.project.picngo.spot.repository.ReviewRepository;
 import com.project.picngo.spot.repository.SpotRepository;
+import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -47,7 +48,7 @@ public class ReviewService {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), toSort(sort));
         Page<Review> reviewPage = reviewRepository.findBySpotId(spotId, pageable);
 
-        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId);
+        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId).get(0);
         Double avgRating = (Double) avgAndCount[0];
         Map<Integer, Long> distribution = buildDistribution(spotId);
 
@@ -56,7 +57,7 @@ public class ReviewService {
         List<Long> userIds = reviews.stream().map(Review::getUserId).toList();
 
         Map<Long, String> nicknameMap = userRepository.findByIdIn(userIds).stream()
-                .collect(Collectors.toMap(u -> u.getId(), u -> u.getNickname()));
+                .collect(Collectors.toMap(User::getId, User::getNickname));
         Map<Long, List<ReviewPhoto>> photoMap = reviewPhotoRepository.findByReview_IdIn(reviewIds).stream()
                 .collect(Collectors.groupingBy(p -> p.getReview().getId()));
 

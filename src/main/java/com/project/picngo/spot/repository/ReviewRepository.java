@@ -12,7 +12,7 @@ import java.util.List;
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
     @Query("SELECT AVG(r.rating), COUNT(r) FROM Review r WHERE r.spot.id = :spotId")
-    Object[] findAvgAndCountBySpotId(@Param("spotId") Long spotId);
+    List<Object[]> findAvgAndCountBySpotId(@Param("spotId") Long spotId);
 
     Page<Review> findBySpotId(Long spotId, Pageable pageable);
 

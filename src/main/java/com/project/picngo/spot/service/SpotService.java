@@ -37,7 +37,7 @@ public class SpotService {
         List<SpotTag> tags = spotTagRepository.findBySpotId(spotId);
         List<String> checklist = ChecklistMapper.getChecklist(spot.getCat3());
 
-        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId);
+        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId).get(0);
         Double avgRating = (Double) avgAndCount[0];
         int reviewCount = avgAndCount[1] != null ? ((Long) avgAndCount[1]).intValue() : 0;
         long photoCount = spotPhotoRepository.countBySpotId(spotId);

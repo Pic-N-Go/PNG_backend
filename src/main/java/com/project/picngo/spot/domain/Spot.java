@@ -94,7 +94,7 @@ public class Spot extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String parking;
 
-    @Comment("장애인 시설 안내. TourAPI: chkhandichief")
+    @Comment("장애인 시설 안내. TourAPI: chkhandicap")
     @Column(length = 100)
     private String wheelchairAccess;
 

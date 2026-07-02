@@ -34,7 +34,7 @@ public class PhotogenicService {
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         String region = extractRegion(spot.getAddress());
-        FactorInfo seasonFactor = calculateSeason(spot.getAddress());
+        FactorInfo seasonFactor = calculateSeason(region);
 
         Item air = airQualityClient.getAirQuality(region);
         FactorInfo fineDustFactor = calculateFineDust(air);
@@ -106,8 +106,7 @@ public class PhotogenicService {
         return val != null ? val : "";
     }
 
-    private FactorInfo calculateSeason(String address) {
-        String region = extractRegion(address); // ponytail: calculate()에서도 추출하지만 여기선 독립적으로 사용
+    private FactorInfo calculateSeason(String region) {
         List<SeasonEvent> events = seasonEventRepository.findActiveByRegion(region);
 
         MonthDay today = MonthDay.now();
