@@ -25,9 +25,13 @@ public class WeatherClient {
     private final WebClient sunriseWebClient;
     private final String serviceKey;
 
-    public WeatherClient(WebClient.Builder webClientBuilder, @Value("${weather.api.key}") String serviceKey) {
-        this.kmaWebClient = webClientBuilder.clone().baseUrl("http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0").build();
-        this.sunriseWebClient = webClientBuilder.clone().baseUrl("https://api.sunrise-sunset.org").build();
+    public WeatherClient(
+            WebClient.Builder webClientBuilder, 
+            @Value("${weather.api.key}") String serviceKey,
+            @Value("${weather.api.kma-url:http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0}") String kmaUrl,
+            @Value("${weather.api.sunrise-url:https://api.sunrise-sunset.org}") String sunriseUrl) {
+        this.kmaWebClient = webClientBuilder.clone().baseUrl(kmaUrl).build();
+        this.sunriseWebClient = webClientBuilder.clone().baseUrl(sunriseUrl).build();
         this.serviceKey = serviceKey;
     }
 
