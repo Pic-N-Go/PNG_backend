@@ -1,6 +1,7 @@
 package com.project.picngo.course.controller;
 
 import com.project.picngo.course.dto.*;
+import com.project.picngo.course.service.CourseFacade;
 import com.project.picngo.course.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +17,7 @@ import java.util.List;
 public class CourseController implements CourseControllerApiSpec {
 
     private final CourseService courseService;
+    private final CourseFacade courseFacade;
 
     @GetMapping
     public ResponseEntity<List<CourseResponse>> getCourses(@AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -45,18 +47,18 @@ public class CourseController implements CourseControllerApiSpec {
 
     @PostMapping("/{id}/spots")
     public ResponseEntity<CourseSpotResponse> addCourseSpot(@PathVariable Long id, @RequestBody CourseSpotAddRequest request) {
-        return ResponseEntity.ok(courseService.addCourseSpot(id, request));
+        return ResponseEntity.ok(courseFacade.addCourseSpot(id, request));
     }
 
     @DeleteMapping("/{id}/spots/{spotId}")
     public ResponseEntity<Void> removeCourseSpot(@PathVariable Long id, @PathVariable Long spotId) {
-        courseService.removeCourseSpot(id, spotId);
+        courseFacade.removeCourseSpot(id, spotId);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/spots/order")
     public ResponseEntity<Void> updateSpotOrder(@PathVariable Long id, @RequestBody CourseSpotOrderUpdateRequest request) {
-        courseService.updateSpotOrder(id, request);
+        courseFacade.updateSpotOrder(id, request);
         return ResponseEntity.ok().build();
     }
 }
