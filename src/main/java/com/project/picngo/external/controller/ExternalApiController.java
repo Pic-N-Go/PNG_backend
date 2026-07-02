@@ -41,10 +41,16 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         return ResponseEntity.ok(weatherClient.getForecast(lat, lng, date));
     }
 
-    // 3. TourAPI 특정 지역 동기화
+    // 3. TourAPI 특정 지역 동기화 (startPage/endPage로 분할 가능)
     @PostMapping("/tour-api/sync")
-    public ResponseEntity<String> syncSpots(@RequestParam int areaCode) {
-        int saved = tourApiSyncService.sync(areaCode);
+    public ResponseEntity<String> syncSpots(
+            @RequestParam int areaCode,
+            @RequestParam(required = false) Integer startPage,
+            @RequestParam(required = false) Integer endPage
+    ) {
+        int saved = (startPage != null && endPage != null)
+                ? tourApiSyncService.sync(areaCode, startPage, endPage)
+                : tourApiSyncService.sync(areaCode);
         return ResponseEntity.ok(saved + "건 저장 완료");
     }
 
