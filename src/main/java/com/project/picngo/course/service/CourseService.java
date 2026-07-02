@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Service
@@ -131,24 +133,22 @@ public class CourseService {
     }
 
     @Transactional
-    public Integer updateSpotOrderInternal(Long courseId, CourseSpotOrderUpdateRequest request) {
+    public Set<Integer> updateSpotOrderInternal(Long courseId, CourseSpotOrderUpdateRequest request) {
         Course course = findCourseOrThrow(courseId);
 
         Map<Long, CourseSpot> spotMap = course.getCourseSpots().stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
-        Integer dayNumber = null;
+        Set<Integer> affectedDays = new HashSet<>();
         List<Long> orderedIds = request.spotIds();
         for (int i = 0; i < orderedIds.size(); i++) {
             CourseSpot spot = spotMap.get(orderedIds.get(i));
             if (spot != null) {
                 spot.updateOrder(i + 1);
-                if (dayNumber == null) {
-                    dayNumber = spot.getDayNumber();
-                }
+                affectedDays.add(spot.getDayNumber());
             }
         }
-        return dayNumber;
+        return affectedDays;
     }
 
     public List<CourseSpotResponse> getDaySpots(Long courseId, Integer dayNumber) {

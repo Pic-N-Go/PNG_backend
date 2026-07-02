@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -32,8 +33,8 @@ public class CourseFacade {
     }
 
     public void updateSpotOrder(Long courseId, CourseSpotOrderUpdateRequest request) {
-        Integer dayNumber = courseService.updateSpotOrderInternal(courseId, request);
-        if (dayNumber != null) {
+        Set<Integer> affectedDays = courseService.updateSpotOrderInternal(courseId, request);
+        for (Integer dayNumber : affectedDays) {
             recalculateTravelTimesForDay(courseId, dayNumber);
         }
     }
