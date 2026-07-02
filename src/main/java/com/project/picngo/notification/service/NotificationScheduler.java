@@ -45,21 +45,21 @@ public class NotificationScheduler {
             List<WishlistItem> userItems = wishlistItemRepository.findAllByWishlist_UserIdAndIsActiveTrue(userId);
             
             for (WishlistItem item : userItems) {
-                // 임시 하드코딩 위경도 (Spot 도메인 연동 전까지 서울 좌표 사용)
+                // TODO: Spot 도메인이 연동되면 하드코딩된 서울 좌표 대신 item.getSpot().getLat(), getLng()를 사용해야 함
                 Double lat = 37.5665;
                 Double lng = 126.9780;
 
                 try {
                     List<WeatherForecastResponse> forecasts = weatherClient.getForecast(lat, lng, today);
                     
-                    // 조건 확인 (간단하게 첫 번째 예보와 유저의 weatherCondition이 맞는지 확인)
+                    // TODO: 단순히 첫 번째 예보(forecasts.get(0))만 확인하지 말고, 낮 시간대(오전 9시~오후 6시) 등 전체 예보를 순회하며 매칭되는 조건이 있는지 확인하는 로직으로 고도화 필요
                     if (!forecasts.isEmpty()) {
                         WeatherForecastResponse forecast = forecasts.get(0);
                         String apiWeather = forecast.weatherStatus();
                         WeatherCondition userWeather = item.getWeatherCondition();
                         
                         boolean weatherMatch = userWeather == WeatherCondition.NONE || apiWeather.equals(userWeather.name());
-                        // TimeCondition (SUNRISE/SUNSET)은 현재 KMA에선 판단하기 어렵지만, 골든아워 API와 연동 로직 추가 가능
+                        // TODO TimeCondition (SUNRISE/SUNSET)은 현재 KMA에선 판단하기 어렵지만, 골든아워 API와 연동 로직 추가 -> Spot 도메인 연동 후 구현 예정
                         
                         if (weatherMatch) {
                             String title = "오늘의 추천 여행지 알림 ☀️";
