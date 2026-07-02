@@ -90,26 +90,39 @@ public class CourseService {
     public CourseSpotResponse addCourseSpot(Long courseId, CourseSpotAddRequest request) {
         Course course = findCourseOrThrow(courseId);
 
-        // 이동 시간 캐싱: 이전 스팟이 존재하면 DirectionsClient로 이동 시간 계산
-        Integer travelTime = calculateTravelTime(course, request);
-
         CourseSpot courseSpot = CourseSpot.builder()
                 .course(course)
                 .spotId(request.spotId())
                 .dayNumber(request.dayNumber())
                 .sequenceOrder(request.sequenceOrder())
                 .memo(request.memo())
-                .travelTimeMinutes(travelTime)
+                .travelTimeMinutes(null) // 재계산 로직에서 채워짐
                 .build();
 
         CourseSpot saved = courseSpotRepository.save(courseSpot);
+        
+        // 영속성 컨텍스트에 새 스팟을 추가한 뒤 해당 일차의 이동 시간 재계산
+        course.getCourseSpots().add(saved);
+        recalculateTravelTimesForDay(course, request.dayNumber());
+        
         return toCourseSpotResponse(saved);
     }
 
     @Transactional
     public void removeCourseSpot(Long courseId, Long spotId) {
         Course course = findCourseOrThrow(courseId);
-        course.getCourseSpots().removeIf(cs -> cs.getId().equals(spotId));
+        
+        course.getCourseSpots().stream()
+                .filter(cs -> cs.getId().equals(spotId))
+                .findFirst()
+                .ifPresent(spot -> {
+                    Integer dayNumber = spot.getDayNumber();
+                    course.getCourseSpots().remove(spot);
+                    courseSpotRepository.delete(spot);
+                    
+                    // 중간 장소가 빠졌으므로 동선 재계산
+                    recalculateTravelTimesForDay(course, dayNumber);
+                });
     }
 
     @Transactional
@@ -120,12 +133,21 @@ public class CourseService {
         Map<Long, CourseSpot> spotMap = course.getCourseSpots().stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
+        Integer dayNumber = null;
         List<Long> orderedIds = request.spotIds();
         for (int i = 0; i < orderedIds.size(); i++) {
             CourseSpot spot = spotMap.get(orderedIds.get(i));
             if (spot != null) {
                 spot.updateOrder(i + 1);
+                if (dayNumber == null) {
+                    dayNumber = spot.getDayNumber();
+                }
             }
+        }
+        
+        // 순서가 재배정된 해당 일차의 전체 소요시간 재계산
+        if (dayNumber != null) {
+            recalculateTravelTimesForDay(course, dayNumber);
         }
     }
 
@@ -137,21 +159,39 @@ public class CourseService {
     }
 
     /**
-     * 코스에 스팟을 추가할 때, 같은 일차(dayNumber)의 이전 스팟이 있으면
-     * DirectionsClient를 호출하여 이동 시간을 계산하고 캐싱합니다.
+     * 특정 일차(dayNumber)의 모든 스팟을 순서대로 정렬한 뒤
+     * 처음부터 끝까지 전체 구간의 이동 시간을 동적으로 재계산합니다.
      */
-    private Integer calculateTravelTime(Course course, CourseSpotAddRequest request) {
-        // 같은 일차의 스팟 중 바로 앞 순서의 스팟을 찾는다
-        return course.getCourseSpots().stream()
-                .filter(cs -> cs.getDayNumber().equals(request.dayNumber()))
-                .filter(cs -> cs.getSequenceOrder() < request.sequenceOrder())
-                .max((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()))
-                .map(prevSpot -> {
-                    // TODO: prevSpot.getSpotId()와 request.spotId()의 실제 좌표를 조회하여 전달
-                    // 현재는 Spot 엔티티의 위경도를 아직 모르므로 더미 좌표로 호출
-                    return directionsClient.getTravelTimeMinutes(0.0, 0.0, 0.0, 0.0);
-                })
-                .orElse(null); // 첫 번째 스팟이면 이동 시간 없음
+    private void recalculateTravelTimesForDay(Course course, Integer dayNumber) {
+        List<CourseSpot> daySpots = course.getCourseSpots().stream()
+                .filter(cs -> cs.getDayNumber().equals(dayNumber))
+                .sorted((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()))
+                .toList();
+
+        if (daySpots.isEmpty()) return;
+
+        // 첫 번째 장소는 이동 시간이 없으므로 null 처리
+        daySpots.get(0).updateTravelTime(null);
+
+        // 두 번째 장소부터 앞 장소와의 이동 시간 계산
+        for (int i = 1; i < daySpots.size(); i++) {
+            CourseSpot currentSpot = daySpots.get(i);
+            
+            // TODO: 실제 Spot 엔티티에서 위경도를 가져와야 하나 현재는 도메인이 없으므로 안전한 좌표 하드코딩
+            // 서울역 -> 강남역 좌표 사용
+            Double startLat = 37.5546;
+            Double startLng = 126.9725;
+            Double goalLat = 37.4979;
+            Double goalLng = 127.0276;
+
+            try {
+                Integer travelTime = directionsClient.getTravelTimeMinutes(startLat, startLng, goalLat, goalLng);
+                currentSpot.updateTravelTime(travelTime);
+            } catch (Exception e) {
+                // 에러 발생 시 임의의 30분 처리로 기능 마비 방지
+                currentSpot.updateTravelTime(30);
+            }
+        }
     }
 
     // ==================== Entity → DTO 변환 ====================
