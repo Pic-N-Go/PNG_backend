@@ -9,16 +9,19 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.project.picngo.auth.service.CustomUserDetails;
+import io.swagger.v3.oas.annotations.Parameter;
 import java.util.List;
 
 @Tag(name = "코스 (Course)", description = "코스 생성, 조회 및 코스 내 방문 장소 관리 API")
 public interface CourseControllerApiSpec {
 
     @Operation(summary = "전체 코스 목록 조회", description = "사용자가 생성하거나 접근 가능한 코스 목록을 반환합니다.")
-    ResponseEntity<List<CourseResponse>> getCourses();
+    ResponseEntity<List<CourseResponse>> getCourses(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
     @Operation(summary = "새 코스 생성", description = "새로운 사진 코스를 생성합니다.")
-    ResponseEntity<CourseResponse> createCourse(@RequestBody CourseCreateRequest request);
+    ResponseEntity<CourseResponse> createCourse(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody CourseCreateRequest request);
 
     @Operation(summary = "코스 상세 조회", description = "특정 코스의 상세 정보와 포함된 명소 목록을 조회합니다.")
     @Parameter(name = "id", description = "코스 ID")

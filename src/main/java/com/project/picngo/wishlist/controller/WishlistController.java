@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.project.picngo.auth.service.CustomUserDetails;
 import java.util.List;
 
 import jakarta.validation.Valid;
@@ -16,47 +18,46 @@ import jakarta.validation.Valid;
 public class WishlistController implements WishlistControllerApiSpec {
 
     private final WishlistService wishlistService;
-    // For now, hardcode user ID until Spring Security is fully integrated
-    private final Long TEMP_USER_ID = 1L;
-
     @GetMapping
-    public ResponseEntity<List<WishlistResponse>> getWishlist() {
-        return ResponseEntity.ok(wishlistService.getWishlist(TEMP_USER_ID));
+    public ResponseEntity<List<WishlistResponse>> getWishlist(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(wishlistService.getWishlist(userDetails.getId()));
     }
 
     @PostMapping
-    public ResponseEntity<WishlistResponse> createWishlist(@Valid @RequestBody WishlistCreateRequest request) {
-        return ResponseEntity.ok(wishlistService.createWishlist(TEMP_USER_ID, request));
+    public ResponseEntity<WishlistResponse> createWishlist(@AuthenticationPrincipal CustomUserDetails userDetails, @Valid @RequestBody WishlistCreateRequest request) {
+        return ResponseEntity.ok(wishlistService.createWishlist(userDetails.getId(), request));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<WishlistResponse> getWishlistDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(wishlistService.getWishlistDetail(id, TEMP_USER_ID));
+    public ResponseEntity<WishlistResponse> getWishlistDetail(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
+        return ResponseEntity.ok(wishlistService.getWishlistDetail(id, userDetails.getId()));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<WishlistResponse> updateWishlist(@PathVariable Long id, @Valid @RequestBody WishlistUpdateRequest request) {
-        return ResponseEntity.ok(wishlistService.updateWishlist(id, TEMP_USER_ID, request));
+    public ResponseEntity<WishlistResponse> updateWishlist(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @Valid @RequestBody WishlistUpdateRequest request) {
+        return ResponseEntity.ok(wishlistService.updateWishlist(id, userDetails.getId(), request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteWishlist(@PathVariable Long id) {
-        wishlistService.deleteWishlist(id, TEMP_USER_ID);
+    public ResponseEntity<Void> deleteWishlist(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
+        wishlistService.deleteWishlist(id, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/items")
     public ResponseEntity<WishlistItemResponse> addItemToWishlist(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
             @Valid @RequestBody WishlistItemRequest request) {
-        return ResponseEntity.ok(wishlistService.addItemToWishlist(id, TEMP_USER_ID, request));
+        return ResponseEntity.ok(wishlistService.addItemToWishlist(id, userDetails.getId(), request));
     }
 
     @DeleteMapping("/{id}/items/{itemId}")
     public ResponseEntity<Void> removeItemFromWishlist(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
             @PathVariable Long itemId) {
-        wishlistService.removeItemFromWishlist(id, itemId, TEMP_USER_ID);
+        wishlistService.removeItemFromWishlist(id, itemId, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
 }
