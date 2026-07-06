@@ -196,7 +196,7 @@ public class CourseService {
     }
 
     private void validateCourseOwner(Course course, Long userId) {
-        if (!course.getUserId().equals(userId)) {
+        if (!userId.equals(course.getUserId())) {
             throw new CustomException(AuthErrorCode.FORBIDDEN_ACCESS);
         }
     }

@@ -50,7 +50,7 @@ public class WishlistService {
 
     public WishlistResponse getWishlistDetail(Long id, Long userId) {
         Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> w.getUserId().equals(userId))
+                .filter(w -> userId.equals(w.getUserId()))
                 .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         return WishlistResponse.from(wishlist);
     }
@@ -58,7 +58,7 @@ public class WishlistService {
     @Transactional
     public WishlistResponse updateWishlist(Long id, Long userId, WishlistUpdateRequest request) {
         Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> w.getUserId().equals(userId))
+                .filter(w -> userId.equals(w.getUserId()))
                 .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         
         wishlist.updateName(request.name());
@@ -68,7 +68,7 @@ public class WishlistService {
     @Transactional
     public void deleteWishlist(Long id, Long userId) {
         Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> w.getUserId().equals(userId))
+                .filter(w -> userId.equals(w.getUserId()))
                 .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         wishlistRepository.delete(wishlist);
     }
@@ -76,7 +76,7 @@ public class WishlistService {
     @Transactional
     public WishlistItemResponse addItemToWishlist(Long id, Long userId, WishlistItemRequest request) {
         Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> w.getUserId().equals(userId))
+                .filter(w -> userId.equals(w.getUserId()))
                 .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
 
         WishlistItem item = WishlistItem.builder()
@@ -95,7 +95,7 @@ public class WishlistService {
     @Transactional
     public void removeItemFromWishlist(Long id, Long itemId, Long userId) {
         Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> w.getUserId().equals(userId))
+                .filter(w -> userId.equals(w.getUserId()))
                 .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
 
         WishlistItem item = wishlistItemRepository.findById(itemId)
