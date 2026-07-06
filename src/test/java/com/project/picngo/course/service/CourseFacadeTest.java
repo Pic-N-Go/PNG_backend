@@ -8,6 +8,7 @@ import com.project.picngo.course.dto.CourseSpotResponse;
 import com.project.picngo.course.repository.CourseChecklistRepository;
 import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.course.repository.CourseSpotRepository;
+import com.project.picngo.user.repository.UserRepository;
 import com.project.picngo.external.DirectionsClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,11 +43,14 @@ class CourseFacadeTest {
     private CourseChecklistRepository courseChecklistRepository;
 
     @Mock
+    private UserRepository userRepository;
+
+    @Mock
     private DirectionsClient directionsClient;
 
     @BeforeEach
     void setUp() {
-        courseService = new CourseService(courseRepository, courseSpotRepository, courseChecklistRepository);
+        courseService = new CourseService(courseRepository, courseSpotRepository, courseChecklistRepository, userRepository);
         courseFacade = new CourseFacade(courseService, directionsClient);
     }
 
@@ -91,7 +95,7 @@ class CourseFacadeTest {
         CourseSpotAddRequest request = new CourseSpotAddRequest(200L, 1, 2, "두번째 스팟");
 
         // when
-        CourseSpotResponse response = courseFacade.addCourseSpot(1L, request);
+        CourseSpotResponse response = courseFacade.addCourseSpot(1L, 1L, request);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(2);
@@ -121,7 +125,7 @@ class CourseFacadeTest {
         CourseSpotAddRequest request = new CourseSpotAddRequest(300L, 1, 1, "중간 삽입 스팟");
 
         // when
-        courseFacade.addCourseSpot(1L, request);
+        courseFacade.addCourseSpot(1L, 1L, request);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(3);
@@ -153,7 +157,7 @@ class CourseFacadeTest {
                 .thenReturn(60);
 
         // when
-        courseFacade.removeCourseSpot(1L, 2L);
+        courseFacade.removeCourseSpot(1L, 1L, 2L);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(2);
@@ -185,7 +189,7 @@ class CourseFacadeTest {
         CourseSpotOrderUpdateRequest request = new CourseSpotOrderUpdateRequest(List.of(3L, 2L, 1L));
 
         // when
-        courseFacade.updateSpotOrder(1L, request);
+        courseFacade.updateSpotOrder(1L, 1L, request);
 
         // then
         assertThat(spot3.getSequenceOrder()).isEqualTo(1);
@@ -220,7 +224,7 @@ class CourseFacadeTest {
         CourseSpotAddRequest request = new CourseSpotAddRequest(200L, 1, 2, "새 스팟");
 
         // when
-        courseFacade.addCourseSpot(1L, request);
+        courseFacade.addCourseSpot(1L, 1L, request);
 
         // then
         assertThat(course.getCourseSpots()).hasSize(2);

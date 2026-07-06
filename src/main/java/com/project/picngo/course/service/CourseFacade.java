@@ -19,21 +19,21 @@ public class CourseFacade {
     private final CourseService courseService;
     private final DirectionsClient directionsClient;
 
-    public CourseSpotResponse addCourseSpot(Long courseId, CourseSpotAddRequest request) {
-        CourseSpotResponse response = courseService.addCourseSpotInternal(courseId, request);
+    public CourseSpotResponse addCourseSpot(Long userId, Long courseId, CourseSpotAddRequest request) {
+        CourseSpotResponse response = courseService.addCourseSpotInternal(userId, courseId, request);
         recalculateTravelTimesForDay(courseId, request.dayNumber());
         return response;
     }
 
-    public void removeCourseSpot(Long courseId, Long spotId) {
-        Integer dayNumber = courseService.removeCourseSpotInternal(courseId, spotId);
+    public void removeCourseSpot(Long userId, Long courseId, Long spotId) {
+        Integer dayNumber = courseService.removeCourseSpotInternal(userId, courseId, spotId);
         if (dayNumber != null) {
             recalculateTravelTimesForDay(courseId, dayNumber);
         }
     }
 
-    public void updateSpotOrder(Long courseId, CourseSpotOrderUpdateRequest request) {
-        Set<Integer> affectedDays = courseService.updateSpotOrderInternal(courseId, request);
+    public void updateSpotOrder(Long userId, Long courseId, CourseSpotOrderUpdateRequest request) {
+        Set<Integer> affectedDays = courseService.updateSpotOrderInternal(userId, courseId, request);
         for (Integer dayNumber : affectedDays) {
             recalculateTravelTimesForDay(courseId, dayNumber);
         }

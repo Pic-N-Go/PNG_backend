@@ -10,6 +10,9 @@ import com.project.picngo.course.repository.CourseSpotRepository;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
+import com.project.picngo.common.exception.code.AuthErrorCode;
+import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,12 +31,15 @@ public class CourseService {
     private final CourseRepository courseRepository;
     private final CourseSpotRepository courseSpotRepository;
     private final CourseChecklistRepository courseChecklistRepository;
+    private final UserRepository userRepository;
 
 
     // ==================== 코스 CRUD ====================
 
     @Transactional
     public CourseResponse createCourse(Long userId, CourseCreateRequest request) {
+        validateUserExists(userId);
+        
         Course course = Course.builder()
                 .userId(userId)
                 .title(request.title())
@@ -74,23 +80,27 @@ public class CourseService {
     }
 
     @Transactional
-    public CourseResponse updateCourse(Long courseId, CourseCreateRequest request) {
+    public CourseResponse updateCourse(Long userId, Long courseId, CourseCreateRequest request) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+        
         course.update(request.title(), request.startDate(), request.endDate());
         return toCourseResponse(course);
     }
 
     @Transactional
-    public void deleteCourse(Long courseId) {
+    public void deleteCourse(Long userId, Long courseId) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
         courseRepository.delete(course);
     }
 
     // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
 
     @Transactional
-    public CourseSpotResponse addCourseSpotInternal(Long courseId, CourseSpotAddRequest request) {
+    public CourseSpotResponse addCourseSpotInternal(Long userId, Long courseId, CourseSpotAddRequest request) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
 
         // 중복 순서 방지(Shift) 로직: 같은 일차에서 추가되는 순서보다 크거나 같은 기존 스팟들의 순서를 +1씩 밀어줌
         course.getCourseSpots().stream()
@@ -117,8 +127,9 @@ public class CourseService {
     }
 
     @Transactional
-    public Integer removeCourseSpotInternal(Long courseId, Long spotId) {
+    public Integer removeCourseSpotInternal(Long userId, Long courseId, Long spotId) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
         
         return course.getCourseSpots().stream()
                 .filter(cs -> cs.getId().equals(spotId))
@@ -133,8 +144,9 @@ public class CourseService {
     }
 
     @Transactional
-    public Set<Integer> updateSpotOrderInternal(Long courseId, CourseSpotOrderUpdateRequest request) {
+    public Set<Integer> updateSpotOrderInternal(Long userId, Long courseId, CourseSpotOrderUpdateRequest request) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
 
         Map<Long, CourseSpot> spotMap = course.getCourseSpots().stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
@@ -175,6 +187,18 @@ public class CourseService {
     private Course findCourseOrThrow(Long courseId) {
         return courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+    }
+
+    private void validateUserExists(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+    }
+
+    private void validateCourseOwner(Course course, Long userId) {
+        if (!course.getUserId().equals(userId)) {
+            throw new CustomException(AuthErrorCode.FORBIDDEN_ACCESS);
+        }
     }
 
     // ==================== Entity → DTO 변환 ====================

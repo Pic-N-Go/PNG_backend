@@ -35,30 +35,30 @@ public class CourseController implements CourseControllerApiSpec {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CourseResponse> updateCourse(@PathVariable Long id, @RequestBody CourseCreateRequest request) {
-        return ResponseEntity.ok(courseService.updateCourse(id, request));
+    public ResponseEntity<CourseResponse> updateCourse(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseCreateRequest request) {
+        return ResponseEntity.ok(courseService.updateCourse(userDetails.getId(), id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteCourse(@PathVariable Long id) {
-        courseService.deleteCourse(id);
+    public ResponseEntity<Void> deleteCourse(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
+        courseService.deleteCourse(userDetails.getId(), id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/spots")
-    public ResponseEntity<CourseSpotResponse> addCourseSpot(@PathVariable Long id, @RequestBody CourseSpotAddRequest request) {
-        return ResponseEntity.ok(courseFacade.addCourseSpot(id, request));
+    public ResponseEntity<CourseSpotResponse> addCourseSpot(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotAddRequest request) {
+        return ResponseEntity.ok(courseFacade.addCourseSpot(userDetails.getId(), id, request));
     }
 
     @DeleteMapping("/{id}/spots/{spotId}")
-    public ResponseEntity<Void> removeCourseSpot(@PathVariable Long id, @PathVariable Long spotId) {
-        courseFacade.removeCourseSpot(id, spotId);
+    public ResponseEntity<Void> removeCourseSpot(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @PathVariable Long spotId) {
+        courseFacade.removeCourseSpot(userDetails.getId(), id, spotId);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/spots/order")
-    public ResponseEntity<Void> updateSpotOrder(@PathVariable Long id, @RequestBody CourseSpotOrderUpdateRequest request) {
-        courseFacade.updateSpotOrder(id, request);
+    public ResponseEntity<Void> updateSpotOrder(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotOrderUpdateRequest request) {
+        courseFacade.updateSpotOrder(userDetails.getId(), id, request);
         return ResponseEntity.ok().build();
     }
 }

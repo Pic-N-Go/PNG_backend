@@ -8,6 +8,8 @@ import com.project.picngo.wishlist.repository.WishlistItemRepository;
 import com.project.picngo.wishlist.repository.WishlistRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.WishlistErrorCode;
+import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ public class WishlistService {
     private final WishlistRepository wishlistRepository;
     private final WishlistItemRepository wishlistItemRepository;
     private final WeatherClient weatherClient;
+    private final UserRepository userRepository;
 
     public List<WishlistResponse> getWishlist(Long userId) {
         // Fetch all wishlists (folders) for the user.
@@ -35,6 +38,8 @@ public class WishlistService {
 
     @Transactional
     public WishlistResponse createWishlist(Long userId, WishlistCreateRequest request) {
+        validateUserExists(userId);
+        
         Wishlist wishlist = Wishlist.builder()
                 .userId(userId)
                 .name(request.name())
@@ -103,5 +108,11 @@ public class WishlistService {
     @Transactional
     public void checkConditionsAndNotify() {
         // TODO: Scheduler logic for later
+    }
+
+    private void validateUserExists(Long userId) {
+        if (!userRepository.existsById(userId)) {
+            throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
     }
 }
