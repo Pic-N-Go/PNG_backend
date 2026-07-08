@@ -38,5 +38,7 @@ out/
 
 # 환경변수 (API 키 등 민감 정보)
 .env
+firebase-key.json
 
 .claude/
+CLAUDE.md

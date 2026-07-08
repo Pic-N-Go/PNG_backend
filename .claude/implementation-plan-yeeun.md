@@ -47,9 +47,12 @@
 - [x] 204 No Content 반환
 
 ### 6. `POST /spots/{spotId}/bookmark` — 북마크 토글
-- [ ] `BookmarkRepository.findBySpotIdAndUserId()`
-- [ ] 없으면 INSERT / 있으면 DELETE
-- [ ] `{ "isBookmarked": true/false }` 반환
+- [x] `BookmarkRepository.findBySpotIdAndUserId()`
+- [x] 없으면 INSERT / 있으면 DELETE
+- [x] `{ "isBookmarked": true/false }` 반환
+
+### 6-1. `DELETE /spots/{spotId}/bookmark` — 북마크 해제
+- [x] 토글 방식으로 대체 (별도 엔드포인트 불필요)
 
 ### 7. `GET /spots/{spotId}/photos` — TourAPI 사진 목록
 - [x] `TourApiClient.getDetailImages()` 구현
@@ -60,6 +63,20 @@
 ### 8. `GET /spots/{spotId}/nearby-parking` — 주변 주차장
 - [ ] 공공데이터 전국주차장정보표준데이터 API 연동
 - [ ] 노출 항목: 주차장명, 거리, 무료/유료
+
+### 9. `GET /spots/{spotId}/checklist` — 촬영 체크리스트
+- [x] 기본 항목(cat3 기반) + 사용자 추가 항목 조회
+- [x] `POST /spots/{id}/checklist` — 사용자 항목 추가 (최대 10개, 20자 이하)
+- [x] `DELETE /spots/{id}/checklist/{itemId}` — 사용자 항목 삭제
+- [x] ChecklistItem에 userId 컬럼 추가
+
+### 10. `GET /spots/nearby` — 내 위치 기반 주변 스팟 조회
+- [x] 위경도 파라미터 받아서 거리 기반 필터링 (Haversine 공식)
+- [x] 응답 DTO 작성 (distanceKm 포함)
+
+### 11. `GET /spots/recommended` — 오늘의 추천 스팟
+- [x] 추천 로직: 리뷰+북마크 합산 인기 스팟 중 RAND() (데이터 쌓이면 자동 반영)
+- [x] 응답 DTO 작성 (limit 기본 10, 최대 20)
 
 ---
 
@@ -73,6 +90,32 @@
 - [ ] 날씨 점수 (40점): 모정민 영역, 연동 대기
 - [ ] 골든아워 점수 (20점): 모정민 영역, 연동 대기
 - **현재**: 날씨/골든아워 "구현 예정" stub, 총점 = 미세먼지+오존+시즌만 합산
+
+---
+
+## Phase 4 — 커뮤니티 피드
+
+### 12. `GET /posts` — 피드 게시물 목록
+- [ ] 페이징 처리
+- [ ] 응답 DTO 작성
+
+### 13. `POST /posts` — 새 게시물 작성
+- [ ] `PostRequest` DTO 작성
+- [ ] 이미지 업로드 연동 (소영재 담당 `/upload/image` 완료 후)
+
+### 14. `GET /posts/{id}` — 게시물 상세 조회
+- [ ] 응답 DTO 작성
+
+### 15. `POST /posts/{id}/like` — 좋아요
+- [ ] 중복 좋아요 방지
+
+### 16. `DELETE /posts/{id}/like` — 좋아요 취소
+
+### 17. `GET /posts/{id}/comments` — 댓글 목록
+
+### 18. `POST /posts/{id}/comments` — 댓글 작성
+
+### 19. `POST /posts/{id}/bookmark` — 게시물 북마크
 
 ---
 
@@ -101,11 +144,26 @@
 
 | 항목 | 우선순위 | 비고 |
 |------|----------|------|
-| 북마크 토글 API | P1 | - |
-| 주변 주차장 API | P1 | 공공데이터 API |
+| 북마크 해제 엔드포인트 | ✅ 불필요 | 토글로 대체 |
+| 체크리스트 API | ✅ 완료 | 기본+사용자 항목, 최대 10개 20자 |
+| 추천 스팟 API | ✅ 완료 | 리뷰+북마크 합산 + 랜덤 |
+| 주변 주차장 API | P2 | 나중에 재진행 |
+| 커뮤니티 피드 전체 | P2 | 이미지 업로드 소영재 연동 후 |
 | 포토제닉 날씨/골든아워 | P2 | 모정민 연동 후 |
+| Security 연동 후 엔드포인트 권한 정리 | 배포 전 | `/reviews/**` 쓰기, `/tour-api/**` ADMIN |
 | TourAPI 재sync | 언제든 | overview/parking NULL 해소 |
-| `/tour-api/**` 권한 | 배포 전 | permitAll → hasRole("ADMIN") |
+
+## 코드 리뷰 반영 현황
+
+| 항목 | 상태 |
+|------|------|
+| 리뷰 0건 스팟 조회 500 에러 | ✅ 수정 |
+| limit 상한값 50 적용 | ✅ 수정 |
+| syncAll() @Transactional 제거 | ✅ 수정 |
+| 포토제닉 외부 API 실패 시 폴백 | ✅ 수정 |
+| Bookmark BaseTimeEntity 상속 | ✅ 수정 |
+| sort 잘못된 값 400 에러 반환 | ✅ 수정 |
+| Security 연동 후 엔드포인트 권한 정리 | 배포 전 처리 |
 
 ---
 
