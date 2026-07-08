@@ -38,6 +38,23 @@ public class SpotService {
         ).map(SpotResponse::from);
     }
 
+    // Search approved spots by keyword and optional category.
+    public Page<SpotResponse> searchSpots(String keyword, String category, int page, int size) {
+        if (keyword == null || keyword.isBlank()) {
+            throw new IllegalArgumentException("寃?됱뼱瑜??낅젰?댁＜?몄슂.");
+        }
+
+        SpotCategory spotCategory = parseCategory(category);
+        Pageable pageable = createPageable(page, size, "latest");
+
+        return spotRepository.searchSpots(
+                keyword.trim(),
+                spotCategory,
+                SpotStatus.APPROVED,
+                pageable
+        ).map(SpotResponse::from);
+    }
+
     private Pageable createPageable(int page, int size, String sort) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
@@ -66,7 +83,7 @@ public class SpotService {
         try {
             return SpotCategory.valueOf(category.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("지원하지 않는 스팟 카테고리입니다.");
+            throw new IllegalArgumentException("吏?먰븯吏 ?딅뒗 ?ㅽ뙚 移댄뀒怨좊━?낅땲??");
         }
     }
 }

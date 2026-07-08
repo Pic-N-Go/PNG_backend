@@ -26,4 +26,15 @@ public class SpotController {
     ) {
         return ResponseEntity.ok(spotService.getSpots(category, sort, page, size));
     }
+
+    // 스팟 검색 API
+    @GetMapping("/search")
+    public ResponseEntity<Page<SpotResponse>> searchSpots(
+            @RequestParam String keyword,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(spotService.searchSpots(keyword, category, page, size));
+    }
 }
