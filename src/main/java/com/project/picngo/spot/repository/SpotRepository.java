@@ -22,4 +22,12 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             """, nativeQuery = true)
     List<Spot> findNearbySpots(@Param("lat") Double lat, @Param("lng") Double lng,
                                @Param("radiusKm") Double radiusKm, @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT * FROM spot
+            WHERE is_active = true
+            ORDER BY (review_count + bookmark_count) DESC, RAND()
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Spot> findRecommendedSpots(@Param("limit") int limit);
 }

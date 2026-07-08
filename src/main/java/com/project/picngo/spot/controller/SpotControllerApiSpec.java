@@ -3,6 +3,7 @@ package com.project.picngo.spot.controller;
 import com.project.picngo.spot.dto.BookmarkResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
+import com.project.picngo.spot.dto.RecommendedSpotResponse;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
@@ -20,6 +21,11 @@ import java.util.List;
 
 @Tag(name = "스팟 (Spot)", description = "스팟 상세 정보 API")
 public interface SpotControllerApiSpec {
+
+    @Operation(summary = "추천 스팟 조회", description = "리뷰+북마크 합산 인기 스팟 중 랜덤으로 반환합니다. limit 기본값 10, 최대 20.")
+    ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
+            @Parameter(description = "결과 수 (최대 20)") @RequestParam(defaultValue = "10") int limit
+    );
 
     @Operation(summary = "주변 스팟 조회", description = "현재 위치 기준 반경 내 스팟을 거리 순으로 반환합니다. radiusKm 기본값 5.0, limit 기본값 20.")
     ResponseEntity<List<NearbySpotResponse>> getNearbySpots(

@@ -7,6 +7,7 @@ import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.dto.NearbySpotResponse;
+import com.project.picngo.spot.dto.RecommendedSpotResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
 import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.repository.*;
@@ -49,6 +50,13 @@ public class SpotService {
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
                 reviewCount, photoCount, isBookmarked
         );
+    }
+
+    public List<RecommendedSpotResponse> getRecommendedSpots(int limit) {
+        return spotRepository.findRecommendedSpots(Math.min(limit, 20))
+                .stream()
+                .map(RecommendedSpotResponse::from)
+                .toList();
     }
 
     public List<NearbySpotResponse> getNearbySpots(Double lat, Double lng, Double radiusKm, int limit) {

@@ -3,6 +3,7 @@ package com.project.picngo.spot.controller;
 import com.project.picngo.spot.dto.BookmarkResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
+import com.project.picngo.spot.dto.RecommendedSpotResponse;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
@@ -34,6 +35,13 @@ public class SpotController implements SpotControllerApiSpec {
     private final ReviewService reviewService;
     private final BookmarkService bookmarkService;
     private final PhotogenicService photogenicService;
+
+    @GetMapping("/recommended")
+    public ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(spotService.getRecommendedSpots(limit));
+    }
 
     @GetMapping("/nearby")
     public ResponseEntity<List<NearbySpotResponse>> getNearbySpots(
