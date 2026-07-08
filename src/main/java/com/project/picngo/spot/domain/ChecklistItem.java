@@ -22,8 +22,12 @@ public class ChecklistItem {
     @JoinColumn(name = "spot_id", nullable = false)
     private Spot spot;
 
-    @Comment("항목 내용. 예: 삼각대 필요")
-    @Column(nullable = false, length = 100)
+    @Comment("유저 ID. null이면 시스템 기본 항목")
+    @Column
+    private Long userId;
+
+    @Comment("항목 내용 (최대 20자)")
+    @Column(nullable = false, length = 20)
     private String content;
 
     @Comment("표시 순서")
@@ -31,8 +35,9 @@ public class ChecklistItem {
     private Integer orderIndex;
 
     @Builder
-    public ChecklistItem(Spot spot, String content, Integer orderIndex) {
+    public ChecklistItem(Spot spot, Long userId, String content, Integer orderIndex) {
         this.spot = spot;
+        this.userId = userId;
         this.content = content;
         this.orderIndex = orderIndex;
     }

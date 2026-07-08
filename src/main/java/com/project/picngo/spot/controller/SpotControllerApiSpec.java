@@ -1,6 +1,8 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.dto.BookmarkResponse;
+import com.project.picngo.spot.dto.ChecklistRequest;
+import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
@@ -61,6 +63,23 @@ public interface SpotControllerApiSpec {
     @Operation(summary = "스팟 사진 목록 조회", description = "한국관광공사 TourAPI에서 스팟 공식 사진 목록을 실시간 조회합니다. 사용자 등록 스팟은 빈 배열 반환.")
     ResponseEntity<SpotPhotoResponse> getSpotPhotos(
             @Parameter(description = "스팟 ID") @PathVariable Long id
+    );
+
+    @Operation(summary = "촬영 체크리스트 조회", description = "시스템 기본 항목(cat3 기반) + 사용자 추가 항목을 반환합니다.")
+    ResponseEntity<ChecklistResponse> getChecklist(
+            @Parameter(description = "스팟 ID") @PathVariable Long id
+    );
+
+    @Operation(summary = "체크리스트 항목 추가", description = "사용자가 체크리스트 항목을 추가합니다. 최대 10개, 내용 20자 이하.")
+    ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @RequestBody ChecklistRequest request
+    );
+
+    @Operation(summary = "체크리스트 항목 삭제", description = "사용자가 직접 추가한 항목만 삭제 가능합니다.")
+    ResponseEntity<Void> deleteChecklistItem(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "항목 ID") @PathVariable Long itemId
     );
 
     @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진 업로드는 별도 API로 처리합니다.")

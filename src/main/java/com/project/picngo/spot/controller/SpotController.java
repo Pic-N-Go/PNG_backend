@@ -1,6 +1,8 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.dto.BookmarkResponse;
+import com.project.picngo.spot.dto.ChecklistRequest;
+import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
@@ -10,12 +12,14 @@ import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
 import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.service.BookmarkService;
+import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +39,7 @@ public class SpotController implements SpotControllerApiSpec {
     private final ReviewService reviewService;
     private final BookmarkService bookmarkService;
     private final PhotogenicService photogenicService;
+    private final ChecklistService checklistService;
 
     @GetMapping("/recommended")
     public ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
@@ -81,6 +86,25 @@ public class SpotController implements SpotControllerApiSpec {
     @GetMapping("/{id}/photos")
     public ResponseEntity<SpotPhotoResponse> getSpotPhotos(@PathVariable Long id) {
         return ResponseEntity.ok(spotService.getSpotPhotos(id));
+    }
+
+    @GetMapping("/{id}/checklist")
+    public ResponseEntity<ChecklistResponse> getChecklist(@PathVariable Long id) {
+        return ResponseEntity.ok(checklistService.getChecklist(id));
+    }
+
+    @PostMapping("/{id}/checklist")
+    public ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
+            @PathVariable Long id,
+            @jakarta.validation.Valid @RequestBody ChecklistRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(checklistService.addItem(id, request));
+    }
+
+    @DeleteMapping("/{id}/checklist/{itemId}")
+    public ResponseEntity<Void> deleteChecklistItem(@PathVariable Long id, @PathVariable Long itemId) {
+        checklistService.deleteItem(id, itemId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/reviews")

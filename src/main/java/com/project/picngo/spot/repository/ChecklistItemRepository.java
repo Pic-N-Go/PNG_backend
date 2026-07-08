@@ -7,5 +7,7 @@ import java.util.List;
 
 public interface ChecklistItemRepository extends JpaRepository<ChecklistItem, Long> {
 
-    List<ChecklistItem> findBySpotIdOrderByOrderIndex(Long spotId);
+    List<ChecklistItem> findBySpotIdAndUserIdIsNullOrderByOrderIndex(Long spotId);
+    List<ChecklistItem> findBySpotIdAndUserIdOrderByOrderIndex(Long spotId, Long userId);
+    int countBySpotIdAndUserId(Long spotId, Long userId);
 }
