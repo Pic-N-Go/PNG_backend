@@ -7,7 +7,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -19,27 +19,27 @@ public class ChatParticipantService {
     private final StringRedisTemplate redisTemplate;
 
     public void enter(Long spotId, Long userId, String nickname) {
-        redisTemplate.opsForSet().add(key(spotId), value(userId, nickname));
+        redisTemplate.opsForHash().put(key(spotId), String.valueOf(userId), nickname);
     }
 
-    public void leave(Long spotId, Long userId, String nickname) {
-        redisTemplate.opsForSet().remove(key(spotId), value(userId, nickname));
+    public void leave(Long spotId, Long userId) {
+        redisTemplate.opsForHash().delete(key(spotId), String.valueOf(userId));
     }
 
     public long getParticipantCount(Long spotId) {
-        Long size = redisTemplate.opsForSet().size(key(spotId));
+        Long size = redisTemplate.opsForHash().size(key(spotId));
         return size == null ? 0L : size;
     }
 
+    //Todo : 사용자가 많아진다면
     public List<ChatParticipantResponse> getParticipants(Long spotId) {
-        Set<String> values = redisTemplate.opsForSet().members(key(spotId));
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key(spotId));
 
-        if (values == null) {
-            return List.of();
-        }
-
-        return values.stream()
-                .map(ChatParticipantResponse::from)
+        return entries.entrySet().stream()
+                .map(entry -> new ChatParticipantResponse(
+                        Long.valueOf((String) entry.getKey()),
+                        (String) entry.getValue()
+                ))
                 .toList();
     }
 
@@ -47,7 +47,4 @@ public class ChatParticipantService {
         return PARTICIPANTS_KEY_PREFIX + spotId + PARTICIPANTS_KEY_SUFFIX;
     }
 
-    private String value(Long userId, String nickname) {
-        return userId + ":" + nickname;
-    }
 }

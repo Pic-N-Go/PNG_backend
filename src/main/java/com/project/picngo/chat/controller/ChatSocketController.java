@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -44,32 +45,38 @@ public class ChatSocketController {
     @MessageMapping("/chats/{spotId}/enter")
     public void enter(
             @DestinationVariable Long spotId,
-            Principal principal
+            Principal principal,
+            SimpMessageHeaderAccessor headerAccessor
     ) {
         CustomUserDetails userDetails = getUserDetails(principal);
 
-        chatParticipantService.enter(
-                spotId,
-                userDetails.getId(),
-                userDetails.getNickname());
+        chatParticipantService.enter(spotId, userDetails.getId(), userDetails.getNickname());
+
+        if (headerAccessor.getSessionAttributes() != null) {
+            headerAccessor.getSessionAttributes().put("spotId", spotId);
+        }
 
         long participantCount = chatParticipantService.getParticipantCount(spotId);
+
         messagingTemplate.convertAndSend("/topic/chats/" + spotId + "/participants/count", participantCount);
     }
 
     @MessageMapping("/chats/{spotId}/leave")
     public void leave(
             @DestinationVariable Long spotId,
-            Principal principal
+            Principal principal,
+            SimpMessageHeaderAccessor headerAccessor
     ) {
         CustomUserDetails userDetails = getUserDetails(principal);
 
-        chatParticipantService.leave(
-                spotId,
-                userDetails.getId(),
-                userDetails.getNickname());
+        chatParticipantService.leave(spotId, userDetails.getId());
+
+        if (headerAccessor.getSessionAttributes() != null) {
+            headerAccessor.getSessionAttributes().remove("spotId");
+        }
 
         long participantCount = chatParticipantService.getParticipantCount(spotId);
+
         messagingTemplate.convertAndSend("/topic/chats/" + spotId + "/participants/count", participantCount);
     }
 
