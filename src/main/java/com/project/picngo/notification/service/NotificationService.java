@@ -9,19 +9,24 @@ import com.project.picngo.notification.dto.NotificationSettingUpdateRequest;
 import com.project.picngo.notification.repository.NotificationRepository;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
+    private final FcmService fcmService;
 
+    @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
         return notificationRepository.findAllByUserId(userId).stream()
                 .map(NotificationResponse::from)
@@ -61,8 +66,38 @@ public class NotificationService {
     }
 
 
-    @Transactional
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
-        // TODO: Call FCM API (using WebClient) and save Notification entity to DB
+        notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
+            if (Boolean.TRUE.equals(setting.getIsAllPushEnabled()) && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
+                try {
+                    fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink);
+                } catch (Exception e) {
+                    log.warn("Failed to send FCM push to userId: {}", userId, e);
+                }
+            }
+        });
+
+        Notification notification = Notification.builder()
+                .userId(userId)
+                .type(type)
+                .title(title)
+                .content(content)
+                .deepLink(deepLink)
+                .build();
+        notificationRepository.save(notification);
+    }
+
+    @Scheduled(cron = "0 0 3 * * *")
+    public void deleteOldNotifications() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
+        int deletedCount;
+        int totalDeleted = 0;
+        
+        do {
+            deletedCount = notificationRepository.deleteByCreatedAtBeforeWithLimit(cutoff, 1000);
+            totalDeleted += deletedCount;
+        } while (deletedCount == 1000);
+        
+        log.info("Old notifications before {} have been deleted. Total deleted: {}", cutoff, totalDeleted);
     }
 }
