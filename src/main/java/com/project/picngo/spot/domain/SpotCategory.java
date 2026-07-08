@@ -11,5 +11,9 @@ public enum SpotCategory {
     FESTIVAL,
     FLOWER,
     FOREST,
+    PORTRAIT,
+    PET,
+    SUNRISE_SUNSET,
+    MILKY_WAY,
     ETC
 }

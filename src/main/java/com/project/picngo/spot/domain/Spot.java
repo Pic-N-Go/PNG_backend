@@ -26,7 +26,7 @@ public class Spot extends BaseTimeEntity {
     private String zipcode;
 
     @Column(columnDefinition = "TEXT")
-    private String description;
+    private String overview;
 
     @Column(nullable = false)
     private Double latitude;
@@ -105,7 +105,7 @@ public class Spot extends BaseTimeEntity {
             String name,
             String address,
             String zipcode,
-            String description,
+            String overview,
             Double latitude,
             Double longitude,
             SpotCategory category,
@@ -133,7 +133,7 @@ public class Spot extends BaseTimeEntity {
         this.name = name;
         this.address = address;
         this.zipcode = zipcode;
-        this.description = description;
+        this.overview = overview;
         this.latitude = latitude;
         this.longitude = longitude;
         this.category = category;
