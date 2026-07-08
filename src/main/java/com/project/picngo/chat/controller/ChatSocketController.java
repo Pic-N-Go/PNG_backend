@@ -16,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
 import java.security.Principal;
+import java.util.Map;
 
 @Controller
 @RequiredArgsConstructor
@@ -50,11 +51,24 @@ public class ChatSocketController {
     ) {
         CustomUserDetails userDetails = getUserDetails(principal);
 
-        chatParticipantService.enter(spotId, userDetails.getId(), userDetails.getNickname());
+        Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
 
-        if (headerAccessor.getSessionAttributes() != null) {
-            headerAccessor.getSessionAttributes().put("spotId", spotId);
+        if (sessionAttributes != null) {
+            Long previousSpotId = (Long) sessionAttributes.get("spotId");
+
+            if (previousSpotId != null && !previousSpotId.equals(spotId)) {
+
+                chatParticipantService.leave(previousSpotId, userDetails.getId());
+
+                long previousParticipantCount = chatParticipantService.getParticipantCount(previousSpotId);
+
+                messagingTemplate.convertAndSend("/topic/chats/" + previousSpotId + "/participants/count", previousParticipantCount);
+            }
+
+            sessionAttributes.put("spotId", spotId);
         }
+
+        chatParticipantService.enter(spotId, userDetails.getId(), userDetails.getNickname());
 
         long participantCount = chatParticipantService.getParticipantCount(spotId);
 
