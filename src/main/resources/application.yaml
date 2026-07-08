@@ -52,3 +52,6 @@ jwt:
 firebase:
   config:
     path: ${FIREBASE_CONFIG_PATH}
+
+websocket:
+  allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
