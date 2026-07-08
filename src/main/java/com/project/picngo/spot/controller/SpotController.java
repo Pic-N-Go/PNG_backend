@@ -1,6 +1,7 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.dto.BookmarkResponse;
+import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/spots")
@@ -31,6 +34,16 @@ public class SpotController implements SpotControllerApiSpec {
     private final ReviewService reviewService;
     private final BookmarkService bookmarkService;
     private final PhotogenicService photogenicService;
+
+    @GetMapping("/nearby")
+    public ResponseEntity<List<NearbySpotResponse>> getNearbySpots(
+            @RequestParam Double lat,
+            @RequestParam Double lng,
+            @RequestParam(defaultValue = "5.0") Double radiusKm,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return ResponseEntity.ok(spotService.getNearbySpots(lat, lng, radiusKm, limit));
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<SpotDetailResponse> getSpotDetail(@PathVariable Long id) {

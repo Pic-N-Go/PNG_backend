@@ -125,9 +125,10 @@ public class ReviewService {
 
     private Sort toSort(String sort) {
         return switch (sort) {
+            case "LATEST" -> Sort.by(Sort.Direction.DESC, "createdAt");
             case "RATING_HIGH" -> Sort.by(Sort.Direction.DESC, "rating");
             case "RATING_LOW" -> Sort.by(Sort.Direction.ASC, "rating");
-            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+            default -> throw new CustomException(ReviewErrorCode.REVIEW_INVALID_SORT);
         };
     }
 

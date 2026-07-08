@@ -1,6 +1,7 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.dto.BookmarkResponse;
+import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
@@ -15,8 +16,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.List;
+
 @Tag(name = "스팟 (Spot)", description = "스팟 상세 정보 API")
 public interface SpotControllerApiSpec {
+
+    @Operation(summary = "주변 스팟 조회", description = "현재 위치 기준 반경 내 스팟을 거리 순으로 반환합니다. radiusKm 기본값 5.0, limit 기본값 20.")
+    ResponseEntity<List<NearbySpotResponse>> getNearbySpots(
+            @Parameter(description = "위도") @RequestParam Double lat,
+            @Parameter(description = "경도") @RequestParam Double lng,
+            @Parameter(description = "반경 (km)") @RequestParam(defaultValue = "5.0") Double radiusKm,
+            @Parameter(description = "최대 결과 수") @RequestParam(defaultValue = "20") int limit
+    );
 
     @Operation(summary = "스팟 상세 조회", description = "스팟 ID로 상세 정보를 조회합니다. 태그, 편의정보, 체크리스트, 통계, 북마크 여부를 포함합니다.")
     ResponseEntity<SpotDetailResponse> getSpotDetail(

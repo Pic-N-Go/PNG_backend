@@ -11,6 +11,7 @@ import com.project.picngo.spot.dto.PhotogenicResponse.FactorInfo;
 import com.project.picngo.spot.repository.SeasonEventRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.time.MonthDay;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -36,7 +38,12 @@ public class PhotogenicService {
         String region = extractRegion(spot.getAddress());
         FactorInfo seasonFactor = calculateSeason(region);
 
-        Item air = airQualityClient.getAirQuality(region);
+        Item air = null;
+        try {
+            air = airQualityClient.getAirQuality(region);
+        } catch (Exception e) {
+            log.warn("에어코리아 API 호출 실패, 대기질 점수 0점 처리: {}", e.getMessage());
+        }
         FactorInfo fineDustFactor = calculateFineDust(air);
         FactorInfo ozoneFactor = calculateOzone(air);
 

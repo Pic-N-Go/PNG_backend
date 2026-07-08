@@ -6,6 +6,7 @@ import com.project.picngo.external.TourApiClient;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
+import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
 import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.repository.*;
@@ -37,9 +38,9 @@ public class SpotService {
         List<SpotTag> tags = spotTagRepository.findBySpotId(spotId);
         List<String> checklist = ChecklistMapper.getChecklist(spot.getCat3());
 
-        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId).get(0);
-        Double avgRating = (Double) avgAndCount[0];
-        int reviewCount = avgAndCount[1] != null ? ((Long) avgAndCount[1]).intValue() : 0;
+        List<Object[]> rows = reviewRepository.findAvgAndCountBySpotId(spotId);
+        Double avgRating = rows.isEmpty() || rows.get(0)[0] == null ? null : (Double) rows.get(0)[0];
+        int reviewCount = rows.isEmpty() || rows.get(0)[1] == null ? 0 : ((Long) rows.get(0)[1]).intValue();
         long photoCount = spotPhotoRepository.countBySpotId(spotId);
         boolean isBookmarked = bookmarkRepository.existsBySpotIdAndUserId(spotId, TEMP_USER_ID);
 
@@ -48,6 +49,25 @@ public class SpotService {
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
                 reviewCount, photoCount, isBookmarked
         );
+    }
+
+    public List<NearbySpotResponse> getNearbySpots(Double lat, Double lng, Double radiusKm, int limit) {
+        List<Spot> spots = spotRepository.findNearbySpots(lat, lng, radiusKm, Math.min(limit, 50));
+        return spots.stream()
+                .map(spot -> {
+                    double distance = calcDistance(lat, lng, spot.getLatitude(), spot.getLongitude());
+                    return NearbySpotResponse.of(spot, distance);
+                })
+                .toList();
+    }
+
+    private double calcDistance(double lat1, double lng1, double lat2, double lng2) {
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLng = Math.toRadians(lng2 - lng1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
     public SpotPhotoResponse getSpotPhotos(Long spotId) {
