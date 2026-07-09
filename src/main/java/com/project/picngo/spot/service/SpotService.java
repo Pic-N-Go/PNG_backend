@@ -12,6 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -38,7 +40,30 @@ public class SpotService {
         ).map(SpotResponse::from);
     }
 
-    // Search approved spots by keyword and optional category.
+    // 북마크 수와 리뷰 수를 기준으로 인기스팟 조회
+    public List<SpotResponse> getPopularSpots(String category, int size){
+        SpotCategory spotCategory = parseCategory(category);
+        Pageable pageable = createPageable(0, size, "popular");
+
+        if (spotCategory == null) {
+            return spotRepository.findAllByStatusAndIsActiveTrue(
+                    SpotStatus.APPROVED,
+                    pageable
+            ).stream()
+                    .map(SpotResponse::from)
+                    .toList();
+        }
+
+        return spotRepository.findAllByCategoryAndStatusAndIsActiveTrue(
+                spotCategory,
+                SpotStatus.APPROVED,
+                pageable
+        ).stream()
+                .map(SpotResponse::from)
+                .toList();
+    }
+
+    // 키워드로 스팟 검색하기
     public Page<SpotResponse> searchSpots(String keyword, String category, int page, int size) {
         if (keyword == null || keyword.isBlank()) {
             throw new IllegalArgumentException("검색어를 입력해주세요.");

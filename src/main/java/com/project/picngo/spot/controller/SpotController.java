@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/spots")
 @RequiredArgsConstructor
@@ -25,6 +27,15 @@ public class SpotController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(spotService.getSpots(category, sort, page, size));
+    }
+
+    // 인기 스팟 조회 API
+    @GetMapping("/popular")
+    public ResponseEntity<List<SpotResponse>> getPopularSpots(
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "10") int size
+    ){
+        return ResponseEntity.ok(spotService.getPopularSpots(category, size));
     }
 
     // 스팟 검색 API
