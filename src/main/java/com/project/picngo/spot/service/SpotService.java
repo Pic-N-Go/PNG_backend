@@ -41,7 +41,7 @@ public class SpotService {
     // Search approved spots by keyword and optional category.
     public Page<SpotResponse> searchSpots(String keyword, String category, int page, int size) {
         if (keyword == null || keyword.isBlank()) {
-            throw new IllegalArgumentException("寃?됱뼱瑜??낅젰?댁＜?몄슂.");
+            throw new IllegalArgumentException("검색어를 입력해주세요.");
         }
 
         SpotCategory spotCategory = parseCategory(category);
