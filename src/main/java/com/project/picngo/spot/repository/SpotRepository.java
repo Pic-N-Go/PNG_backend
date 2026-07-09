@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SpotRepository extends JpaRepository<Spot, Long> {
 
@@ -63,5 +64,10 @@ order by s.photogenicScore desc, s.bookmarkCount desc
             @Param("northEastLng") Double northEastLng,
             @Param("category") SpotCategory category,
             @Param("status") SpotStatus status
+    );
+
+    Optional<Spot> findByIdAndStatusAndIsActiveTrue(
+            Long id,
+            SpotStatus status
     );
 }

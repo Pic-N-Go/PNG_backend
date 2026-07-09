@@ -2,14 +2,12 @@ package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
+import com.project.picngo.spot.dto.SpotSummaryResponse;
 import com.project.picngo.spot.service.SpotService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -66,5 +64,13 @@ public class SpotController {
                 northEastLng,
                 category
         ));
+    }
+
+    // 지도 핀 선택 시 하단 요약 카드에 표시할 스팟 정보 조회 API
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<SpotSummaryResponse> getSpotSummary(
+            @PathVariable Long id
+    ){
+        return ResponseEntity.ok(spotService.getSpotSummary(id));
     }
 }

@@ -4,6 +4,7 @@ import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.SpotStatus;
 import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
+import com.project.picngo.spot.dto.SpotSummaryResponse;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -150,5 +151,12 @@ public class SpotService {
         if (southWestLat > northEastLat || southWestLng > northEastLng) {
             throw new IllegalArgumentException("지도 영역 좌표가 올바르지 않습니다.");
         }
+    }
+
+    // 지도 핀을 선택했을 때 보여줄 스팟 요약 정보 조회
+    public SpotSummaryResponse getSpotSummary(Long id){
+        return spotRepository.findByIdAndStatusAndIsActiveTrue(id, SpotStatus.APPROVED)
+                .map(SpotSummaryResponse::from)
+                .orElseThrow(()-> new IllegalArgumentException("스팟을 찾을 수 없습니다."));
     }
 }
