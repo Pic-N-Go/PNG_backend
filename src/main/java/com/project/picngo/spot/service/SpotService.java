@@ -2,6 +2,7 @@ package com.project.picngo.spot.service;
 
 import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.SpotStatus;
+import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
@@ -109,6 +110,45 @@ public class SpotService {
             return SpotCategory.valueOf(category.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("吏?먰븯吏 ?딅뒗 ?ㅽ뙚 移댄뀒怨좊━?낅땲??");
+        }
+    }
+
+    // 지도 영역 좌표를 기준으로 화면에 표시할 스팟 핀 목록 조회
+    public List<SpotMapResponse> getMapSpots(
+            Double southWestLat,
+            Double southWestLng,
+            Double northEastLat,
+            Double northEastLng,
+            String category
+    ){
+        validateMapBounds(southWestLat, southWestLng, northEastLat, northEastLng);
+
+        SpotCategory spotCategory = parseCategory(category);
+
+        return spotRepository.findSpotsInMapBounds(
+                southWestLat,
+                southWestLng,
+                northEastLat,
+                northEastLng,
+                spotCategory,
+                SpotStatus.APPROVED
+        ).stream()
+                .map(SpotMapResponse::from)
+                .toList();
+    }
+
+    private void validateMapBounds(
+            Double southWestLat,
+            Double southWestLng,
+            Double northEastLat,
+            Double northEastLng
+    ){
+        if (southWestLat == null || southWestLng == null || northEastLat == null || northEastLng == null) {
+            throw new IllegalArgumentException("지도 영역 좌표를 모두 입력해주세요.");
+        }
+
+        if (southWestLat > northEastLat || southWestLng > northEastLng) {
+            throw new IllegalArgumentException("지도 영역 좌표가 올바르지 않습니다.");
         }
     }
 }

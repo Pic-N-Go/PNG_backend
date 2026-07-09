@@ -1,5 +1,6 @@
 package com.project.picngo.spot.controller;
 
+import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.service.SpotService;
 import lombok.RequiredArgsConstructor;
@@ -47,5 +48,23 @@ public class SpotController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ResponseEntity.ok(spotService.searchSpots(keyword, category, page, size));
+    }
+
+    // 현재 지도 영역 안의 스팟 핀 조회 API
+    @GetMapping("/map")
+    public ResponseEntity<List<SpotMapResponse>> getMapSpots(
+            @RequestParam Double southWestLat,
+            @RequestParam Double southWestLng,
+            @RequestParam Double northEastLat,
+            @RequestParam Double northEastLng,
+            @RequestParam(required = false) String category
+    ){
+        return ResponseEntity.ok(spotService.getMapSpots(
+                southWestLat,
+                southWestLng,
+                northEastLat,
+                northEastLng,
+                category
+        ));
     }
 }

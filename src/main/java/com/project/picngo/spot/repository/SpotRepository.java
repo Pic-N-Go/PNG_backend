@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface SpotRepository extends JpaRepository<Spot, Long> {
 
     Page<Spot> findAllByStatusAndIsActiveTrue(
@@ -41,5 +43,25 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
             @Param("category") SpotCategory category,
             @Param("status") SpotStatus status,
             Pageable pageable
+    );
+
+    // 지도 화면의 현재 영역 안에 있는 스팟 조회
+    @Query("""
+select s
+from Spot s
+where s.status = :status
+and s.isActive = true
+and (:category is null or s.category = :category)
+and s.latitude between :southWestLat and :northEastLat
+and s.longitude between :southWestLng and :northEastLng
+order by s.photogenicScore decsc, s.bookmarkCount desc
+""")
+    List<Spot> findSpotInMapBounds(
+            @Param("southWestLat") Double southWestLat,
+            @Param("southWestLng") Double southWestLng,
+            @Param("northEastLat") Double northEastLat,
+            @Param("northEastLng") Double northEastLng,
+            @Param("category") SpotCategory category,
+            @Param("status") SpotStatus status
     );
 }
