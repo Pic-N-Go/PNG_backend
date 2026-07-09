@@ -1,5 +1,7 @@
 package com.project.picngo.spot.service;
 
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.SpotStatus;
 import com.project.picngo.spot.dto.SpotMapResponse;
@@ -68,7 +70,7 @@ public class SpotService {
     // 키워드로 스팟 검색하기
     public Page<SpotResponse> searchSpots(String keyword, String category, int page, int size) {
         if (keyword == null || keyword.isBlank()) {
-            throw new IllegalArgumentException("검색어를 입력해주세요.");
+            throw new CustomException(SpotErrorCode.SEARCH_KEYWORD_REQUIRED);
         }
 
         SpotCategory spotCategory = parseCategory(category);
@@ -110,7 +112,7 @@ public class SpotService {
         try {
             return SpotCategory.valueOf(category.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("吏?먰븯吏 ?딅뒗 ?ㅽ뙚 移댄뀒怨좊━?낅땲??");
+            throw new CustomException(SpotErrorCode.INVALID_SPOT_CATEGORY);
         }
     }
 
@@ -145,11 +147,11 @@ public class SpotService {
             Double northEastLng
     ){
         if (southWestLat == null || southWestLng == null || northEastLat == null || northEastLng == null) {
-            throw new IllegalArgumentException("지도 영역 좌표를 모두 입력해주세요.");
+            throw new CustomException(SpotErrorCode.MAP_BOUNDS_REQUIRED);
         }
 
         if (southWestLat > northEastLat || southWestLng > northEastLng) {
-            throw new IllegalArgumentException("지도 영역 좌표가 올바르지 않습니다.");
+            throw new CustomException(SpotErrorCode.INVALID_MAP_BOUNDS);
         }
     }
 
@@ -157,6 +159,6 @@ public class SpotService {
     public SpotSummaryResponse getSpotSummary(Long id){
         return spotRepository.findByIdAndStatusAndIsActiveTrue(id, SpotStatus.APPROVED)
                 .map(SpotSummaryResponse::from)
-                .orElseThrow(()-> new IllegalArgumentException("스팟을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
     }
 }
