@@ -54,9 +54,9 @@ and s.isActive = true
 and (:category is null or s.category = :category)
 and s.latitude between :southWestLat and :northEastLat
 and s.longitude between :southWestLng and :northEastLng
-order by s.photogenicScore decsc, s.bookmarkCount desc
+order by s.photogenicScore desc, s.bookmarkCount desc
 """)
-    List<Spot> findSpotInMapBounds(
+    List<Spot> findSpotsInMapBounds(
             @Param("southWestLat") Double southWestLat,
             @Param("southWestLng") Double southWestLng,
             @Param("northEastLat") Double northEastLat,
