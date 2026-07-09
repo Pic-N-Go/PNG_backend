@@ -1,0 +1,24 @@
+package com.project.picngo.chat.controller;
+
+import com.project.picngo.chat.dto.ChatMessageResponse;
+import com.project.picngo.chat.dto.ChatParticipantResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
+
+import java.util.List;
+
+public interface ChatRestControllerApiSpec {
+
+    @Operation(summary = "채팅 메시지 조회", description = "스팟 채팅방의 최근 메시지 목록을 조회합니다.")
+    ResponseEntity<List<ChatMessageResponse>> getMessages(@PathVariable Long spotId);
+
+    @Operation(summary = "채팅 미리보기 조회", description = "스팟 채팅방의 최근 메시지 3개를 조회합니다.")
+    ResponseEntity<List<ChatMessageResponse>> getPreviewMessages(@PathVariable Long spotId);
+
+    @Operation(summary = "채팅 참여 인원 조회", description = "스팟 채팅방에 현재 참여 중인 사용자 수를 조회합니다.")
+    ResponseEntity<Long> getParticipantCount(@PathVariable Long spotId);
+
+    @Operation(summary = "채팅 참여자 목록 조회", description = "스팟 채팅방에 현재 참여 중인 사용자 목록을 조회합니다.")
+    ResponseEntity<List<ChatParticipantResponse>> getParticipants(@PathVariable Long spotId);
+}
