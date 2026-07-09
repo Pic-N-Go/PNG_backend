@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/spots")
 @RequiredArgsConstructor
-public class SpotController {
+public class SpotController implements SpotControllerApiSpec {
 
     private final SpotService spotService;
 
