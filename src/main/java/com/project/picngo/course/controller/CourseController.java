@@ -30,8 +30,8 @@ public class CourseController implements CourseControllerApiSpec {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CourseDetailResponse> getCourseDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(courseService.getCourseDetail(id));
+    public ResponseEntity<CourseDetailResponse> getCourseDetail(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
+        return ResponseEntity.ok(courseService.getCourseDetail(userDetails.getId(), id));
     }
 
     @PutMapping("/{id}")

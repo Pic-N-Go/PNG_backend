@@ -25,7 +25,7 @@ public interface CourseControllerApiSpec {
 
     @Operation(summary = "코스 상세 조회", description = "특정 코스의 상세 정보와 포함된 명소 목록을 조회합니다.")
     @Parameter(name = "id", description = "코스 ID")
-    ResponseEntity<CourseDetailResponse> getCourseDetail(@PathVariable Long id);
+    ResponseEntity<CourseDetailResponse> getCourseDetail(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id);
 
     @Operation(summary = "코스 정보 수정", description = "코스의 이름이나 설명을 수정합니다.")
     ResponseEntity<CourseResponse> updateCourse(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseCreateRequest request);
