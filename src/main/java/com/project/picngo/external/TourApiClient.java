@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.DefaultUriBuilderFactory;
 
 import java.util.Collections;
 import java.util.List;
@@ -24,7 +25,10 @@ public class TourApiClient {
     private final String serviceKey;
 
     public TourApiClient(WebClient.Builder builder, @Value("${tour.api.key}") String serviceKey) { // ponytail: tour.api.key → PUBLIC_DATA_SERVICE_KEY 경유
-        this.webClient = builder.baseUrl(BASE_URL).build();
+        // 공공데이터포털 서비스키는 이미 URL 인코딩된 상태로 발급됨 → 이중 인코딩 방지
+        DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory(BASE_URL);
+        factory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.NONE);
+        this.webClient = builder.uriBuilderFactory(factory).build();
         this.serviceKey = serviceKey;
     }
 

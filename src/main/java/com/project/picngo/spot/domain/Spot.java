@@ -147,6 +147,19 @@ public class Spot extends BaseTimeEntity {
         this.petFriendly = petFriendly;
     }
 
+    public void incrementBookmarkCount() {
+        this.bookmarkCount = (this.bookmarkCount == null ? 0 : this.bookmarkCount) + 1;
+    }
+
+    public void decrementBookmarkCount() {
+        this.bookmarkCount = Math.max(0, (this.bookmarkCount == null ? 0 : this.bookmarkCount) - 1);
+    }
+
+    public void updateReviewStats(Double avgRating, int count) {
+        this.reviewAverage = avgRating != null ? avgRating : 0.0;
+        this.reviewCount = count;
+    }
+
     @Builder
     public Spot(String name, String address, String zipcode, String overview,
                 Double latitude, Double longitude,

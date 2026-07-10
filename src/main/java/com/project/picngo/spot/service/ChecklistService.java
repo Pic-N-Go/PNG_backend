@@ -51,16 +51,21 @@ public class ChecklistService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
-        int count = checklistItemRepository.countBySpotIdAndUserId(spotId, TEMP_USER_ID);
-        if (count >= MAX_USER_ITEMS) {
+        List<ChecklistItem> userItems = checklistItemRepository.findBySpotIdAndUserIdOrderByOrderIndex(spotId, TEMP_USER_ID);
+        if (userItems.size() >= MAX_USER_ITEMS) {
             throw new CustomException(SpotErrorCode.CHECKLIST_LIMIT_EXCEEDED);
         }
+
+        int nextOrderIndex = userItems.stream()
+                .mapToInt(ChecklistItem::getOrderIndex)
+                .max()
+                .orElse(-1) + 1;
 
         ChecklistItem item = ChecklistItem.builder()
                 .spot(spot)
                 .userId(TEMP_USER_ID)
                 .content(request.content())
-                .orderIndex(count)
+                .orderIndex(nextOrderIndex)
                 .build();
 
         return ChecklistItemDto.from(checklistItemRepository.save(item));

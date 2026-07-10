@@ -29,10 +29,12 @@ public class BookmarkService {
         return bookmarkRepository.findBySpotIdAndUserId(spotId, TEMP_USER_ID)
                 .map(bookmark -> {
                     bookmarkRepository.delete(bookmark);
+                    spot.decrementBookmarkCount();
                     return new BookmarkResponse(false);
                 })
                 .orElseGet(() -> {
                     bookmarkRepository.save(Bookmark.builder().spot(spot).userId(TEMP_USER_ID).build());
+                    spot.incrementBookmarkCount();
                     return new BookmarkResponse(true);
                 });
     }

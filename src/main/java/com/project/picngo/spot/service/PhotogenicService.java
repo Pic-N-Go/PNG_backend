@@ -116,7 +116,7 @@ public class PhotogenicService {
     private FactorInfo calculateSeason(String region) {
         List<SeasonEvent> events = seasonEventRepository.findActiveByRegion(region);
 
-        MonthDay today = MonthDay.now();
+        MonthDay today = MonthDay.now(java.time.ZoneId.of("Asia/Seoul"));
 
         return events.stream()
                 .filter(e -> isInRange(today, MonthDay.parse(e.getMonthDayStart(), MM_DD),

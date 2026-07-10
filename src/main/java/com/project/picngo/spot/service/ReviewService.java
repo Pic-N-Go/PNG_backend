@@ -48,8 +48,11 @@ public class ReviewService {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), toSort(sort));
         Page<Review> reviewPage = reviewRepository.findBySpotId(spotId, pageable);
 
-        Object[] avgAndCount = reviewRepository.findAvgAndCountBySpotId(spotId).get(0);
-        Double avgRating = (Double) avgAndCount[0];
+        List<Object[]> avgAndCountList = reviewRepository.findAvgAndCountBySpotId(spotId);
+        Double avgRating = null;
+        if (avgAndCountList != null && !avgAndCountList.isEmpty()) {
+            avgRating = (Double) avgAndCountList.get(0)[0];
+        }
         Map<Integer, Long> distribution = buildDistribution(spotId);
 
         List<Review> reviews = reviewPage.getContent();
@@ -98,7 +101,9 @@ public class ReviewService {
                 .visitedAt(request.visitedAt())
                 .build();
 
-        return ReviewResponse.from(reviewRepository.save(review));
+        ReviewResponse saved = ReviewResponse.from(reviewRepository.save(review));
+        updateSpotReviewStats(spot);
+        return saved;
     }
 
     @Transactional
@@ -111,7 +116,10 @@ public class ReviewService {
     @Transactional
     public void deleteReview(Long reviewId) {
         Review review = findMyReview(reviewId);
+        Spot spot = review.getSpot();
         reviewRepository.delete(review);
+        reviewRepository.flush();
+        updateSpotReviewStats(spot);
     }
 
     private Review findMyReview(Long reviewId) {
@@ -130,6 +138,14 @@ public class ReviewService {
             case "RATING_LOW" -> Sort.by(Sort.Direction.ASC, "rating");
             default -> throw new CustomException(ReviewErrorCode.REVIEW_INVALID_SORT);
         };
+    }
+
+    private void updateSpotReviewStats(Spot spot) {
+        List<Object[]> rows = reviewRepository.findAvgAndCountBySpotId(spot.getId());
+        Double avg = (rows != null && !rows.isEmpty()) ? (Double) rows.get(0)[0] : null;
+        int count = (rows != null && !rows.isEmpty() && rows.get(0)[1] != null)
+                ? ((Long) rows.get(0)[1]).intValue() : 0;
+        spot.updateReviewStats(avg, count);
     }
 
     private Map<Integer, Long> buildDistribution(Long spotId) {
