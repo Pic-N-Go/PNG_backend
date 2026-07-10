@@ -52,13 +52,15 @@ public class CourseService {
     }
 
     public List<CourseResponse> getCourses(Long userId) {
+        validateUserExists(userId);
         return courseRepository.findAllByUserId(userId).stream()
                 .map(this::toCourseResponse)
                 .toList();
     }
 
-    public CourseDetailResponse getCourseDetail(Long courseId) {
+    public CourseDetailResponse getCourseDetail(Long userId, Long courseId) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
 
         List<CourseSpotResponse> spots = course.getCourseSpots().stream()
                 .map(this::toCourseSpotResponse)
