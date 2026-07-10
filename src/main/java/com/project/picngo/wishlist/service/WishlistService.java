@@ -28,7 +28,6 @@ public class WishlistService {
     private final UserRepository userRepository;
 
     public List<WishlistResponse> getWishlist(Long userId) {
-        validateUserExists(userId);
         // Fetch all wishlists (folders) for the user.
         // For production, use Fetch Join to avoid N+1 problem with items.
         // For now, we rely on lazy loading (which may trigger N+1) until we optimize queries.

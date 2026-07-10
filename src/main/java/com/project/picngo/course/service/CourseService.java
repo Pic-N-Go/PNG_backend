@@ -52,7 +52,6 @@ public class CourseService {
     }
 
     public List<CourseResponse> getCourses(Long userId) {
-        validateUserExists(userId);
         return courseRepository.findAllByUserId(userId).stream()
                 .map(this::toCourseResponse)
                 .toList();
