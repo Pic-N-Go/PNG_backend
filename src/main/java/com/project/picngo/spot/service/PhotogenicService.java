@@ -11,6 +11,7 @@ import com.project.picngo.spot.domain.SeasonEvent;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse.FactorInfo;
+import com.project.picngo.spot.dto.PhotogenicResponse.GoldenHourInfo;
 import com.project.picngo.spot.repository.SeasonEventRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,22 +36,25 @@ import java.util.List;
 public class PhotogenicService {
 
     private static final DateTimeFormatter MM_DD = DateTimeFormatter.ofPattern("MM-dd");
-
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HHmm");
+    private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
 
     private final SpotRepository spotRepository;
     private final SeasonEventRepository seasonEventRepository;
     private final AirQualityClient airQualityClient;
     private final WeatherClient weatherClient;
 
-    public PhotogenicResponse calculate(Long spotId) {
+    public PhotogenicResponse calculate(Long spotId, LocalDate date, LocalTime time) {
+        LocalDate resolvedDate = date != null ? date : LocalDate.now(KST);
+        LocalTime resolvedTime = time != null ? time : LocalTime.now(KST);
+
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         String region = extractRegion(spot.getAddress());
-        FactorInfo seasonFactor = calculateSeason(region);
+        FactorInfo seasonFactor = calculateSeason(region, resolvedDate);
 
         Item air = null;
         try {
@@ -61,9 +65,8 @@ public class PhotogenicService {
         FactorInfo fineDustFactor = calculateFineDust(air);
         FactorInfo ozoneFactor = calculateOzone(air);
 
-        LocalDate nowDate = LocalDate.now(KST);
-        FactorInfo weatherFactor = calculateWeather(spot.getLatitude(), spot.getLongitude(), nowDate);
-        FactorInfo goldenHourFactor = calculateGoldenHour(spot.getLatitude(), spot.getLongitude(), nowDate);
+        FactorInfo weatherFactor = calculateWeather(spot.getLatitude(), spot.getLongitude(), resolvedDate, resolvedTime);
+        GoldenHourInfo goldenHourFactor = calculateGoldenHour(spot.getLatitude(), spot.getLongitude(), resolvedDate, resolvedTime);
 
         int total = weatherFactor.score() + fineDustFactor.score()
                 + ozoneFactor.score() + seasonFactor.score() + goldenHourFactor.score();
@@ -79,21 +82,21 @@ public class PhotogenicService {
         );
     }
 
-    // 날씨 만점 30점 — 현재 시각에 가장 가까운 예보 슬롯 기준
-    private FactorInfo calculateWeather(Double lat, Double lng, LocalDate date) {
+    // 날씨 만점 30점 — 선택한 시각에 가장 가까운 예보 슬롯 기준
+    private FactorInfo calculateWeather(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
             String dateStr = date.format(DATE_FMT);
             List<WeatherForecastResponse> forecasts = weatherClient.getForecast(lat, lng, dateStr);
             if (forecasts == null || forecasts.isEmpty()) return new FactorInfo("데이터 없음", 0);
 
-            LocalTime now = LocalTime.now(KST);
             WeatherForecastResponse closest = forecasts.stream()
                     .filter(f -> f.date().equals(dateStr))
                     .min(Comparator.comparingLong(f -> {
-                        long diff = Math.abs(Duration.between(LocalTime.parse(f.time(), HHMM), now).toMinutes());
+                        long diff = Math.abs(Duration.between(LocalTime.parse(f.time(), HHMM), time).toMinutes());
                         return Math.min(diff, 1440 - diff);
                     }))
-                    .orElse(forecasts.get(0));
+                    .orElse(null);
+            if (closest == null) return new FactorInfo("데이터 없음", 0);
 
             return switch (closest.weatherStatus()) {
                 case "CLEAR"  -> new FactorInfo("맑음", 30);
@@ -109,22 +112,37 @@ public class PhotogenicService {
     }
 
     // 골든아워 만점 5점 — 일출/일몰 전후 30분 이내
-    private FactorInfo calculateGoldenHour(Double lat, Double lng, LocalDate date) {
+    private GoldenHourInfo calculateGoldenHour(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
             GoldenHourResponse goldenHour = weatherClient.getGoldenHour(lat, lng, date.toString());
-            if (goldenHour == null) return new FactorInfo("데이터 없음", 0);
-            LocalTime now = LocalTime.now(KST);
+            if (goldenHour == null) return new GoldenHourInfo("데이터 없음", 0, null, null);
+
             LocalTime sunrise = OffsetDateTime.parse(goldenHour.sunriseTime()).atZoneSameInstant(KST).toLocalTime();
             LocalTime sunset = OffsetDateTime.parse(goldenHour.sunsetTime()).atZoneSameInstant(KST).toLocalTime();
 
-            boolean isMorningGolden = !now.isBefore(sunrise.minusMinutes(30)) && !now.isAfter(sunrise.plusMinutes(30));
-            boolean isEveningGolden = !now.isBefore(sunset.minusMinutes(30)) && !now.isAfter(sunset.plusMinutes(30));
+            LocalTime morningStart = sunrise.minusMinutes(30);
+            LocalTime morningEnd = sunrise.plusMinutes(30);
+            LocalTime eveningStart = sunset.minusMinutes(30);
+            LocalTime eveningEnd = sunset.plusMinutes(30);
 
-            if (isMorningGolden || isEveningGolden) return new FactorInfo("골든아워", 5);
-            return new FactorInfo("해당 없음", 0);
+            if (!time.isBefore(morningStart) && !time.isAfter(morningEnd)) {
+                return new GoldenHourInfo("골든아워", 5, null, morningStart.format(HH_MM));
+            }
+            if (!time.isBefore(eveningStart) && !time.isAfter(eveningEnd)) {
+                return new GoldenHourInfo("골든아워", 5, null, eveningStart.format(HH_MM));
+            }
+            if (time.isBefore(morningStart)) {
+                long minutes = Duration.between(time, morningStart).toMinutes();
+                return new GoldenHourInfo("해당 없음", 0, (int) minutes, morningStart.format(HH_MM));
+            }
+            if (time.isBefore(eveningStart)) {
+                long minutes = Duration.between(time, eveningStart).toMinutes();
+                return new GoldenHourInfo("해당 없음", 0, (int) minutes, eveningStart.format(HH_MM));
+            }
+            return new GoldenHourInfo("해당 없음", 0, null, null);
         } catch (Exception e) {
             log.warn("골든아워 API 호출 실패, 0점 처리: {}", e.getMessage());
-            return new FactorInfo("데이터 없음", 0);
+            return new GoldenHourInfo("데이터 없음", 0, null, null);
         }
     }
 
@@ -176,10 +194,9 @@ public class PhotogenicService {
         return val != null ? val : "";
     }
 
-    private FactorInfo calculateSeason(String region) {
+    private FactorInfo calculateSeason(String region, LocalDate date) {
         List<SeasonEvent> events = seasonEventRepository.findActiveByRegion(region);
-
-        MonthDay today = MonthDay.now(java.time.ZoneId.of("Asia/Seoul"));
+        MonthDay today = MonthDay.from(date);
 
         return events.stream()
                 .filter(e -> isInRange(today, MonthDay.parse(e.getMonthDayStart(), MM_DD),
@@ -198,9 +215,8 @@ public class PhotogenicService {
         MonthDay peakEnd = MonthDay.parse(event.getMonthDayPeakEnd(), MM_DD);
 
         if (!today.isBefore(peakStart) && !today.isAfter(peakEnd)) {
-            return event.getMaxScore(); // 피크 구간 = 만점
+            return event.getMaxScore();
         }
-        // 피크 바깥: 절반 점수
         return event.getMaxScore() / 2;
     }
 
