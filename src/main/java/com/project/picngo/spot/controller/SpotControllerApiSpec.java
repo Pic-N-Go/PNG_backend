@@ -14,6 +14,7 @@ import com.project.picngo.spot.dto.SpotPhotoResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -73,7 +74,7 @@ public interface SpotControllerApiSpec {
     @Operation(summary = "체크리스트 항목 추가", description = "사용자가 체크리스트 항목을 추가합니다. 최대 10개, 내용 20자 이하.")
     ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
             @Parameter(description = "스팟 ID") @PathVariable Long id,
-            @RequestBody ChecklistRequest request
+            @Valid @RequestBody ChecklistRequest request
     );
 
     @Operation(summary = "체크리스트 항목 삭제", description = "사용자가 직접 추가한 항목만 삭제 가능합니다.")

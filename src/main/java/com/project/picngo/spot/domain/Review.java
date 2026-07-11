@@ -1,6 +1,7 @@
 package com.project.picngo.spot.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.spot.domain.enums.TimeSlot;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import lombok.AccessLevel;
@@ -44,20 +45,27 @@ public class Review extends BaseTimeEntity {
     @Column
     private LocalDate visitedAt;
 
+    @Comment("촬영 시간대. SUNRISE/DAY/SUNSET/NIGHT")
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private TimeSlot timeSlot;
+
     @Builder
-    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, LocalDate visitedAt) {
+    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, LocalDate visitedAt, TimeSlot timeSlot) {
         this.spot = spot;
         this.userId = userId;
         this.rating = rating;
         this.content = content;
         this.equipmentInfo = equipmentInfo;
         this.visitedAt = visitedAt;
+        this.timeSlot = timeSlot;
     }
 
-    public void update(Integer rating, String content, String equipmentInfo, LocalDate visitedAt) {
+    public void update(Integer rating, String content, String equipmentInfo, LocalDate visitedAt, TimeSlot timeSlot) {
         this.rating = rating;
         this.content = content;
         this.equipmentInfo = equipmentInfo;
         this.visitedAt = visitedAt;
+        this.timeSlot = timeSlot;
     }
 }

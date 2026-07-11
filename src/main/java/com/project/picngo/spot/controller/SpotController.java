@@ -16,6 +16,7 @@ import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -96,7 +97,7 @@ public class SpotController implements SpotControllerApiSpec {
     @PostMapping("/{id}/checklist")
     public ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
             @PathVariable Long id,
-            @jakarta.validation.Valid @RequestBody ChecklistRequest request
+            @Valid @RequestBody ChecklistRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(checklistService.addItem(id, request));
     }
@@ -110,7 +111,7 @@ public class SpotController implements SpotControllerApiSpec {
     @PostMapping("/{id}/reviews")
     public ResponseEntity<ReviewResponse> createReview(
             @PathVariable Long id,
-            @jakarta.validation.Valid @RequestBody ReviewRequest request
+            @Valid @RequestBody ReviewRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(id, request));
     }

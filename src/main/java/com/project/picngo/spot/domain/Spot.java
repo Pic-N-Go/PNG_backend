@@ -130,10 +130,6 @@ public class Spot extends BaseTimeEntity {
     @Column(nullable = false)
     private Double reviewAverage = 0.0;
 
-    @Comment("화장실 여부")
-    @Column(nullable = false)
-    private Boolean toilet = false;
-
     public void updateFromTourApi(String overview, String parking, String usetime,
                                    String restdate, String infocenter,
                                    String wheelchairAccess, String strollerAccess, String petFriendly) {

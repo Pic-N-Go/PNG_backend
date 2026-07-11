@@ -96,6 +96,7 @@ public class ReviewService {
                 .spot(spot)
                 .userId(TEMP_USER_ID)
                 .rating(request.rating())
+                .timeSlot(request.timeSlot())
                 .content(request.content())
                 .equipmentInfo(request.equipmentInfo())
                 .visitedAt(request.visitedAt())
@@ -109,7 +110,7 @@ public class ReviewService {
     @Transactional
     public ReviewResponse updateReview(Long reviewId, ReviewRequest request) {
         Review review = findMyReview(reviewId);
-        review.update(request.rating(), request.content(), request.equipmentInfo(), request.visitedAt());
+        review.update(request.rating(), request.content(), request.equipmentInfo(), request.visitedAt(), request.timeSlot());
         return ReviewResponse.from(review);
     }
 
