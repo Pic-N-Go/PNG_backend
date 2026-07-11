@@ -3,7 +3,10 @@ package com.project.picngo.spot.service;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.external.AirQualityClient;
+import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.AirQualityResponse.Item;
+import com.project.picngo.external.dto.GoldenHourResponse;
+import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.spot.domain.SeasonEvent;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.dto.PhotogenicResponse;
@@ -15,8 +18,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.MonthDay;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 
 @Slf4j
@@ -27,9 +36,14 @@ public class PhotogenicService {
 
     private static final DateTimeFormatter MM_DD = DateTimeFormatter.ofPattern("MM-dd");
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HHmm");
+
     private final SpotRepository spotRepository;
     private final SeasonEventRepository seasonEventRepository;
     private final AirQualityClient airQualityClient;
+    private final WeatherClient weatherClient;
 
     public PhotogenicResponse calculate(Long spotId) {
         Spot spot = spotRepository.findById(spotId)
@@ -47,9 +61,9 @@ public class PhotogenicService {
         FactorInfo fineDustFactor = calculateFineDust(air);
         FactorInfo ozoneFactor = calculateOzone(air);
 
-        // ponytail: 날씨/골든아워는 모정민 영역, 연동 후 채움
-        FactorInfo weatherFactor = new FactorInfo("구현 예정", 0);
-        FactorInfo goldenHourFactor = new FactorInfo("구현 예정", 0);
+        LocalDate nowDate = LocalDate.now(KST);
+        FactorInfo weatherFactor = calculateWeather(spot.getLatitude(), spot.getLongitude(), nowDate);
+        FactorInfo goldenHourFactor = calculateGoldenHour(spot.getLatitude(), spot.getLongitude(), nowDate);
 
         int total = weatherFactor.score() + fineDustFactor.score()
                 + ozoneFactor.score() + seasonFactor.score() + goldenHourFactor.score();
@@ -63,6 +77,55 @@ public class PhotogenicService {
                 seasonFactor,
                 goldenHourFactor
         );
+    }
+
+    // 날씨 만점 30점 — 현재 시각에 가장 가까운 예보 슬롯 기준
+    private FactorInfo calculateWeather(Double lat, Double lng, LocalDate date) {
+        try {
+            String dateStr = date.format(DATE_FMT);
+            List<WeatherForecastResponse> forecasts = weatherClient.getForecast(lat, lng, dateStr);
+            if (forecasts == null || forecasts.isEmpty()) return new FactorInfo("데이터 없음", 0);
+
+            LocalTime now = LocalTime.now(KST);
+            WeatherForecastResponse closest = forecasts.stream()
+                    .filter(f -> f.date().equals(dateStr))
+                    .min(Comparator.comparingLong(f -> {
+                        long diff = Math.abs(Duration.between(LocalTime.parse(f.time(), HHMM), now).toMinutes());
+                        return Math.min(diff, 1440 - diff);
+                    }))
+                    .orElse(forecasts.get(0));
+
+            return switch (closest.weatherStatus()) {
+                case "CLEAR"  -> new FactorInfo("맑음", 30);
+                case "CLOUDY" -> new FactorInfo("흐림", 15);
+                case "SNOWY"  -> new FactorInfo("눈", 10);
+                case "RAINY"  -> new FactorInfo("비", 5);
+                default       -> new FactorInfo("데이터 없음", 0);
+            };
+        } catch (Exception e) {
+            log.warn("날씨 API 호출 실패, 0점 처리: {}", e.getMessage());
+            return new FactorInfo("데이터 없음", 0);
+        }
+    }
+
+    // 골든아워 만점 5점 — 일출/일몰 전후 30분 이내
+    private FactorInfo calculateGoldenHour(Double lat, Double lng, LocalDate date) {
+        try {
+            GoldenHourResponse goldenHour = weatherClient.getGoldenHour(lat, lng, date.toString());
+            if (goldenHour == null) return new FactorInfo("데이터 없음", 0);
+            LocalTime now = LocalTime.now(KST);
+            LocalTime sunrise = OffsetDateTime.parse(goldenHour.sunriseTime()).atZoneSameInstant(KST).toLocalTime();
+            LocalTime sunset = OffsetDateTime.parse(goldenHour.sunsetTime()).atZoneSameInstant(KST).toLocalTime();
+
+            boolean isMorningGolden = !now.isBefore(sunrise.minusMinutes(30)) && !now.isAfter(sunrise.plusMinutes(30));
+            boolean isEveningGolden = !now.isBefore(sunset.minusMinutes(30)) && !now.isAfter(sunset.plusMinutes(30));
+
+            if (isMorningGolden || isEveningGolden) return new FactorInfo("골든아워", 5);
+            return new FactorInfo("해당 없음", 0);
+        } catch (Exception e) {
+            log.warn("골든아워 API 호출 실패, 0점 처리: {}", e.getMessage());
+            return new FactorInfo("데이터 없음", 0);
+        }
     }
 
     // 미세먼지 만점 20점 — grade 없으면 pm10Value(㎍/㎥)로 직접 판단
