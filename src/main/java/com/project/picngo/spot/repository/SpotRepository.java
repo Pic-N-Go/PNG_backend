@@ -96,7 +96,8 @@ order by s.photogenicScore desc, s.bookmarkCount desc
             @Param("northEastLat") Double northEastLat,
             @Param("northEastLng") Double northEastLng,
             @Param("category") SpotCategory category,
-            @Param("status") SpotStatus status
+            @Param("status") SpotStatus status,
+            Pageable pageable
     );
 
     Optional<Spot> findByIdAndStatusAndIsActiveTrue(

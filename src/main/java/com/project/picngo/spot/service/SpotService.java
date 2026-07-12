@@ -206,7 +206,8 @@ public class SpotService {
                 request.northEastLat(),
                 request.northEastLng(),
                 spotCategory,
-                SpotStatus.APPROVED
+                SpotStatus.APPROVED,
+                org.springframework.data.domain.PageRequest.of(0, 100)
         ).stream()
                 .map(SpotMapResponse::from)
                 .toList();
