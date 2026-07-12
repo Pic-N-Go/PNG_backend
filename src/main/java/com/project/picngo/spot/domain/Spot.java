@@ -114,27 +114,27 @@ public class Spot extends BaseTimeEntity {
 
     @Comment("북마크 수 (denormalized)")
     @Column(name = "bookmark_count", nullable = false)
-    private Integer bookmarkCount = 0;
+    private int bookmarkCount = 0;
 
     @Comment("리뷰 수 (denormalized)")
     @Column(name = "review_count", nullable = false)
-    private Integer reviewCount = 0;
+    private int reviewCount = 0;
 
     @Comment("포토제닉 점수")
     @Column(name = "photogenic_score", nullable = false)
-    private Integer photogenicScore = 0;
+    private int photogenicScore = 0;
 
     @Comment("활성화 여부")
     @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
+    private boolean isActive = true;
 
     @Comment("리뷰 평균 별점 (denormalized)")
     @Column(name = "review_average", nullable = false)
-    private Double reviewAverage = 0.0;
+    private double reviewAverage = 0.0;
 
     @Comment("화장실 여부")
     @Column(nullable = false)
-    private Boolean toilet = false;
+    private boolean toilet = false;
 
     public void updateFromTourApi(String overview, String parking, String usetime,
                                    String restdate, String infocenter,
@@ -150,11 +150,11 @@ public class Spot extends BaseTimeEntity {
     }
 
     public void incrementBookmarkCount() {
-        this.bookmarkCount = (this.bookmarkCount == null ? 0 : this.bookmarkCount) + 1;
+        this.bookmarkCount += 1;
     }
 
     public void decrementBookmarkCount() {
-        this.bookmarkCount = Math.max(0, (this.bookmarkCount == null ? 0 : this.bookmarkCount) - 1);
+        this.bookmarkCount = Math.max(0, this.bookmarkCount - 1);
     }
 
     public void updateReviewStats(Double avgRating, int count) {
