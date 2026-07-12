@@ -47,6 +47,17 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             Pageable pageable
     );
 
+    List<Spot> findListByStatusAndIsActiveTrue(
+            SpotStatus status,
+            Pageable pageable
+    );
+
+    List<Spot> findListByCategoryAndStatusAndIsActiveTrue(
+            SpotCategory category,
+            SpotStatus status,
+            Pageable pageable
+    );
+
     // 키워드로 스팟 이름, 주소, 설명 검색
     // 카테고리가 null이면 전체 카테고리 검색
     @Query("""

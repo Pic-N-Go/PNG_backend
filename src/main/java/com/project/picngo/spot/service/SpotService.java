@@ -123,7 +123,7 @@ public class SpotService {
         Pageable pageable = createPageable(0, size, "popular");
 
         if (spotCategory == null) {
-            return spotRepository.findAllByStatusAndIsActiveTrue(
+            return spotRepository.findListByStatusAndIsActiveTrue(
                     SpotStatus.APPROVED,
                     pageable
             ).stream()
@@ -131,7 +131,7 @@ public class SpotService {
                     .toList();
         }
 
-        return spotRepository.findAllByCategoryAndStatusAndIsActiveTrue(
+        return spotRepository.findListByCategoryAndStatusAndIsActiveTrue(
                 spotCategory,
                 SpotStatus.APPROVED,
                 pageable
