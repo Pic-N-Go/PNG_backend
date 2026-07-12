@@ -64,11 +64,7 @@ public interface SpotControllerApiSpec {
             description = "현재 지도 화면의 남서/북동 좌표 범위 안에 있는 스팟 핀 목록을 조회합니다."
     )
     ResponseEntity<List<SpotMapResponse>> getMapSpots(
-            @Parameter(description = "남서쪽 위도") @RequestParam Double southWestLat,
-            @Parameter(description = "남서쪽 경도") @RequestParam Double southWestLng,
-            @Parameter(description = "북동쪽 위도") @RequestParam Double northEastLat,
-            @Parameter(description = "북동쪽 경도") @RequestParam Double northEastLng,
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category
+            @org.springdoc.core.annotations.ParameterObject @jakarta.validation.Valid com.project.picngo.spot.dto.MapBoundsRequest request
     );
 
     @Operation(

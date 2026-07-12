@@ -75,19 +75,9 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping("/map")
     public ResponseEntity<List<SpotMapResponse>> getMapSpots(
-            @RequestParam Double southWestLat,
-            @RequestParam Double southWestLng,
-            @RequestParam Double northEastLat,
-            @RequestParam Double northEastLng,
-            @RequestParam(required = false) String category
+            @org.springdoc.core.annotations.ParameterObject @jakarta.validation.Valid com.project.picngo.spot.dto.MapBoundsRequest request
     ){
-        return ResponseEntity.ok(spotService.getMapSpots(
-                southWestLat,
-                southWestLng,
-                northEastLat,
-                northEastLng,
-                category
-        ));
+        return ResponseEntity.ok(spotService.getMapSpots(request));
     }
 
     @GetMapping("/{id}/summary")

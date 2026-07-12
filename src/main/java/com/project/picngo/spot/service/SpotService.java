@@ -190,22 +190,21 @@ public class SpotService {
     }
 
     // 지도 영역 좌표를 기준으로 화면에 표시할 스팟 핀 목록 조회
-    public List<SpotMapResponse> getMapSpots(
-            Double southWestLat,
-            Double southWestLng,
-            Double northEastLat,
-            Double northEastLng,
-            String category
-    ){
-        validateMapBounds(southWestLat, southWestLng, northEastLat, northEastLng);
+    public List<SpotMapResponse> getMapSpots(com.project.picngo.spot.dto.MapBoundsRequest request) {
+        validateMapBounds(
+                request.southWestLat(),
+                request.southWestLng(),
+                request.northEastLat(),
+                request.northEastLng()
+        );
 
-        SpotCategory spotCategory = parseCategory(category);
+        SpotCategory spotCategory = parseCategory(request.category());
 
         return spotRepository.findSpotsInMapBounds(
-                southWestLat,
-                southWestLng,
-                northEastLat,
-                northEastLng,
+                request.southWestLat(),
+                request.southWestLng(),
+                request.northEastLat(),
+                request.northEastLng(),
                 spotCategory,
                 SpotStatus.APPROVED
         ).stream()
@@ -219,10 +218,6 @@ public class SpotService {
             Double northEastLat,
             Double northEastLng
     ){
-        if (southWestLat == null || southWestLng == null || northEastLat == null || northEastLng == null) {
-            throw new CustomException(SpotErrorCode.MAP_BOUNDS_REQUIRED);
-        }
-
         if (southWestLat > northEastLat || southWestLng > northEastLng) {
             throw new CustomException(SpotErrorCode.INVALID_MAP_BOUNDS);
         }
