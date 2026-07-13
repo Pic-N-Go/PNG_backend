@@ -4,10 +4,10 @@ import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
-import com.project.picngo.wishlist.domain.WishlistItem;
+import com.project.picngo.wishlist.domain.Wishlist;
 import com.project.picngo.wishlist.domain.enums.TimeCondition;
 import com.project.picngo.wishlist.domain.enums.WeatherCondition;
-import com.project.picngo.wishlist.repository.WishlistItemRepository;
+import com.project.picngo.wishlist.repository.WishlistRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,8 +25,7 @@ import java.util.List;
 public class NotificationScheduler {
 
     private final NotificationSettingRepository notificationSettingRepository;
-    private final NotificationService notificationService;
-    private final WishlistItemRepository wishlistItemRepository;
+    private final WishlistRepository wishlistRepository;
     private final WeatherClient weatherClient;
 
     // 매일 아침 7시에 실행
@@ -52,26 +51,29 @@ public class NotificationScheduler {
 
         for (NotificationSetting setting : activeSettings) {
             Long userId = setting.getUserId();
-            List<WishlistItem> userItems = wishlistItemRepository.findAllByWishlist_UserIdAndIsActiveTrue(userId);
+            List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
             
-            for (WishlistItem item : userItems) {
+            for (Wishlist wishlist : userWishlists) {
                 try {
                     // TODO: 단순히 첫 번째 예보(forecasts.get(0))만 확인하지 말고, 낮 시간대(오전 9시~오후 6시) 등 전체 예보를 순회하며 매칭되는 조건이 있는지 확인하는 로직으로 고도화 필요
                     if (!forecasts.isEmpty()) {
                         WeatherForecastResponse forecast = forecasts.get(0);
                         String apiWeather = forecast.weatherStatus();
-                        WeatherCondition userWeather = item.getWeatherCondition();
+                        // TODO: Phase 2에서 컬렉션 기반 로직으로 전면 개편 예정
+                        // Set<WeatherCondition> userWeather = wishlist.getWeatherConditions();
                         
-                        boolean weatherMatch = userWeather == WeatherCondition.NONE || apiWeather.equals(userWeather.name());
+                        // boolean weatherMatch = userWeather.contains(WeatherCondition.NONE) || userWeather.contains(WeatherCondition.valueOf(apiWeather));
                         // TODO TimeCondition (SUNRISE/SUNSET)은 현재 KMA에선 판단하기 어렵지만, 골든아워 API와 연동 로직 추가 -> Spot 도메인 연동 후 구현 예정
                         
+                        /*
                         if (weatherMatch) {
                             String title = "오늘의 추천 여행지 알림 ☀️";
                             String body = "회원님의 위시리스트 날씨 조건과 완벽하게 일치하는 장소가 있습니다!";
-                            notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, body, "/wishlist/" + item.getWishlist().getId());
-                            log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료 (SpotId: {})", userId, item.getSpotId());
+                            notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, body, "/wishlist/" + wishlist.getSpotId());
+                            log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료 (SpotId: {})", userId, wishlist.getSpotId());
                             break; // 하루 한 번만 발송하도록 제어
                         }
+                        */
                     }
                 } catch (Exception e) {
                     log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);

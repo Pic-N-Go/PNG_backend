@@ -15,36 +15,25 @@ import java.util.List;
 @Tag(name = "위시리스트 (Wishlist)", description = "사용자 찜(위시리스트) 폴더 및 장소 관리 API")
 public interface WishlistControllerApiSpec {
 
-    @Operation(summary = "내 위시리스트 목록 조회", description = "사용자가 생성한 모든 위시리스트 폴더와 내부 아이템을 조회합니다.")
-    ResponseEntity<List<WishlistResponse>> getWishlist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
+    @Operation(summary = "내 위시리스트 목록 조회", description = "사용자가 위시리스트에 담은 모든 스팟 목록과 설정을 조회합니다.")
+    ResponseEntity<List<WishlistSettingResponse>> getWishlists(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
-    @Operation(summary = "위시리스트 생성", description = "새로운 위시리스트(폴더)를 생성합니다.")
-    ResponseEntity<WishlistResponse> createWishlist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody WishlistCreateRequest request);
-
-    @Operation(summary = "위시리스트 상세 조회", description = "특정 위시리스트 폴더 안의 항목을 조회합니다.")
-    ResponseEntity<WishlistResponse> getWishlistDetail(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @Parameter(description = "위시리스트 ID") @PathVariable Long id);
-
-    @Operation(summary = "위시리스트 수정", description = "위시리스트 폴더의 이름을 수정합니다.")
-    ResponseEntity<WishlistResponse> updateWishlist(
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "위시리스트 ID") @PathVariable Long id,
-            @RequestBody WishlistUpdateRequest request
+    @Operation(summary = "위시리스트 상세 설정 조회", description = "특정 스팟의 위시리스트 알림 설정을 조회합니다.")
+    ResponseEntity<WishlistSettingResponse> getWishlistDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, 
+            @Parameter(description = "스팟 ID") @PathVariable Long spotId
     );
 
-    @Operation(summary = "위시리스트 삭제", description = "위시리스트 폴더 전체를 삭제합니다.")
-    ResponseEntity<Void> deleteWishlist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @Parameter(description = "위시리스트 ID") @PathVariable Long id);
-
-    @Operation(summary = "위시리스트에 장소 추가", description = "특정 위시리스트 폴더에 새로운 장소(아이템)와 알림 조건을 추가합니다.")
-    ResponseEntity<WishlistItemResponse> addItemToWishlist(
+    @Operation(summary = "위시리스트 설정 저장 (추가/수정)", description = "특정 스팟의 위시리스트 설정을 저장합니다. 기존에 없으면 새로 생성하고, 있으면 덮어씁니다.")
+    ResponseEntity<WishlistSettingResponse> updateWishlistSettings(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "위시리스트 ID") @PathVariable Long id,
-            @RequestBody WishlistItemRequest request
+            @Parameter(description = "스팟 ID") @PathVariable Long spotId,
+            @RequestBody WishlistSettingUpdateRequest request
     );
 
-    @Operation(summary = "위시리스트에서 장소 제거", description = "위시리스트 폴더에서 특정 장소를 삭제합니다.")
-    ResponseEntity<Void> removeItemFromWishlist(
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
-            @Parameter(description = "위시리스트 ID") @PathVariable Long id,
-            @Parameter(description = "아이템 ID") @PathVariable Long itemId
+    @Operation(summary = "위시리스트에서 장소 제거", description = "특정 스팟을 위시리스트에서 완전히 삭제합니다.")
+    ResponseEntity<Void> deleteWishlist(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, 
+            @Parameter(description = "스팟 ID") @PathVariable Long spotId
     );
 }

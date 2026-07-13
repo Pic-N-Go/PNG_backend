@@ -19,45 +19,30 @@ public class WishlistController implements WishlistControllerApiSpec {
 
     private final WishlistService wishlistService;
     @GetMapping
-    public ResponseEntity<List<WishlistResponse>> getWishlist(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(wishlistService.getWishlist(userDetails.getId()));
+    public ResponseEntity<List<WishlistSettingResponse>> getWishlists(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(wishlistService.getWishlists(userDetails.getId()));
     }
 
-    @PostMapping
-    public ResponseEntity<WishlistResponse> createWishlist(@AuthenticationPrincipal CustomUserDetails userDetails, @Valid @RequestBody WishlistCreateRequest request) {
-        return ResponseEntity.ok(wishlistService.createWishlist(userDetails.getId(), request));
+    @GetMapping("/{spotId}")
+    public ResponseEntity<WishlistSettingResponse> getWishlistDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails, 
+            @PathVariable Long spotId) {
+        return ResponseEntity.ok(wishlistService.getWishlistDetail(userDetails.getId(), spotId));
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<WishlistResponse> getWishlistDetail(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
-        return ResponseEntity.ok(wishlistService.getWishlistDetail(id, userDetails.getId()));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<WishlistResponse> updateWishlist(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @Valid @RequestBody WishlistUpdateRequest request) {
-        return ResponseEntity.ok(wishlistService.updateWishlist(id, userDetails.getId(), request));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteWishlist(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
-        wishlistService.deleteWishlist(id, userDetails.getId());
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/items")
-    public ResponseEntity<WishlistItemResponse> addItemToWishlist(
+    @PutMapping("/{spotId}")
+    public ResponseEntity<WishlistSettingResponse> updateWishlistSettings(
             @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long id,
-            @Valid @RequestBody WishlistItemRequest request) {
-        return ResponseEntity.ok(wishlistService.addItemToWishlist(id, userDetails.getId(), request));
+            @PathVariable Long spotId,
+            @Valid @RequestBody WishlistSettingUpdateRequest request) {
+        return ResponseEntity.ok(wishlistService.updateWishlistSettings(userDetails.getId(), spotId, request));
     }
 
-    @DeleteMapping("/{id}/items/{itemId}")
-    public ResponseEntity<Void> removeItemFromWishlist(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
-            @PathVariable Long id,
-            @PathVariable Long itemId) {
-        wishlistService.removeItemFromWishlist(id, itemId, userDetails.getId());
+    @DeleteMapping("/{spotId}")
+    public ResponseEntity<Void> deleteWishlist(
+            @AuthenticationPrincipal CustomUserDetails userDetails, 
+            @PathVariable Long spotId) {
+        wishlistService.deleteWishlist(userDetails.getId(), spotId);
         return ResponseEntity.noContent().build();
     }
 }

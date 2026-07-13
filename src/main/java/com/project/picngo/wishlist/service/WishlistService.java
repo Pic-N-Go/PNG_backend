@@ -2,9 +2,7 @@ package com.project.picngo.wishlist.service;
 
 import com.project.picngo.external.WeatherClient;
 import com.project.picngo.wishlist.domain.Wishlist;
-import com.project.picngo.wishlist.domain.WishlistItem;
 import com.project.picngo.wishlist.dto.*;
-import com.project.picngo.wishlist.repository.WishlistItemRepository;
 import com.project.picngo.wishlist.repository.WishlistRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.WishlistErrorCode;
@@ -23,96 +21,76 @@ import java.util.stream.Collectors;
 public class WishlistService {
 
     private final WishlistRepository wishlistRepository;
-    private final WishlistItemRepository wishlistItemRepository;
     private final WeatherClient weatherClient;
     private final UserRepository userRepository;
 
-    public List<WishlistResponse> getWishlist(Long userId) {
-        // Fetch all wishlists (folders) for the user.
-        // For production, use Fetch Join to avoid N+1 problem with items.
-        // For now, we rely on lazy loading (which may trigger N+1) until we optimize queries.
+    public List<WishlistSettingResponse> getWishlists(Long userId) {
+        validateUserExists(userId);
         return wishlistRepository.findAllByUserId(userId).stream()
-                .map(WishlistResponse::from)
+                .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
+    public WishlistSettingResponse getWishlistDetail(Long userId, Long spotId) {
+        validateUserExists(userId);
+        Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
+                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
+        return convertToResponse(wishlist);
+    }
+
     @Transactional
-    public WishlistResponse createWishlist(Long userId, WishlistCreateRequest request) {
+    public WishlistSettingResponse updateWishlistSettings(Long userId, Long spotId, WishlistSettingUpdateRequest request) {
         validateUserExists(userId);
         
-        Wishlist wishlist = Wishlist.builder()
-                .userId(userId)
-                .name(request.name())
-                .build();
-        Wishlist saved = wishlistRepository.save(wishlist);
-        return WishlistResponse.from(saved);
-    }
-
-    public WishlistResponse getWishlistDetail(Long id, Long userId) {
-        Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> userId.equals(w.getUserId()))
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
-        return WishlistResponse.from(wishlist);
-    }
-
-    @Transactional
-    public WishlistResponse updateWishlist(Long id, Long userId, WishlistUpdateRequest request) {
-        Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> userId.equals(w.getUserId()))
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
+        Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
+                .orElseGet(() -> Wishlist.builder()
+                        .userId(userId)
+                        .spotId(spotId)
+                        .build());
         
-        wishlist.updateName(request.name());
-        return WishlistResponse.from(wishlist);
+        wishlist.updateSettings(
+                request.memo(),
+                request.weatherConditions(),
+                request.timeConditions(),
+                request.alertTimingDays(),
+                request.isAlertEnabled()
+        );
+
+        Wishlist saved = wishlistRepository.save(wishlist);
+        return convertToResponse(saved);
     }
 
     @Transactional
-    public void deleteWishlist(Long id, Long userId) {
-        Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> userId.equals(w.getUserId()))
+    public void deleteWishlist(Long userId, Long spotId) {
+        validateUserExists(userId);
+        Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
                 .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
         wishlistRepository.delete(wishlist);
-    }
-
-    @Transactional
-    public WishlistItemResponse addItemToWishlist(Long id, Long userId, WishlistItemRequest request) {
-        Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> userId.equals(w.getUserId()))
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
-
-        WishlistItem item = WishlistItem.builder()
-                .wishlist(wishlist)
-                .spotId(request.spotId())
-                .weatherCondition(request.weatherCondition())
-                .timeCondition(request.timeCondition())
-                .build();
-        
-        wishlist.addItem(item);
-        WishlistItem savedItem = wishlistItemRepository.save(item);
-        
-        return WishlistItemResponse.from(savedItem);
-    }
-
-    @Transactional
-    public void removeItemFromWishlist(Long id, Long itemId, Long userId) {
-        Wishlist wishlist = wishlistRepository.findById(id)
-                .filter(w -> userId.equals(w.getUserId()))
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
-
-        WishlistItem item = wishlistItemRepository.findById(itemId)
-                .filter(i -> i.getWishlist().getId().equals(wishlist.getId()))
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_ITEM_NOT_FOUND));
-
-        wishlist.getItems().remove(item);
-    }
-
-    @Transactional
-    public void checkConditionsAndNotify() {
-        // TODO: Scheduler logic for later
     }
 
     private void validateUserExists(Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new CustomException(UserErrorCode.USER_NOT_FOUND);
         }
+    }
+
+    private WishlistSettingResponse convertToResponse(Wishlist wishlist) {
+        // TODO: 향후 Spot 엔티티 연동하여 spotName, address, tags 등 채우기
+        // TODO: 기상청 중기예보(7일) API 연동 및 DND 시간(NotificationSetting) 조회 로직 추가
+        return new WishlistSettingResponse(
+                wishlist.getSpotId(),
+                "스팟 이름 (임시)", 
+                "주소 (임시)",
+                0,
+                List.of(),
+                wishlist.getMemo(),
+                wishlist.getWeatherConditions(),
+                wishlist.getTimeConditions(),
+                wishlist.getIsActive(),
+                wishlist.getAlertTimingDays(),
+                null,
+                null,
+                List.of()
+        );
     }
 }
