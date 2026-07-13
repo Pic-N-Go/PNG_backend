@@ -4,6 +4,9 @@ import com.project.picngo.common.domain.BaseTimeEntity;
 import com.project.picngo.spot.domain.enums.TimePeriod;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -44,6 +47,9 @@ public class Review extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private TimePeriod timePeriod;
+
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewPhoto> photos = new ArrayList<>();
 
     @Comment("방문 날짜. 사용자 직접 입력, nullable")
     @Column
