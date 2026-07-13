@@ -26,6 +26,8 @@ class WeatherClientIntegrationTest {
     @Autowired
     private WeatherClient weatherClient;
 
+
+
     @Test
     @DisplayName("실제 기상청 API를 호출하여 날씨 데이터를 받아온다")
     void 실제_기상청_단기예보_조회() {
@@ -35,7 +37,7 @@ class WeatherClientIntegrationTest {
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
         // when
-        List<WeatherForecastResponse> forecasts = weatherClient.getForecast(lat, lng, today);
+        List<WeatherForecastResponse> forecasts = weatherClient.getShortTermForecast(lat, lng, today);
 
         // then
         System.out.println("==================================================");

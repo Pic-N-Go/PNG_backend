@@ -34,6 +34,7 @@ public class NotificationScheduler {
     private final WishlistRepository wishlistRepository;
     private final SpotRepository spotRepository;
     private final WeatherCacheService weatherCacheService;
+    private final NotificationService notificationService;
 
     // [A. 고정 시간대 스케줄러]
     // 해당 시간에 스케줄러가 돌아가며, 조건이 맞는 스팟들에 대해 알림 발송
@@ -139,7 +140,10 @@ public class NotificationScheduler {
                             long diffMinutes = java.time.Duration.between(now, alertTime).toMinutes();
                             if (Math.abs(diffMinutes) <= 5) {
                                 log.info("유저 {} 의 스팟 {} 에 대해 {} 골든아워 임박 알림 발송 조건 충족! (D-{})", userId, spot.getId(), timeCondition, dDay);
-                                // notificationService.sendPushNotification(...)
+                                String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
+                                String title = "🌅 골든아워 알림";
+                                String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
+                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId());
                             }
                         }
 
@@ -221,8 +225,11 @@ public class NotificationScheduler {
                 }
 
                 if (isAirQualityMatched) {
-                    // notificationService.sendPushNotification(...)
                     log.info("유저 {} 의 스팟 {} 에 대한 날씨 및 미세먼지 조건이 일치합니다! (D-{})", userId, spot.getId(), dDay);
+                    String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
+                    String title = "☁️ 날씨 조건 매칭 알림";
+                    String content = String.format("%s %s에 설정하신 날씨 조건이 충족될 예정입니다!", dayStr, spot.getName());
+                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId());
                 }
             }
 
