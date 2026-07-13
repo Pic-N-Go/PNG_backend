@@ -39,9 +39,8 @@ public class WeatherForecastService {
             // 기준 발표 시각을 구합니다. (오늘 오전 6시 기준)
             String tmFc = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "0600";
             
-            // TODO: 추후 nx, ny (lat, lng)를 광역구역코드(regId)로 변환하는 매퍼 추가 필요
-            // 임시로 서울/경기(11B00000) 고정
-            String regId = "11B00000"; 
+            // nx, ny (lat, lng)를 광역구역코드(regId)로 변환
+            String regId = getMidTermRegionCode(lat, lng); 
             
             KmaMidWeatherApiResponse midTermResponse = weatherClient.getMidTermForecast(regId, tmFc);
             
@@ -91,5 +90,26 @@ public class WeatherForecastService {
         if (wf.contains("눈")) return "SNOWY";
         if (wf.contains("흐림") || wf.contains("구름많음")) return "CLOUDY";
         return "CLEAR";
+    }
+
+    /**
+     * 위도/경도를 기반으로 기상청 중기예보 육상구역코드(regId)를 대략적으로 매핑합니다.
+     * 기상 예보는 광역 단위로 이루어지므로 Bounding Box를 이용한 근사치를 사용합니다.
+     */
+    private String getMidTermRegionCode(Double lat, Double lng) {
+        if (lat < 33.5) {
+            return "11G00000"; // 제주도
+        }
+        if (lat < 36.0) {
+            if (lng < 127.5) return "11F20000"; // 광주, 전라남도, 전라북도
+            else return "11H20000"; // 부산, 울산, 경상남도, 경상북도
+        }
+        if (lat < 37.0) {
+            return "11C20000"; // 대전, 세종, 충청남도, 충청북도
+        }
+        if (lng > 127.8) {
+            return "11D10000"; // 강원도 (영서/영동 통합)
+        }
+        return "11B00000"; // 서울, 인천, 경기도 (기본값)
     }
 }
