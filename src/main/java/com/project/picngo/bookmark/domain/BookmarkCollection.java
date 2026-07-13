@@ -11,7 +11,9 @@ import org.hibernate.annotations.Comment;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(indexes = @Index(name = "idx_collection_user", columnList = "userId"))
+@Table(
+        uniqueConstraints = @UniqueConstraint(name = "uk_collection_user_name", columnNames = {"user_id", "name"}),
+        indexes = @Index(name = "idx_collection_user", columnList = "userId"))
 public class BookmarkCollection extends BaseTimeEntity {
 
     @Id

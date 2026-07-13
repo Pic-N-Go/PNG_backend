@@ -10,4 +10,5 @@ public interface BookmarkCollectionRepository extends JpaRepository<BookmarkColl
     List<BookmarkCollection> findByUserIdOrderByCreatedAtAsc(Long userId);
     List<BookmarkCollection> findByUserId(Long userId);
     long countByUserId(Long userId);
+    boolean existsByUserIdAndName(Long userId, String name);
 }

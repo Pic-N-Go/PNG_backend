@@ -12,6 +12,7 @@ import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,19 +63,28 @@ public class BookmarkCollectionService {
     @Transactional
     public BookmarkCollectionResponse createCollection(CreateCollectionRequest request) {
         validateColorIcon(request.color(), request.icon());
+        String name = request.name().trim(); // 프론트와 동일하게 trim 기준으로 비교/저장
 
         if (collectionRepository.countByUserId(TEMP_USER_ID) >= MAX_COLLECTIONS) {
             throw new CustomException(BookmarkErrorCode.COLLECTION_LIMIT_EXCEEDED);
         }
+        // 순차 중복은 사전 체크로 깔끔하게 409
+        if (collectionRepository.existsByUserIdAndName(TEMP_USER_ID, name)) {
+            throw new CustomException(BookmarkErrorCode.COLLECTION_NAME_DUPLICATE);
+        }
 
-        BookmarkCollection saved = collectionRepository.save(BookmarkCollection.builder()
-                .userId(TEMP_USER_ID)
-                .name(request.name())
-                .color(request.color())
-                .icon(request.icon())
-                .build());
-
-        return BookmarkCollectionResponse.of(saved, 0, false);
+        try {
+            BookmarkCollection saved = collectionRepository.saveAndFlush(BookmarkCollection.builder()
+                    .userId(TEMP_USER_ID)
+                    .name(name)
+                    .color(request.color())
+                    .icon(request.icon())
+                    .build());
+            return BookmarkCollectionResponse.of(saved, 0, false);
+        } catch (DataIntegrityViolationException e) {
+            // 동시 생성 레이스: (user_id, name) unique 제약이 최종 방어 → 예외를 던져 롤백하며 409로 변환
+            throw new CustomException(BookmarkErrorCode.COLLECTION_NAME_DUPLICATE);
+        }
     }
 
     // 체크된 collectionIds 집합으로 이 스팟의 멤버십을 통째 동기화 (추가 + 제거)
@@ -116,6 +126,8 @@ public class BookmarkCollectionService {
         else if (wasBookmarked && !isBookmarked) spot.decrementBookmarkCount();
     }
 
+    // 동시 최초 접근(예: StrictMode 이중 GET) 레이스는 (user_id, name) unique 제약이 데이터 무결성을 최종 보장 —
+    // 드물게 진 요청은 500 후 재요청 시 정상. 기본 컬렉션이 2개 생기는 일은 없음.
     private void ensureDefaultCollection(Long userId) {
         if (collectionRepository.countByUserId(userId) == 0) {
             collectionRepository.save(BookmarkCollection.builder()
