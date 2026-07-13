@@ -26,6 +26,7 @@ import java.time.MonthDay;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 
@@ -40,6 +41,7 @@ public class PhotogenicService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HHmm");
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
+    private static final int NON_LEAP_YEAR = 2001; // MonthDay 거리 계산용 임의 기준 연도 (윤년 2/29 이슈 회피)
 
     private final SpotRepository spotRepository;
     private final SeasonEventRepository seasonEventRepository;
@@ -54,7 +56,7 @@ public class PhotogenicService {
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         String region = extractRegion(spot.getAddress());
-        FactorInfo seasonFactor = calculateSeason(region, resolvedDate);
+        FactorInfo seasonFactor = calculateSeason(region, spot.getCat3(), resolvedDate);
 
         Item air = null;
         try {
@@ -194,20 +196,34 @@ public class PhotogenicService {
         return val != null ? val : "";
     }
 
-    private FactorInfo calculateSeason(String region, LocalDate date) {
+    private FactorInfo calculateSeason(String region, String cat3, LocalDate date) {
         List<SeasonEvent> events = seasonEventRepository.findActiveByRegion(region);
         MonthDay today = MonthDay.from(date);
 
         return events.stream()
+                .filter(e -> e.isEligibleForCat3(cat3))
                 .filter(e -> isInRange(today, MonthDay.parse(e.getMonthDayStart(), MM_DD),
                         MonthDay.parse(e.getMonthDayEnd(), MM_DD)))
-                .findFirst()
+                // 겹치는 이벤트 중 오늘이 "피크 구간"인 쪽을 우선, 그 다음 피크 중심일과 가까운 쪽을 우선
+                // (findActiveByRegion에 ORDER BY가 없어 row 순서에만 의존하면 겹치는 기간에 엉뚱한 이벤트가 뽑힘)
+                .min(Comparator
+                        .comparing((SeasonEvent e) -> isInRange(today, MonthDay.parse(e.getMonthDayPeakStart(), MM_DD),
+                                MonthDay.parse(e.getMonthDayPeakEnd(), MM_DD)) ? 0 : 1)
+                        .thenComparing(e -> peakCenterDistance(today, e)))
                 .map(e -> {
                     int score = calculateSeasonScore(today, e);
                     int pct = (int) Math.round(score * 100.0 / e.getMaxScore());
                     return new FactorInfo(e.getName() + " " + pct + "%", score);
                 })
                 .orElse(new FactorInfo("해당 없음", 0));
+    }
+
+    private long peakCenterDistance(MonthDay today, SeasonEvent event) {
+        LocalDate refToday = today.atYear(NON_LEAP_YEAR);
+        LocalDate peakStart = MonthDay.parse(event.getMonthDayPeakStart(), MM_DD).atYear(NON_LEAP_YEAR);
+        LocalDate peakEnd = MonthDay.parse(event.getMonthDayPeakEnd(), MM_DD).atYear(NON_LEAP_YEAR);
+        LocalDate peakCenter = peakStart.plusDays(ChronoUnit.DAYS.between(peakStart, peakEnd) / 2);
+        return Math.abs(ChronoUnit.DAYS.between(refToday, peakCenter));
     }
 
     private int calculateSeasonScore(MonthDay today, SeasonEvent event) {
