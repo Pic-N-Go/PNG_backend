@@ -18,6 +18,7 @@ import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ReviewService {
 
     private static final int MAX_REVIEW_PHOTO_COUNT = 10;
@@ -110,12 +113,18 @@ public class ReviewService {
                 .build();
 
         Review savedReview = reviewRepository.save(review);
+        List<String> uploadedKeys = new ArrayList<>();
 
-        List<String> photoUrls = uploadReviewPhotos(savedReview, photos);
+        try {
+            List<String> photoUrls = uploadReviewPhotos(savedReview, photos, uploadedKeys);
 
-        updateSpotReviewStats(spot);
+            updateSpotReviewStats(spot);
 
-        return ReviewResponse.from(savedReview, photoUrls);
+            return ReviewResponse.from(savedReview, photoUrls);
+        } catch (RuntimeException e) {
+            deleteUploadedImages(uploadedKeys);
+            throw e;
+        }
     }
 
     @Transactional
@@ -135,8 +144,16 @@ public class ReviewService {
     public void deleteReview(Long userId, Long reviewId) {
         Review review = findMyReview(userId, reviewId);
         Spot spot = review.getSpot();
+
+        List<String> photoKeys = reviewPhotoRepository.findByReviewId(reviewId).stream()
+                .map(ReviewPhoto::getPhotoUrl)
+                .toList();
+
         reviewRepository.delete(review);
         reviewRepository.flush();
+
+        deleteUploadedImages(photoKeys);
+
         updateSpotReviewStats(spot);
     }
 
@@ -174,25 +191,45 @@ public class ReviewService {
         return distribution;
     }
 
-    private List<String> uploadReviewPhotos(Review review, List<MultipartFile> photos) {
+    private List<String> uploadReviewPhotos(Review review, List<MultipartFile> photos, List<String> uploadedKeys) {
         if (photos == null || photos.isEmpty()) {
             return List.of();
         }
+
         if (photos.size() > MAX_REVIEW_PHOTO_COUNT) {
             throw new CustomException(ImageErrorCode.IMAGE_FILE_TOO_MANY);
         }
 
-        return photos.stream()
-                .filter(photo -> photo != null && !photo.isEmpty())
-                .map(photo -> {
-                    ImageUploadResult uploadResult = imageStorageService.upload(photo, "reviews/" + review.getId());
-                    reviewPhotoRepository.save(ReviewPhoto.builder()
-                            .review(review)
-                            .photoUrl(uploadResult.key())
-                            .build());
-                    return uploadResult.url();
-                })
-                .toList();
+        List<String> photoUrls = new ArrayList<>();
+
+        for (MultipartFile photo : photos) {
+            if (photo == null || photo.isEmpty()) {
+                continue;
+            }
+
+            ImageUploadResult uploadResult = imageStorageService.upload(photo, "reviews/" + review.getId());
+            uploadedKeys.add(uploadResult.key());
+
+            ReviewPhoto reviewPhoto = ReviewPhoto.builder()
+                    .review(review)
+                    .photoUrl(uploadResult.key())
+                    .build();
+
+            reviewPhotoRepository.save(reviewPhoto);
+            photoUrls.add(uploadResult.url());
+        }
+
+        return photoUrls;
+    }
+
+    private void deleteUploadedImages(List<String> uploadedKeys) {
+        for (String uploadedKey : uploadedKeys) {
+            try {
+                imageStorageService.delete(uploadedKey);
+            } catch (RuntimeException e) {
+                log.warn("이미지 삭제에 실패했습니다. key={}", uploadedKey, e);;
+            }
+        }
     }
 
     private String joinEquipmentInfo(List<String> equipmentInfo) {

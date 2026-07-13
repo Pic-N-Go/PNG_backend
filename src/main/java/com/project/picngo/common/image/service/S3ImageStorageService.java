@@ -4,12 +4,14 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -21,6 +23,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class S3ImageStorageService implements ImageStorageService {
 
     private final S3Client s3Client;
@@ -49,9 +52,15 @@ public class S3ImageStorageService implements ImageStorageService {
 
         try {
             s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-            return new ImageUploadResult(key, getPresignedUrl(key));
         } catch (IOException | SdkException e) {
             throw new CustomException(ImageErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+
+        try {
+            return new ImageUploadResult(key, getPresignedUrl(key));
+        } catch (RuntimeException e) {
+            deleteQuietly(key);
+            throw e;
         }
     }
 
@@ -74,6 +83,24 @@ public class S3ImageStorageService implements ImageStorageService {
             return s3Presigner.presignGetObject(presignRequest).url().toString();
         } catch (SdkException e) {
             throw new CustomException(ImageErrorCode.IMAGE_PRESIGNED_URL_FAILED);
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        if (objectKey == null || objectKey.isBlank() || objectKey.startsWith("http")) {
+            return;
+        }
+
+        DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+
+        try {
+            s3Client.deleteObject(deleteObjectRequest);
+        } catch (SdkException e) {
+            throw new CustomException(ImageErrorCode.IMAGE_DELETE_FAILED);
         }
     }
 
@@ -101,8 +128,16 @@ public class S3ImageStorageService implements ImageStorageService {
 
     private void validateImageFile(MultipartFile file) {
         String contentType = file.getContentType();
-        if (contentType != null && !contentType.startsWith("image/")) {
+        if (contentType == null || !contentType.startsWith("image/")) {
             throw new CustomException(ImageErrorCode.INVALID_IMAGE_FILE);
+        }
+    }
+
+    private void deleteQuietly(String objectKey) {
+        try {
+            delete(objectKey);
+        } catch (RuntimeException e) {
+            log.warn("Presigned URL 생성 실패 후 업로드된 이미지 삭제에 실패했습니다. key={}", objectKey, e);
         }
     }
 }

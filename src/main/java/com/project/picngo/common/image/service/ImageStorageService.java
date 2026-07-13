@@ -8,4 +8,6 @@ public interface ImageStorageService {
     ImageUploadResult upload(MultipartFile file, String directory);
 
     String getPresignedUrl(String objectKey);
+
+    void delete(String objectKey);
 }
