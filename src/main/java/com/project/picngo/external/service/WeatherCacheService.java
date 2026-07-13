@@ -1,5 +1,6 @@
 package com.project.picngo.external.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.picngo.external.AirQualityClient;
 import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.AirQualityResponse;
@@ -7,6 +8,7 @@ import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,7 +26,7 @@ public class WeatherCacheService {
 
     // Redis 연동
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
     // 3시간 TTL
     private static final long TTL_HOURS = 3;
