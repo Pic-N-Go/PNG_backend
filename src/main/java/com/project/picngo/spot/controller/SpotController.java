@@ -1,6 +1,5 @@
 package com.project.picngo.spot.controller;
 
-import com.project.picngo.spot.dto.BookmarkResponse;
 import com.project.picngo.spot.dto.ChecklistRequest;
 import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
@@ -11,7 +10,6 @@ import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
 import com.project.picngo.spot.dto.SpotPhotoResponse;
-import com.project.picngo.spot.service.BookmarkService;
 import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
@@ -42,7 +40,6 @@ public class SpotController implements SpotControllerApiSpec {
 
     private final SpotService spotService;
     private final ReviewService reviewService;
-    private final BookmarkService bookmarkService;
     private final PhotogenicService photogenicService;
     private final ChecklistService checklistService;
 
@@ -84,11 +81,6 @@ public class SpotController implements SpotControllerApiSpec {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime time) {
         return ResponseEntity.ok(photogenicService.calculate(id, date, time));
-    }
-
-    @PostMapping("/{id}/bookmark")
-    public ResponseEntity<BookmarkResponse> toggleBookmark(@PathVariable Long id) {
-        return ResponseEntity.ok(bookmarkService.toggle(id));
     }
 
     @GetMapping("/{id}/photos")

@@ -1,6 +1,5 @@
 package com.project.picngo.spot.controller;
 
-import com.project.picngo.spot.dto.BookmarkResponse;
 import com.project.picngo.spot.dto.ChecklistRequest;
 import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
@@ -59,11 +58,6 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Parameter(description = "조회 날짜 (yyyy-MM-dd, 생략 시 오늘)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Parameter(description = "조회 시각 (HH:mm, 생략 시 현재)") @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime time
-    );
-
-    @Operation(summary = "북마크 토글", description = "북마크를 추가하거나 취소합니다. isBookmarked: true면 추가됨, false면 취소됨.")
-    ResponseEntity<BookmarkResponse> toggleBookmark(
-            @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
     @Operation(summary = "스팟 사진 목록 조회", description = "한국관광공사 TourAPI에서 스팟 공식 사진 목록을 실시간 조회합니다. 사용자 등록 스팟은 빈 배열 반환.")

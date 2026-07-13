@@ -1,0 +1,138 @@
+package com.project.picngo.bookmark.service;
+
+import com.project.picngo.bookmark.domain.BookmarkCollection;
+import com.project.picngo.bookmark.domain.BookmarkCollectionSpot;
+import com.project.picngo.bookmark.dto.BookmarkCollectionResponse;
+import com.project.picngo.bookmark.dto.CreateCollectionRequest;
+import com.project.picngo.bookmark.repository.BookmarkCollectionRepository;
+import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.BookmarkErrorCode;
+import com.project.picngo.common.exception.code.SpotErrorCode;
+import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.repository.SpotRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class BookmarkCollectionService {
+
+    // ponytail: Spring Security 연동 전까지 하드코딩 (스팟 상세 영역 공통 컨벤션)
+    private static final Long TEMP_USER_ID = 1L;
+    private static final int MAX_COLLECTIONS = 5;
+
+    // color/icon 허용 키 — 프론트 피커와 합의된 값. 추가되면 여기에만 반영하면 됨.
+    private static final Set<String> ALLOWED_COLORS = Set.of("pink", "blue", "purple", "green", "orange");
+    private static final Set<String> ALLOWED_ICONS = Set.of(
+            "star", "heart", "bookmark", "map-pin", "camera", "flag", "sparkles", "mountain", "clock", "archive");
+
+    private static final String DEFAULT_NAME = "내 즐겨찾기";
+    private static final String DEFAULT_COLOR = "pink";
+    private static final String DEFAULT_ICON = "star";
+
+    private final BookmarkCollectionRepository collectionRepository;
+    private final BookmarkCollectionSpotRepository membershipRepository;
+    private final SpotRepository spotRepository;
+
+    // 시트 오픈용: 유저의 컬렉션 목록 + 각 컬렉션의 스팟 수 + 이 스팟 소속 여부(contains)
+    @Transactional // 최초 접근 시 기본 컬렉션 자동 생성이 있어 쓰기 트랜잭션
+    public List<BookmarkCollectionResponse> getCollections(Long spotId) {
+        ensureDefaultCollection(TEMP_USER_ID);
+
+        Set<Long> containingIds = (spotId == null) ? Set.of()
+                : membershipRepository.findByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId).stream()
+                        .map(m -> m.getCollection().getId())
+                        .collect(Collectors.toSet());
+
+        return collectionRepository.findByUserIdOrderByCreatedAtAsc(TEMP_USER_ID).stream()
+                .map(c -> BookmarkCollectionResponse.of(
+                        c,
+                        membershipRepository.countByCollectionId(c.getId()),
+                        containingIds.contains(c.getId())))
+                .toList();
+    }
+
+    @Transactional
+    public BookmarkCollectionResponse createCollection(CreateCollectionRequest request) {
+        validateColorIcon(request.color(), request.icon());
+
+        if (collectionRepository.countByUserId(TEMP_USER_ID) >= MAX_COLLECTIONS) {
+            throw new CustomException(BookmarkErrorCode.COLLECTION_LIMIT_EXCEEDED);
+        }
+
+        BookmarkCollection saved = collectionRepository.save(BookmarkCollection.builder()
+                .userId(TEMP_USER_ID)
+                .name(request.name())
+                .color(request.color())
+                .icon(request.icon())
+                .build());
+
+        return BookmarkCollectionResponse.of(saved, 0, false);
+    }
+
+    // 체크된 collectionIds 집합으로 이 스팟의 멤버십을 통째 동기화 (추가 + 제거)
+    @Transactional
+    public void syncSpotCollections(Long spotId, List<Long> collectionIds) {
+        Spot spot = spotRepository.findById(spotId)
+                .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
+
+        Set<Long> target = Set.copyOf(collectionIds);
+
+        // 대상 컬렉션이 모두 이 유저 소유인지 검증
+        Set<Long> ownedIds = collectionRepository.findByUserId(TEMP_USER_ID).stream()
+                .map(BookmarkCollection::getId)
+                .collect(Collectors.toSet());
+        if (!ownedIds.containsAll(target)) {
+            throw new CustomException(BookmarkErrorCode.COLLECTION_NOT_FOUND);
+        }
+
+        List<BookmarkCollectionSpot> current = membershipRepository.findByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId);
+        Set<Long> currentIds = current.stream().map(m -> m.getCollection().getId()).collect(Collectors.toSet());
+
+        // 제거: 현재 있으나 대상에 없는 것
+        List<BookmarkCollectionSpot> toRemove = current.stream()
+                .filter(m -> !target.contains(m.getCollection().getId()))
+                .toList();
+        membershipRepository.deleteAll(toRemove);
+
+        // 추가: 대상에 있으나 현재 없는 것
+        List<BookmarkCollectionSpot> toAdd = collectionRepository.findAllById(
+                        target.stream().filter(id -> !currentIds.contains(id)).toList()).stream()
+                .map(c -> BookmarkCollectionSpot.builder().collection(c).spotId(spotId).build())
+                .toList();
+        membershipRepository.saveAll(toAdd);
+
+        // 스팟의 북마크 카운트 유지 (추천 스팟 정렬에 사용) — 이 유저 기준 0↔1 전이일 때만 증감
+        boolean wasBookmarked = !currentIds.isEmpty();
+        boolean isBookmarked = !target.isEmpty();
+        if (!wasBookmarked && isBookmarked) spot.incrementBookmarkCount();
+        else if (wasBookmarked && !isBookmarked) spot.decrementBookmarkCount();
+    }
+
+    private void ensureDefaultCollection(Long userId) {
+        if (collectionRepository.countByUserId(userId) == 0) {
+            collectionRepository.save(BookmarkCollection.builder()
+                    .userId(userId)
+                    .name(DEFAULT_NAME)
+                    .color(DEFAULT_COLOR)
+                    .icon(DEFAULT_ICON)
+                    .build());
+        }
+    }
+
+    private void validateColorIcon(String color, String icon) {
+        if (!ALLOWED_COLORS.contains(color)) {
+            throw new CustomException(BookmarkErrorCode.INVALID_COLLECTION_COLOR);
+        }
+        if (!ALLOWED_ICONS.contains(icon)) {
+            throw new CustomException(BookmarkErrorCode.INVALID_COLLECTION_ICON);
+        }
+    }
+}

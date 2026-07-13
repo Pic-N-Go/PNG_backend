@@ -28,6 +28,8 @@ public class SecurityConfig {
 		"/categories",
 		"/spots/**",
 		"/reviews/**",
+		"/bookmark-collections/**", // Spot Detail: TEMP_USER_ID 기반, 실 인증 연동 시 제거 필요
+
 		"/swagger-ui/**",
 		"/v3/api-docs/**",
 		"/swagger-resources/**",

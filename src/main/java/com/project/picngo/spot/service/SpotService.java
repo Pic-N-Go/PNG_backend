@@ -1,5 +1,6 @@
 package com.project.picngo.spot.service;
 
+import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.external.TourApiClient;
@@ -29,7 +30,7 @@ public class SpotService {
     private final SpotTagRepository spotTagRepository;
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
-    private final BookmarkRepository bookmarkRepository;
+    private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
     private final TourApiClient tourApiClient;
 
     public SpotDetailResponse getSpotDetail(Long spotId) {
@@ -43,7 +44,8 @@ public class SpotService {
         Double avgRating = rows.isEmpty() || rows.get(0)[0] == null ? null : (Double) rows.get(0)[0];
         int reviewCount = rows.isEmpty() || rows.get(0)[1] == null ? 0 : ((Long) rows.get(0)[1]).intValue();
         long photoCount = spotPhotoRepository.countBySpotId(spotId);
-        boolean isBookmarked = bookmarkRepository.existsBySpotIdAndUserId(spotId, TEMP_USER_ID);
+        // 북마크 = 1개 이상 컬렉션에 소속
+        boolean isBookmarked = bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId);
 
         return SpotDetailResponse.of(
                 spot, tags, checklist,
