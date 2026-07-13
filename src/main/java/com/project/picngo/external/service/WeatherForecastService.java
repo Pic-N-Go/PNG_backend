@@ -72,13 +72,14 @@ public class WeatherForecastService {
         List<WeatherForecastResponse> list = new ArrayList<>();
         String targetDate = baseDate.plusDays(plusDays).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         
-        // 오전(AM)은 0600으로 매핑
+        // 오전(AM)은 1000으로 매핑
         if (wfAm != null) {
-            list.add(new WeatherForecastResponse(targetDate, "0600", mapWfToStatus(wfAm), 0.0));
+            list.add(new WeatherForecastResponse(targetDate, "1000", mapWfToStatus(wfAm), 0.0));
         }
-        // 오후(PM)는 1500으로 매핑
+        // 오후(PM)는 1400, 1800으로 매핑
         if (wfPm != null) {
-            list.add(new WeatherForecastResponse(targetDate, "1500", mapWfToStatus(wfPm), 0.0));
+            list.add(new WeatherForecastResponse(targetDate, "1400", mapWfToStatus(wfPm), 0.0));
+            list.add(new WeatherForecastResponse(targetDate, "1800", mapWfToStatus(wfPm), 0.0));
         }
         
         return list;

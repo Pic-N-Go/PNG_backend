@@ -14,6 +14,7 @@ public interface NotificationSettingRepository extends JpaRepository<Notificatio
 
     // 모든 유저 중에서 알림을 켜두었고 (isAllPushEnabled가 true) fcmToken이 null이 아니고 빈 문자열이 아닌 유저 목록 조회
     // 전체 공지용 알림 보낼 때 사용
+    // 알림을 보내야하는 유저를 찾을 때 사용
     @Query("SELECT n FROM NotificationSetting n WHERE n.isAllPushEnabled = true AND n.fcmToken IS NOT NULL AND n.fcmToken != ''")
     List<NotificationSetting> findActiveSettingsWithToken();
 }

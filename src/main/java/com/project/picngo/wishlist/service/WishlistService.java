@@ -1,6 +1,11 @@
 package com.project.picngo.wishlist.service;
 
-import com.project.picngo.external.WeatherClient;
+import com.project.picngo.external.service.WeatherCacheService;
+import com.project.picngo.notification.repository.NotificationSettingRepository;
+import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.SpotTag;
+import com.project.picngo.spot.repository.SpotRepository;
+import com.project.picngo.spot.repository.SpotTagRepository;
 import com.project.picngo.wishlist.domain.Wishlist;
 import com.project.picngo.wishlist.dto.*;
 import com.project.picngo.wishlist.repository.WishlistRepository;
@@ -12,7 +17,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,8 +29,11 @@ import java.util.stream.Collectors;
 public class WishlistService {
 
     private final WishlistRepository wishlistRepository;
-    private final WeatherClient weatherClient;
+    private final WeatherCacheService weatherCacheService;
     private final UserRepository userRepository;
+    private final SpotRepository spotRepository;
+    private final SpotTagRepository spotTagRepository;
+    private final NotificationSettingRepository notificationSettingRepository;
 
     public List<WishlistSettingResponse> getWishlists(Long userId) {
         validateUserExists(userId);
@@ -76,23 +87,100 @@ public class WishlistService {
     }
 
     private WishlistSettingResponse convertToResponse(Wishlist wishlist) {
-        // TODO: 향후 Spot 엔티티 연동하여 spotName, address, tags 등 채우기
-        // TODO: 기상청 중기예보(7일) API 연동 및 DND 시간(NotificationSetting) 조회 로직 추가
+        Spot spot = spotRepository.findById(wishlist.getSpotId()).orElse(null);
+        String spotName = spot != null ? spot.getName() : "알 수 없는 스팟";
+        String address = spot != null ? spot.getAddress() : "주소 미상";
+        Integer photogenicScore = spot != null ? spot.getPhotogenicScore() : 0;
+        
+        List<String> tags = spotTagRepository.findBySpotId(wishlist.getSpotId())
+                .stream()
+                .map(SpotTag::getTag)
+                .collect(Collectors.toList());
+                
+        LocalTime dndStartTime = null;
+        LocalTime dndEndTime = null;
+        var notiSetting = notificationSettingRepository.findByUserId(wishlist.getUserId()).orElse(null);
+        if (notiSetting != null) {
+            dndStartTime = notiSetting.getDndStartTime();
+            dndEndTime = notiSetting.getDndEndTime();
+        }
+
+        List<WishlistSettingResponse.ExpectedMatchDayDto> expectedMatchDays = new ArrayList<>();
+        if (spot != null) {
+            String todayStr = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            List<com.project.picngo.external.dto.WeatherForecastResponse> forecasts = weatherCacheService.getCached7DayForecast(spot.getLatitude(), spot.getLongitude(), todayStr);
+            
+            Map<String, List<com.project.picngo.external.dto.WeatherForecastResponse>> byDate = forecasts.stream()
+                    .collect(Collectors.groupingBy(com.project.picngo.external.dto.WeatherForecastResponse::date));
+            
+            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+            for (int i = 0; i <= 7; i++) {
+                java.time.LocalDate target = today.plusDays(i);
+                String targetDateStr = target.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+                List<com.project.picngo.external.dto.WeatherForecastResponse> dayForecasts = byDate.getOrDefault(targetDateStr, List.of());
+                
+                if (dayForecasts.isEmpty() && i > 0) continue; 
+                
+                String dayLabel;
+                if (i == 0) {
+                    dayLabel = "오늘";
+                } else if (i == 1) {
+                    dayLabel = "내일";
+                } else {
+                    dayLabel = target.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.KOREAN);
+                }
+                
+                String repWeather = "CLEAR";
+                boolean isMatched = false;
+                
+                if (!dayForecasts.isEmpty()) {
+                    List<com.project.picngo.external.dto.WeatherForecastResponse> daytime = dayForecasts.stream()
+                        .filter(f -> f.time().equals("1000") || f.time().equals("1400") || f.time().equals("1800"))
+                        .toList();
+                        
+                    if (daytime.isEmpty()) daytime = dayForecasts; 
+                    
+                    repWeather = daytime.get(daytime.size() / 2).weatherStatus(); 
+                    
+                    if (wishlist.getWeatherConditions() != null && wishlist.getWeatherConditions().contains(com.project.picngo.wishlist.domain.enums.WeatherCondition.NONE)) {
+                        isMatched = true;
+                    } else if (wishlist.getWeatherConditions() != null) {
+                        for (var f : daytime) {
+                            try {
+                                if (wishlist.getWeatherConditions().contains(com.project.picngo.wishlist.domain.enums.WeatherCondition.valueOf(f.weatherStatus()))) {
+                                    isMatched = true;
+                                    repWeather = f.weatherStatus(); // 매칭된 날씨를 대표로 표기
+                                    break;
+                                }
+                            } catch (Exception e) {}
+                        }
+                    }
+                }
+                
+                expectedMatchDays.add(new WishlistSettingResponse.ExpectedMatchDayDto(
+                    dayLabel,
+                    target.format(java.time.format.DateTimeFormatter.ofPattern("MM/dd")),
+                    repWeather,
+                    isMatched
+                ));
+            }
+        }
+        
         return new WishlistSettingResponse(
                 wishlist.getSpotId(),
-                "스팟 이름 (임시)", 
-                "주소 (임시)",
-                0,
-                List.of(),
+                spotName, 
+                address,
+                photogenicScore,
+                tags,
                 wishlist.getMemo(),
                 wishlist.getWeatherConditions(),
                 wishlist.getTimeConditions(),
                 wishlist.getAirQualityCondition(),
                 wishlist.getIsActive(),
                 wishlist.getAlertTimingDays(),
-                null,
-                null,
-                List.of()
+                dndStartTime,
+                dndEndTime,
+                expectedMatchDays
         );
     }
 }
