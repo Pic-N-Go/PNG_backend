@@ -22,69 +22,79 @@ public class WeatherCacheService {
     private final WeatherClient weatherClient;
     private final AirQualityClient airQualityClient;
 
-    // 인메모리 캐시 (간이 구현)
-    // Key: lat_lng, Value: CacheEntry
-    private final Map<String, CacheEntry<List<WeatherForecastResponse>>> forecastCache = new ConcurrentHashMap<>();
-    private final Map<String, CacheEntry<GoldenHourResponse>> goldenHourCache = new ConcurrentHashMap<>();
-    private final Map<String, CacheEntry<AirQualityResponse.Item>> airQualityCache = new ConcurrentHashMap<>();
+    // Redis 연동
+    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     // 3시간 TTL
-    private static final long TTL_MILLIS = 3 * 60 * 60 * 1000;
+    private static final long TTL_HOURS = 3;
 
     public List<WeatherForecastResponse> getCached7DayForecast(Double lat, Double lng, String date) {
-        String key = String.format("%.3f_%.3f", lat, lng); // 소수점 3자리(약 100m 오차)로 클러스터링
+        String key = "weather:forecast:7day:" + String.format("%.1f_%.1f", lat, lng); // 반경 11.1km 이내 지역은 같은 날씨 데이터 사용
         
-        CacheEntry<List<WeatherForecastResponse>> entry = forecastCache.get(key);
-        if (entry != null && !entry.isExpired()) {
-            return entry.getData();
+        String cachedData = redisTemplate.opsForValue().get(key);
+        if (cachedData != null) {
+            try {
+                return objectMapper.readValue(cachedData, new com.fasterxml.jackson.core.type.TypeReference<List<WeatherForecastResponse>>() {});
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("Redis 단기예보 파싱 실패 (key: {})", key, e);
+            }
         }
 
         List<WeatherForecastResponse> freshData = weatherForecastService.getCombined7DayForecast(lat, lng, date);
-        forecastCache.put(key, new CacheEntry<>(freshData, System.currentTimeMillis()));
+        
+        try {
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(freshData), TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("Redis 단기예보 저장 실패 (key: {})", key, e);
+        }
+        
         return freshData;
     }
 
     public GoldenHourResponse getCachedGoldenHour(Double lat, Double lng, String targetDate) {
-        String key = String.format("%.3f_%.3f_%s", lat, lng, targetDate);
+        String key = "weather:goldenhour:" + String.format("%.1f_%.1f_%s", lat, lng, targetDate);
         
-        CacheEntry<GoldenHourResponse> entry = goldenHourCache.get(key);
-        if (entry != null && !entry.isExpired()) {
-            return entry.getData();
+        String cachedData = redisTemplate.opsForValue().get(key);
+        if (cachedData != null) {
+            try {
+                return objectMapper.readValue(cachedData, GoldenHourResponse.class);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("Redis 골든아워 파싱 실패 (key: {})", key, e);
+            }
         }
 
         GoldenHourResponse freshData = weatherClient.getGoldenHour(lat, lng, targetDate);
-        goldenHourCache.put(key, new CacheEntry<>(freshData, System.currentTimeMillis()));
+        
+        try {
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(freshData), TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("Redis 골든아워 저장 실패 (key: {})", key, e);
+        }
+        
         return freshData;
     }
 
     public AirQualityResponse.Item getCachedAirQuality(String sidoName) {
-        CacheEntry<AirQualityResponse.Item> entry = airQualityCache.get(sidoName);
-        if (entry != null && !entry.isExpired()) {
-            return entry.getData();
+        String key = "weather:airquality:" + sidoName;
+        
+        String cachedData = redisTemplate.opsForValue().get(key);
+        if (cachedData != null) {
+            try {
+                return objectMapper.readValue(cachedData, AirQualityResponse.Item.class);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("Redis 미세먼지 파싱 실패 (key: {})", key, e);
+            }
         }
 
         AirQualityResponse.Item freshData = airQualityClient.getAirQuality(sidoName);
         if (freshData != null) {
-            airQualityCache.put(sidoName, new CacheEntry<>(freshData, System.currentTimeMillis()));
+            try {
+                redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(freshData), TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("Redis 미세먼지 저장 실패 (key: {})", key, e);
+            }
         }
         return freshData;
-    }
-
-    private static class CacheEntry<T> {
-        private final T data;
-        private final long timestamp;
-
-        public CacheEntry(T data, long timestamp) {
-            this.data = data;
-            this.timestamp = timestamp;
-        }
-
-        public T getData() {
-            return data;
-        }
-
-        public boolean isExpired() {
-            return System.currentTimeMillis() - timestamp > TTL_MILLIS;
-        }
     }
 }
