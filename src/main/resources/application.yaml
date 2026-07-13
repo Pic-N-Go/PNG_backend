@@ -29,10 +29,23 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 weather:
   api:
     key: ${WEATHER_SERVICE_KEY}
+
+tour:
+  api:
+    key: ${PUBLIC_DATA_SERVICE_KEY}
+
+air:
+  quality:
+    key: ${PUBLIC_DATA_SERVICE_KEY}
 
 kakao:
   rest:
@@ -49,3 +62,6 @@ jwt:
 firebase:
   config:
     path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
+
+websocket:
+  allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}

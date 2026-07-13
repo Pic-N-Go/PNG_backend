@@ -57,8 +57,9 @@ public class CourseService {
                 .toList();
     }
 
-    public CourseDetailResponse getCourseDetail(Long courseId) {
+    public CourseDetailResponse getCourseDetail(Long userId, Long courseId) {
         Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
 
         List<CourseSpotResponse> spots = course.getCourseSpots().stream()
                 .map(this::toCourseSpotResponse)

@@ -15,7 +15,17 @@ import java.util.List;
 @Tag(name = "외부 API 연동 (External)", description = "길찾기, 기상청, 일출/일몰 외부 API 통신 컨트롤러")
 public interface ExternalApiControllerApiSpec {
 
-    @Operation(summary = "길찾기 (이동시간/거리)", description = "카카오모빌리티 API를 이용하여 출발지에서 목적지까지의 자동차 예상 소요 시간과 거리를 조회합니다.")
+    @Operation(summary = "한국관광공사 특정 지역 스팟 동기화", description = "TourAPI에서 특정 지역 관광지 전체를 페이지 순환하여 DB에 저장합니다. areaCode: 1=서울, 6=부산, 39=제주 등")
+    ResponseEntity<String> syncSpots(
+            @Parameter(description = "지역 코드 (1=서울, 2=인천, 3=대전, 4=대구, 5=광주, 6=부산, 7=울산, 8=세종, 31=경기, 32=강원, 33=충북, 34=충남, 35=경북, 36=경남, 37=전북, 38=전남, 39=제주)") @RequestParam int areaCode,
+            @Parameter(description = "시작 페이지 (분할 sync 시 사용, 미입력 시 전체)") @RequestParam(required = false) Integer startPage,
+            @Parameter(description = "끝 페이지 (분할 sync 시 사용, 미입력 시 전체)") @RequestParam(required = false) Integer endPage
+    );
+
+    @Operation(summary = "한국관광공사 전체 지역 스팟 동기화", description = "전국 17개 지역 관광지 데이터를 totalCount 기반 페이지 순환으로 전부 가져옵니다. 최초 1회 실행용.\n\n⚠️ 주의: 스팟 수만큼 detailCommon API를 추가 호출하므로 완료까지 상당한 시간이 소요됩니다.\n중간 업데이트가 필요하거나 특정 지역만 갱신할 경우 POST /tour-api/sync (areaCode 지정)를 사용하세요.")
+    ResponseEntity<String> syncAll();
+
+@Operation(summary = "길찾기 (이동시간/거리)", description = "카카오모빌리티 API를 이용하여 출발지에서 목적지까지의 자동차 예상 소요 시간과 거리를 조회합니다.")
     ResponseEntity<DirectionsResponse> getDirections(
             @Parameter(description = "출발지 위도") @RequestParam Double startLat,
             @Parameter(description = "출발지 경도") @RequestParam Double startLng,
