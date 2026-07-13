@@ -1,36 +1,22 @@
 package com.project.picngo.spot.controller;
 
-import com.project.picngo.spot.dto.BookmarkResponse;
-import com.project.picngo.spot.dto.ChecklistRequest;
-import com.project.picngo.spot.dto.ChecklistResponse;
-import com.project.picngo.spot.dto.NearbySpotResponse;
-import com.project.picngo.spot.dto.PhotogenicResponse;
-import com.project.picngo.spot.dto.RecommendedSpotResponse;
-import com.project.picngo.spot.dto.ReviewListResponse;
-import com.project.picngo.spot.dto.ReviewRequest;
-import com.project.picngo.spot.dto.ReviewResponse;
-import com.project.picngo.spot.dto.SpotDetailResponse;
-import com.project.picngo.spot.dto.SpotPhotoResponse;
-import com.project.picngo.spot.dto.SpotMapResponse;
-import com.project.picngo.spot.dto.SpotResponse;
-import com.project.picngo.spot.dto.SpotSummaryResponse;
+import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.spot.dto.*;
 import com.project.picngo.spot.service.BookmarkService;
 import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -75,7 +61,7 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping("/map")
     public ResponseEntity<List<SpotMapResponse>> getMapSpots(
-            @org.springdoc.core.annotations.ParameterObject @jakarta.validation.Valid com.project.picngo.spot.dto.MapBoundsRequest request
+            @ParameterObject @Valid MapBoundsRequest request
     ){
         return ResponseEntity.ok(spotService.getMapSpots(request));
     }
@@ -142,7 +128,7 @@ public class SpotController implements SpotControllerApiSpec {
     @PostMapping("/{id}/checklist")
     public ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
             @PathVariable Long id,
-            @jakarta.validation.Valid @RequestBody ChecklistRequest request
+            @Valid @RequestBody ChecklistRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(checklistService.addItem(id, request));
     }
@@ -153,11 +139,14 @@ public class SpotController implements SpotControllerApiSpec {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/reviews")
+    @PostMapping(value ="/{id}/reviews", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ReviewResponse> createReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
-            @jakarta.validation.Valid @RequestBody ReviewRequest request
+            @Valid @RequestPart("request") ReviewRequest request,
+            @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(id, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(reviewService.createReview(userDetails.getId(), id, request, photos));
     }
 }

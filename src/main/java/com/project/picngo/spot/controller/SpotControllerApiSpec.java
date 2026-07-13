@@ -1,8 +1,10 @@
 package com.project.picngo.spot.controller;
 
+import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.BookmarkResponse;
 import com.project.picngo.spot.dto.ChecklistRequest;
 import com.project.picngo.spot.dto.ChecklistResponse;
+import com.project.picngo.spot.dto.MapBoundsRequest;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
@@ -17,11 +19,16 @@ import com.project.picngo.spot.dto.SpotSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -64,7 +71,7 @@ public interface SpotControllerApiSpec {
             description = "현재 지도 화면의 남서/북동 좌표 범위 안에 있는 스팟 핀 목록을 조회합니다."
     )
     ResponseEntity<List<SpotMapResponse>> getMapSpots(
-            @org.springdoc.core.annotations.ParameterObject @jakarta.validation.Valid com.project.picngo.spot.dto.MapBoundsRequest request
+            @ParameterObject @Valid MapBoundsRequest request
     );
 
     @Operation(
@@ -133,9 +140,12 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "항목 ID") @PathVariable Long itemId
     );
 
-    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진 업로드는 별도 API로 처리합니다.")
+    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 10장까지 함께 업로드할 수 있습니다.")
     ResponseEntity<ReviewResponse> createReview(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
-            @RequestBody ReviewRequest request
+            @Valid @RequestPart("request") ReviewRequest request,
+            @Parameter(description = "리뷰 사진 목록, 최대 10장")
+            @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     );
 }

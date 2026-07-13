@@ -1,11 +1,13 @@
 package com.project.picngo.spot.controller;
 
+import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -14,12 +16,14 @@ public interface ReviewControllerApiSpec {
 
     @Operation(summary = "리뷰 수정", description = "본인 리뷰만 수정할 수 있습니다.")
     ResponseEntity<ReviewResponse> updateReview(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "리뷰 ID") @PathVariable Long id,
             @RequestBody ReviewRequest request
     );
 
     @Operation(summary = "리뷰 삭제", description = "본인 리뷰만 삭제할 수 있습니다.")
     ResponseEntity<Void> deleteReview(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "리뷰 ID") @PathVariable Long id
     );
 }
