@@ -25,8 +25,8 @@ public class WeatherCacheService {
     private final AirQualityClient airQualityClient;
 
     // Redis 연동
-    private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
-    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 3시간 TTL
     private static final long TTL_HOURS = 3;
@@ -55,7 +55,7 @@ public class WeatherCacheService {
     }
 
     public GoldenHourResponse getCachedGoldenHour(Double lat, Double lng, String targetDate) {
-        String key = "weather:goldenhour:" + String.format("%.1f_%.1f_%s", lat, lng, targetDate);
+        String key = "weather:goldenhour:" + String.format("%.0f_%.0f_%s", lat, lng, targetDate);
         
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
