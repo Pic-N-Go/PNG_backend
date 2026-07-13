@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -72,6 +74,17 @@ public class ExifExtractor {
                         .toLocalDateTime();
             }
 
+            Integer imageWidth = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_WIDTH, TAG_IMAGE_WIDTH);
+            Integer imageHeight = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_HEIGHT, TAG_IMAGE_HEIGHT);
+            ImageSize imageSize = readImageSize(file);
+
+            if (imageWidth == null && imageSize != null) {
+                imageWidth = imageSize.width();
+            }
+            if (imageHeight == null && imageSize != null) {
+                imageHeight = imageSize.height();
+            }
+
             return new PhotoExifInfo(
                     latitude,
                     longitude,
@@ -95,8 +108,8 @@ public class ExifExtractor {
                     description(exifDirectory, TAG_EXPOSURE_MODE),
                     description(exifDirectory, TAG_DIGITAL_ZOOM_RATIO),
 
-                    firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_WIDTH, TAG_IMAGE_WIDTH),
-                    firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_HEIGHT, TAG_IMAGE_HEIGHT),
+                    imageWidth,
+                    imageHeight,
                     description(exifDirectory, TAG_COLOR_SPACE),
                     findTagValue(metadata, "Detected File Type Name", "Detected File Type Long Name"),
 
@@ -118,6 +131,8 @@ public class ExifExtractor {
     }
 
     private PhotoExifInfo empty(MultipartFile file) {
+        ImageSize imageSize = readImageSize(file);
+
         return new PhotoExifInfo(
                 null,
                 null,
@@ -141,8 +156,8 @@ public class ExifExtractor {
                 null,
                 null,
 
-                null,
-                null,
+                imageSize == null ? null : imageSize.width(),
+                imageSize == null ? null : imageSize.height(),
                 null,
                 null,
 
@@ -157,6 +172,19 @@ public class ExifExtractor {
                 file.getOriginalFilename(),
                 file.getSize()
         );
+    }
+
+    private ImageSize readImageSize(MultipartFile file) {
+        try (InputStream inputStream = file.getInputStream()) {
+            BufferedImage image = ImageIO.read(inputStream);
+            if (image == null) {
+                return null;
+            }
+            return new ImageSize(image.getWidth(), image.getHeight());
+        } catch (Exception e) {
+            log.debug("Image size extraction failed", e);
+            return null;
+        }
     }
 
     private String string(Directory directory, int tagType) {
@@ -207,5 +235,8 @@ public class ExifExtractor {
             }
         }
         return null;
+    }
+
+    private record ImageSize(Integer width, Integer height) {
     }
 }
