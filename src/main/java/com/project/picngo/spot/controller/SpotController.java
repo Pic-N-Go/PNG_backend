@@ -115,6 +115,18 @@ public class SpotController implements SpotControllerApiSpec {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/{id}/checklist/default/{defaultItemId}")
+    public ResponseEntity<Void> hideDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
+        checklistService.hideDefaultItem(id, defaultItemId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/checklist/default/{defaultItemId}/restore")
+    public ResponseEntity<Void> restoreDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
+        checklistService.restoreDefaultItem(id, defaultItemId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/reviews")
     public ResponseEntity<ReviewResponse> createReview(
             @PathVariable Long id,

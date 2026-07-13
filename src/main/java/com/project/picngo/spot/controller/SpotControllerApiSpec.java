@@ -88,6 +88,18 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "항목 ID") @PathVariable Long itemId
     );
 
+    @Operation(summary = "기본 체크리스트 항목 숨김", description = "시스템 기본 항목을 사용자별로 숨깁니다. 이미 숨긴 항목이어도 204를 반환합니다(멱등).")
+    ResponseEntity<Void> hideDefaultChecklistItem(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
+    );
+
+    @Operation(summary = "기본 체크리스트 항목 복원", description = "숨긴 기본 항목을 다시 표시합니다. 숨겨져 있지 않았어도 204를 반환합니다(멱등).")
+    ResponseEntity<Void> restoreDefaultChecklistItem(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
+    );
+
     @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진 업로드는 별도 API로 처리합니다.")
     ResponseEntity<ReviewResponse> createReview(
             @Parameter(description = "스팟 ID") @PathVariable Long id,
