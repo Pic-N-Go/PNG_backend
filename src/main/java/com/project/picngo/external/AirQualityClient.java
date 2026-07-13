@@ -11,6 +11,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Component
 public class AirQualityClient {
 
+    // 대기오염정보 Open API
     private static final String BASE_URL = "https://apis.data.go.kr/B552584/ArpltnInforInqireSvc";
 
     private final WebClient webClient;

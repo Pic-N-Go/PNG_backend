@@ -52,6 +52,7 @@ public class WishlistService {
                 request.memo(),
                 request.weatherConditions(),
                 request.timeConditions(),
+                request.airQualityCondition(),
                 request.alertTimingDays(),
                 request.isAlertEnabled()
         );
@@ -86,6 +87,7 @@ public class WishlistService {
                 wishlist.getMemo(),
                 wishlist.getWeatherConditions(),
                 wishlist.getTimeConditions(),
+                wishlist.getAirQualityCondition(),
                 wishlist.getIsActive(),
                 wishlist.getAlertTimingDays(),
                 null,

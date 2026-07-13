@@ -2,6 +2,7 @@ package com.project.picngo.wishlist.dto;
 
 import com.project.picngo.wishlist.domain.enums.TimeCondition;
 import com.project.picngo.wishlist.domain.enums.WeatherCondition;
+import com.project.picngo.wishlist.domain.enums.AirQualityCondition;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -17,6 +18,7 @@ public record WishlistSettingResponse(
     String memo,
     Set<WeatherCondition> weatherConditions,
     Set<TimeCondition> timeConditions,
+    AirQualityCondition airQualityCondition,
     
     Boolean isAlertEnabled,
     Integer alertTimingDays,

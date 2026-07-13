@@ -33,11 +33,11 @@ public interface ExternalApiControllerApiSpec {
             @Parameter(description = "목적지 경도") @RequestParam Double goalLng
     );
 
-    @Operation(summary = "단기 예보 조회", description = "기상청 API를 이용하여 특정 위치의 날씨 예보를 조회합니다.")
-    ResponseEntity<List<WeatherForecastResponse>> getWeatherForecast(
-            @Parameter(description = "위도") @RequestParam Double lat,
-            @Parameter(description = "경도") @RequestParam Double lng,
-            @Parameter(description = "조회할 날짜 (yyyyMMdd)") @RequestParam String date
+    @Operation(summary = "단기 날씨 예보 조회", description = "특정 좌표의 단기 날씨 예보를 조회합니다.")
+    ResponseEntity<List<WeatherForecastResponse>> getWeather(
+            @Parameter(description = "위도", example = "37.5665") Double lat,
+            @Parameter(description = "경도", example = "126.9780") Double lng,
+            @Parameter(description = "기준일 (yyyyMMdd)", example = "20231026") String date
     );
 
     @Operation(summary = "명소 골든아워 조회", description = "특정 명소의 일출/일몰 시간을 가져와 골든아워(사진 찍기 좋은 시간)를 계산합니다.")

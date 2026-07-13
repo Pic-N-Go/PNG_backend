@@ -2,6 +2,7 @@ package com.project.picngo.notification.service;
 
 import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import com.project.picngo.wishlist.domain.Wishlist;
@@ -18,6 +19,9 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
+
+import com.project.picngo.external.service.WeatherForecastService;
 
 @Slf4j
 @Service
@@ -27,63 +31,202 @@ public class NotificationScheduler {
     private final NotificationSettingRepository notificationSettingRepository;
     private final WishlistRepository wishlistRepository;
     private final WeatherClient weatherClient;
+    private final WeatherForecastService weatherForecastService;
+    private final com.project.picngo.external.AirQualityClient airQualityClient;
+    // private final NotificationService notificationService; // 주입 필요 시 추가
 
-    // 매일 아침 7시에 실행
-    @Scheduled(cron = "0 0 7 * * *")
-    public void scheduleDailyPushNotifications() {
-        log.info("매일 아침 7시 알림 스케줄러 실행 시작...");
+    // [A. 고정 시간대 스케줄러]
+    // 해당 시간에 스케줄러가 돌아가며, 조건이 맞는 스팟들에 대해 알림 발송
 
-        List<NotificationSetting> activeSettings = notificationSettingRepository.findActiveSettingsWithToken().stream()
-                .filter(setting -> !isDndActive(setting))
-                .toList();
+    // 22시에 새벽 알림 발송
+    @Scheduled(cron = "0 0 22 * * *")
+    public void scheduleDawnNotification() {
+        log.info("새벽(DAWN) 알림 스케줄러 실행...");
+        processFixedTimeNotification(TimeCondition.DAWN);
+    }
 
+    // 4시에 오전 알림 발송
+    @Scheduled(cron = "0 0 4 * * *")
+    public void scheduleMorningNotification() {
+        log.info("오전(MORNING) 알림 스케줄러 실행...");
+        processFixedTimeNotification(TimeCondition.MORNING);
+    }
+
+    // 10시에 오후 알림 발송
+    @Scheduled(cron = "0 0 10 * * *")
+    public void scheduleAfternoonNotification() {
+        log.info("오후(AFTERNOON) 알림 스케줄러 실행...");
+        processFixedTimeNotification(TimeCondition.AFTERNOON);
+    }
+
+    // 16시에 야간 알림 발송
+    @Scheduled(cron = "0 0 16 * * *")
+    public void scheduleNightNotification() {
+        log.info("야간(NIGHT) 알림 스케줄러 실행...");
+        processFixedTimeNotification(TimeCondition.NIGHT);
+    }
+
+    // [B. 동적 시간대(골든아워) 스케줄러]
+
+    // 일출 스케줄러 (04:00 ~ 08:00 사이 매 10분마다 실행)
+    @Scheduled(cron = "0 0/10 4-8 * * *")
+    public void scheduleSunriseNotification() {
+        log.info("일출(SUNRISE) 임박 알림 스케줄러 실행...");
+        processGoldenHourNotification(TimeCondition.SUNRISE);
+    }
+
+    // 일몰 스케줄러 (16:00 ~ 20:00 사이 매 10분마다 실행)
+    @Scheduled(cron = "0 0/10 16-20 * * *")
+    public void scheduleSunsetNotification() {
+        log.info("일몰(SUNSET) 임박 알림 스케줄러 실행...");
+        processGoldenHourNotification(TimeCondition.SUNSET);
+    }
+
+    // --- 공통 로직 ---
+
+    // 고정된 시간대 알림 처리
+    private void processFixedTimeNotification(TimeCondition timeCondition) {
+        List<NotificationSetting> activeSettings = getActiveSettings();
         String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-
-        // TODO: 향후 Spot 연동 시 유저들의 위시리스트 좌표들을 모아 그룹화(Set)하여 기상청 API를 좌표별로 한 번씩만 캐싱 조회하고, 알림도 묶어서 발송(Batch)하도록 성능 고도화 필요
-        Double lat = 37.5665;
-        Double lng = 126.9780;
-        List<WeatherForecastResponse> forecasts = List.of();
-        try {
-            forecasts = weatherClient.getForecast(lat, lng, today);
-        } catch (Exception e) {
-            log.error("스케줄러 기상청 API 초기 조회 실패", e);
-        }
 
         for (NotificationSetting setting : activeSettings) {
             Long userId = setting.getUserId();
             List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
             
             for (Wishlist wishlist : userWishlists) {
-                try {
-                    // TODO: 단순히 첫 번째 예보(forecasts.get(0))만 확인하지 말고, 낮 시간대(오전 9시~오후 6시) 등 전체 예보를 순회하며 매칭되는 조건이 있는지 확인하는 로직으로 고도화 필요
-                    if (!forecasts.isEmpty()) {
-                        WeatherForecastResponse forecast = forecasts.get(0);
-                        String apiWeather = forecast.weatherStatus();
-                        // TODO: Phase 2에서 컬렉션 기반 로직으로 전면 개편 예정
-                        // Set<WeatherCondition> userWeather = wishlist.getWeatherConditions();
-                        
-                        // boolean weatherMatch = userWeather.contains(WeatherCondition.NONE) || userWeather.contains(WeatherCondition.valueOf(apiWeather));
-                        // TODO TimeCondition (SUNRISE/SUNSET)은 현재 KMA에선 판단하기 어렵지만, 골든아워 API와 연동 로직 추가 -> Spot 도메인 연동 후 구현 예정
-                        
-                        /*
-                        if (weatherMatch) {
-                            String title = "오늘의 추천 여행지 알림 ☀️";
-                            String body = "회원님의 위시리스트 날씨 조건과 완벽하게 일치하는 장소가 있습니다!";
-                            notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, body, "/wishlist/" + wishlist.getSpotId());
-                            log.info("유저 {} 에게 스케줄러 푸시 알림 발송 완료 (SpotId: {})", userId, wishlist.getSpotId());
-                            break; // 하루 한 번만 발송하도록 제어
-                        }
-                        */
-                    }
-                } catch (Exception e) {
-                    log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);
+                if (wishlist.getTimeConditions().contains(timeCondition)) {
+                    // TODO: 7일 중기/단기 예보 매칭 로직 연동
+                    log.info("유저 {} 의 스팟 {} 에 대해 {} 알림 조건 충족 확인 중...", userId, wishlist.getSpotId(), timeCondition);
+                    checkWeatherAndNotify(userId, wishlist, today);
                 }
             }
         }
-        
-        log.info("매일 아침 7시 알림 스케줄러 실행 종료.");
     }
 
+    // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머
+    private void processGoldenHourNotification(TimeCondition timeCondition) {
+        List<NotificationSetting> activeSettings = getActiveSettings();
+        String today = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        for (NotificationSetting setting : activeSettings) {
+            Long userId = setting.getUserId();
+            List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
+
+            for (Wishlist wishlist : userWishlists) {
+                if (wishlist.getTimeConditions().contains(timeCondition)) {
+                    try {
+                        // TODO: 실제 Spot DB에서 위경도 조회
+                        Double lat = 37.5665;
+                        Double lng = 126.9780;
+                        
+                        GoldenHourResponse gh = weatherClient.getGoldenHour(lat, lng, today);
+                        
+                        String targetUtcTimeStr = timeCondition == TimeCondition.SUNRISE ? gh.sunriseTime() : gh.sunsetTime();
+                        if (targetUtcTimeStr != null && !targetUtcTimeStr.isEmpty()) {
+                            // ISO 8601 parsing e.g., 2015-05-21T05:05:35+00:00
+                            java.time.ZonedDateTime targetUtc = java.time.ZonedDateTime.parse(targetUtcTimeStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                            java.time.ZonedDateTime targetKst = targetUtc.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+                            
+                            java.time.ZonedDateTime now = java.time.ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+                            
+                            // alertTimingDays 필드를 시간 단위(Hours)로 해석
+                            int hoursBefore = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+                            java.time.ZonedDateTime alertTime = targetKst.minusHours(hoursBefore);
+                            
+                            // 현재 시간이 알림 발송 시간(alertTime)의 반경 10분 이내인지 확인 (스케줄러가 10분마다 도므로)
+                            long diffMinutes = java.time.Duration.between(now, alertTime).toMinutes();
+                            if (Math.abs(diffMinutes) <= 5) {
+                                log.info("유저 {} 의 스팟 {} 에 대해 {} 골든아워 임박 알림 발송 조건 충족!", userId, wishlist.getSpotId(), timeCondition);
+                                // notificationService.sendPushNotification(...)
+                            }
+                        }
+
+                    } catch (Exception e) {
+                        log.error("골든아워 확인 중 오류 발생 (유저: {}, 스팟: {})", userId, wishlist.getSpotId(), e);
+                    }
+                }
+            }
+        }
+    }
+
+    // 날씨 및 미세먼지 조건 확인 후 알림 발송
+    private void checkWeatherAndNotify(Long userId, Wishlist wishlist, String today) {
+        try {
+            // 임시 하드코딩
+            Double lat = 37.5665;
+            Double lng = 126.9780;
+            
+            // 단기 및 중기 예보 병합 (1~7일)
+            List<WeatherForecastResponse> combinedForecast = weatherForecastService.getCombined7DayForecast(lat, lng, today);
+            
+            Set<WeatherCondition> userConditions = wishlist.getWeatherConditions();
+            if (userConditions == null || userConditions.isEmpty()) {
+                return;
+            }
+
+            // 다중 조건 매칭 로직
+            boolean isMatched = false;
+            for (WeatherForecastResponse forecast : combinedForecast) {
+                // 예보 날씨가 유저 설정 조건에 하나라도 포함되어 있는지 확인
+                // NONE 조건이 있다면 무조건 알림 전송 대상 (또는 검사 스킵) 등 기획에 따라 처리 가능
+                if (userConditions.contains(WeatherCondition.NONE)) {
+                    isMatched = true;
+                    break;
+                }
+                
+                try {
+                    WeatherCondition apiWeather = WeatherCondition.valueOf(forecast.weatherStatus());
+                    if (userConditions.contains(apiWeather)) {
+                        isMatched = true;
+                        break;
+                    }
+                } catch (IllegalArgumentException e) {
+                    // API 응답 날씨가 enum에 없는 경우 무시
+                }
+            }
+
+            if (isMatched) {
+                // 미세먼지 조건 필터링
+                boolean isAirQualityMatched = true; // 기본적으로 통과
+                com.project.picngo.wishlist.domain.enums.AirQualityCondition aqCondition = wishlist.getAirQualityCondition();
+                
+                if (aqCondition != null && aqCondition != com.project.picngo.wishlist.domain.enums.AirQualityCondition.NONE) {
+                    try {
+                        // TODO: 실제 Spot DB에서 시도명(sidoName) 조회 필요. 임시로 "서울" 적용
+                        String sidoName = "서울";
+                        com.project.picngo.external.dto.AirQualityResponse.Item aqItem = airQualityClient.getAirQuality(sidoName);
+                        
+                        if (aqItem != null && aqItem.pm10Grade() != null) {
+                            int pm10Grade = Integer.parseInt(aqItem.pm10Grade());
+                            if (aqCondition == com.project.picngo.wishlist.domain.enums.AirQualityCondition.GOOD && pm10Grade > 1) {
+                                isAirQualityMatched = false;
+                            } else if (aqCondition == com.project.picngo.wishlist.domain.enums.AirQualityCondition.NORMAL_OR_BETTER && pm10Grade > 2) {
+                                isAirQualityMatched = false;
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("미세먼지 확인 중 오류 발생, 알림 발송은 진행합니다.", e);
+                    }
+                }
+
+                if (isAirQualityMatched) {
+                    // notificationService.sendPushNotification(...)
+                    log.info("유저 {} 의 스팟 {} 에 대한 날씨 및 미세먼지 조건이 일치합니다!", userId, wishlist.getSpotId());
+                }
+            }
+
+        } catch (Exception e) {
+            log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);
+        }
+    }
+
+    private List<NotificationSetting> getActiveSettings() {
+        return notificationSettingRepository.findActiveSettingsWithToken().stream()
+                .filter(setting -> !isDndActive(setting))
+                .toList();
+    }
+
+    // 방해 금지 시간 (DND) 활성 여부 확인 및 활성 설정 필터링
     private boolean isDndActive(NotificationSetting setting) {
         if (setting.getDndStartTime() == null || setting.getDndEndTime() == null) {
             return false;
@@ -94,10 +237,8 @@ public class NotificationScheduler {
         LocalTime end = setting.getDndEndTime();
 
         if (start.isBefore(end)) {
-            // 예: 10:00 ~ 18:00
             return !now.isBefore(start) && now.isBefore(end);
         } else {
-            // 예: 22:00 ~ 07:00 (자정 넘어가는 경우)
             return !now.isBefore(start) || now.isBefore(end);
         }
     }

@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @RestController
@@ -32,13 +35,15 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
     }
 
     // 2. 단기 예보 조회 (여행 계획 날씨)
-    @GetMapping("/weather/forecast")
-    public ResponseEntity<List<WeatherForecastResponse>> getWeatherForecast(
+    @GetMapping("/weather")
+    public ResponseEntity<List<WeatherForecastResponse>> getWeather(
             @RequestParam Double lat,
             @RequestParam Double lng,
-            @RequestParam String date
-    ) {
-        return ResponseEntity.ok(weatherClient.getForecast(lat, lng, date));
+            @RequestParam(required = false) String date) {
+        if (date == null) {
+            date = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        }
+        return ResponseEntity.ok(weatherClient.getShortTermForecast(lat, lng, date));
     }
 
     // 3. TourAPI 특정 지역 동기화 (startPage/endPage로 분할 가능)

@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 
 import com.project.picngo.wishlist.domain.enums.TimeCondition;
 import com.project.picngo.wishlist.domain.enums.WeatherCondition;
+import com.project.picngo.wishlist.domain.enums.AirQualityCondition;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -42,6 +43,10 @@ public class Wishlist extends BaseTimeEntity {
     @Column(name = "time_condition", length = 50)
     private Set<TimeCondition> timeConditions = new HashSet<>();
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "air_quality_condition", length = 50)
+    private AirQualityCondition airQualityCondition = AirQualityCondition.NONE;
+
     @Column(nullable = false)
     private Integer alertTimingDays = 0;
 
@@ -49,17 +54,18 @@ public class Wishlist extends BaseTimeEntity {
     private Boolean isActive = true;
 
     @Builder
-    public Wishlist(Long userId, Long spotId, String memo, Set<WeatherCondition> weatherConditions, Set<TimeCondition> timeConditions, Integer alertTimingDays, Boolean isActive) {
+    public Wishlist(Long userId, Long spotId, String memo, Set<WeatherCondition> weatherConditions, Set<TimeCondition> timeConditions, AirQualityCondition airQualityCondition, Integer alertTimingDays, Boolean isActive) {
         this.userId = userId;
         this.spotId = spotId;
         this.memo = memo;
         this.weatherConditions = weatherConditions != null ? weatherConditions : new HashSet<>();
         this.timeConditions = timeConditions != null ? timeConditions : new HashSet<>();
+        this.airQualityCondition = airQualityCondition != null ? airQualityCondition : AirQualityCondition.NONE;
         this.alertTimingDays = alertTimingDays != null ? alertTimingDays : 0;
         this.isActive = isActive != null ? isActive : true;
     }
 
-    public void updateSettings(String memo, Set<WeatherCondition> weatherConditions, Set<TimeCondition> timeConditions, Integer alertTimingDays, Boolean isActive) {
+    public void updateSettings(String memo, Set<WeatherCondition> weatherConditions, Set<TimeCondition> timeConditions, AirQualityCondition airQualityCondition, Integer alertTimingDays, Boolean isActive) {
         this.memo = memo;
         if (weatherConditions != null) {
             this.weatherConditions.clear();
@@ -69,6 +75,7 @@ public class Wishlist extends BaseTimeEntity {
             this.timeConditions.clear();
             this.timeConditions.addAll(timeConditions);
         }
+        this.airQualityCondition = airQualityCondition != null ? airQualityCondition : AirQualityCondition.NONE;
         this.alertTimingDays = alertTimingDays != null ? alertTimingDays : 0;
         this.isActive = isActive != null ? isActive : true;
     }
