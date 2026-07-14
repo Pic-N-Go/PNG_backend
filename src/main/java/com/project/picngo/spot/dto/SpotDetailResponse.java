@@ -33,15 +33,20 @@ public record SpotDetailResponse(
     ) {
         public static ConvenienceInfo from(Spot spot) {
             return new ConvenienceInfo(
-                    spot.getParking(),
-                    spot.getWheelchairAccess(),
-                    spot.getStrollerAccess(),
-                    spot.getPetFriendly(),
-                    spot.getSubwayAccess(),
-                    spot.getUsetime(),
-                    spot.getRestdate(),
-                    spot.getInfocenter()
+                    blankToNull(spot.getParking()),
+                    blankToNull(spot.getWheelchairAccess()),
+                    blankToNull(spot.getStrollerAccess()),
+                    blankToNull(spot.getPetFriendly()),
+                    blankToNull(spot.getSubwayAccess()),
+                    blankToNull(spot.getUsetime()),
+                    blankToNull(spot.getRestdate()),
+                    blankToNull(spot.getInfocenter())
             );
+        }
+
+        // "정보 없음"은 null로 통일. 빈 문자열/공백은 TourAPI 미제공 → null. "없음"/"불가" 등 실데이터는 그대로 유지.
+        private static String blankToNull(String value) {
+            return (value == null || value.isBlank()) ? null : value;
         }
     }
 
