@@ -92,7 +92,7 @@ public class PhotogenicService {
             if (forecasts == null || forecasts.isEmpty()) return new FactorInfo("데이터 없음", 0);
 
             WeatherForecastResponse closest = forecasts.stream()
-                    .filter(f -> f.date().equals(dateStr))
+                    .filter(f -> dateStr.equals(f.date()))
                     .min(Comparator.comparingLong(f -> {
                         long diff = Math.abs(Duration.between(LocalTime.parse(f.time(), HHMM), time).toMinutes());
                         return Math.min(diff, 1440 - diff);
@@ -118,6 +118,9 @@ public class PhotogenicService {
         try {
             GoldenHourResponse goldenHour = weatherClient.getGoldenHour(lat, lng, date.toString());
             if (goldenHour == null) return new GoldenHourInfo("데이터 없음", 0, null, null);
+            if (goldenHour.sunriseTime() == null || goldenHour.sunsetTime() == null) {
+                return new GoldenHourInfo("데이터 없음", 0, null, null);
+            }
 
             LocalTime sunrise = OffsetDateTime.parse(goldenHour.sunriseTime()).atZoneSameInstant(KST).toLocalTime();
             LocalTime sunset = OffsetDateTime.parse(goldenHour.sunsetTime()).atZoneSameInstant(KST).toLocalTime();
