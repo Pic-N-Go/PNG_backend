@@ -12,7 +12,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(uniqueConstraints = @UniqueConstraint(columnNames = "name"))
+// 동일 이벤트명이라도 지역별로 일정이 다를 수 있어 (name, region) 복합 유니크
+// ponytail: MySQL은 유니크 제약에서 NULL을 서로 다른 값으로 취급 → region=NULL(전국) row는 이 제약으로 중복 방지 안 됨.
+//           전국 이벤트 중복 방지는 data.sql의 NOT EXISTS 가드가 담당.
+@Table(uniqueConstraints = @UniqueConstraint(name = "uk_season_event_name_region", columnNames = {"name", "region"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SeasonEvent {
