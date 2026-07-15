@@ -19,6 +19,7 @@ import java.util.List;
 @Component
 public class TourApiClient {
 
+    // 한국관광공사 관광정보 Open API
     private static final String BASE_URL = "https://apis.data.go.kr/B551011/KorService2";
 
     private final WebClient webClient;

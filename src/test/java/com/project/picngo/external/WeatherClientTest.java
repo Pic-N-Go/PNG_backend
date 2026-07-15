@@ -78,7 +78,7 @@ class WeatherClientTest {
                 .setBody(mockJsonResponse));
 
         // when
-        List<WeatherForecastResponse> forecasts = weatherClient.getForecast(37.5665, 126.9780, "20260702");
+        List<WeatherForecastResponse> forecasts = weatherClient.getShortTermForecast(37.5665, 126.9780, "20260702");
 
         // then
         assertThat(forecasts).hasSize(1);
@@ -98,7 +98,7 @@ class WeatherClientTest {
                 .setBody("Internal Server Error"));
 
         // when & then
-        assertThatThrownBy(() -> weatherClient.getForecast(37.5665, 126.9780, "20260702"))
+        assertThatThrownBy(() -> weatherClient.getShortTermForecast(37.5665, 126.9780, "20260702"))
                 .isInstanceOf(CustomException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ExternalApiErrorCode.WEATHER_API_ERROR);
     }

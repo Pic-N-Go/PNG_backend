@@ -3,6 +3,7 @@ package com.project.picngo.external;
 import com.project.picngo.common.util.LatXLngYConverter;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.KmaWeatherApiResponse;
+import com.project.picngo.external.dto.KmaMidWeatherApiResponse;
 import com.project.picngo.external.dto.SunriseSunsetApiResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.common.exception.CustomException;
@@ -21,27 +22,32 @@ import java.util.Map;
 @Component
 public class WeatherClient {
 
-    private final WebClient kmaWebClient;
-    private final WebClient sunriseWebClient;
+    // 기상청 Open API 서비스키
     private final String serviceKey;
+
+    // 기상청 날씨(단,중기)예보 Open API
+    private final WebClient kmaWebClient;
+
+    // Sunrise-Sunset API
+    private final WebClient sunriseWebClient;
 
     public WeatherClient(
             WebClient.Builder webClientBuilder, 
             @Value("${weather.api.key}") String serviceKey,
-            @Value("${weather.api.kma-url:http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0}") String kmaUrl,
+            @Value("${weather.api.kma-url:http://apis.data.go.kr/1360000}") String kmaUrl,
             @Value("${weather.api.sunrise-url:https://api.sunrise-sunset.org}") String sunriseUrl) {
         this.kmaWebClient = webClientBuilder.clone().baseUrl(kmaUrl).build();
         this.sunriseWebClient = webClientBuilder.clone().baseUrl(sunriseUrl).build();
         this.serviceKey = serviceKey;
     }
 
-    public List<WeatherForecastResponse> getForecast(Double lat, Double lng, String date) {
+    public List<WeatherForecastResponse> getShortTermForecast(Double lat, Double lng, String date) {
         LatXLngYConverter.LatXLngY grid = LatXLngYConverter.convertGrid(lat, lng);
 
         KmaWeatherApiResponse apiResponse;
         try {
             apiResponse = kmaWebClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/getVilageFcst")
+                    .uri(uriBuilder -> uriBuilder.path("/VilageFcstInfoService_2.0/getVilageFcst")
                             .queryParam("serviceKey", serviceKey)
                             .queryParam("pageNo", 1)
                             .queryParam("numOfRows", 100)
@@ -55,7 +61,7 @@ public class WeatherClient {
                     .bodyToMono(KmaWeatherApiResponse.class)
                     .block();
         } catch (Exception e) {
-            log.error("기상청 API 호출 실패", e);
+            log.error("기상청 단기예보 API 호출 실패", e);
             throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         }
 
@@ -97,6 +103,26 @@ public class WeatherClient {
             result.add(new WeatherForecastResponse(key.date(), key.time(), weatherStatus, temperature));
         }
         return result;
+    }
+
+    public KmaMidWeatherApiResponse getMidTermForecast(String regId, String tmFc) {
+        try {
+            return kmaWebClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/MidFcstInfoService/getMidLandFcst")
+                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("pageNo", 1)
+                            .queryParam("numOfRows", 10)
+                            .queryParam("dataType", "JSON")
+                            .queryParam("regId", regId)
+                            .queryParam("tmFc", tmFc)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(KmaMidWeatherApiResponse.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("기상청 중기예보 API 호출 실패", e);
+            throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
+        }
     }
 
     public GoldenHourResponse getGoldenHour(Double lat, Double lng, String date) {
