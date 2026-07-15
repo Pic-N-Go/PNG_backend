@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,7 +33,7 @@ public class WeatherCacheService {
     private static final long TTL_HOURS = 3;
 
     public List<WeatherForecastResponse> getCached7DayForecast(Double lat, Double lng, String date) {
-        String key = "weather:forecast:7day:" + String.format(java.util.Locale.US, "%.1f_%.1f", lat, lng); // 반경 11.1km 이내 지역은 같은 날씨 데이터 사용
+        String key = "weather:forecast:7day:" + String.format(Locale.US, "%.1f_%.1f", lat, lng); // 반경 11.1km 이내 지역은 같은 날씨 데이터 사용
         
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
@@ -55,7 +56,7 @@ public class WeatherCacheService {
     }
 
     public GoldenHourResponse getCachedGoldenHour(Double lat, Double lng, String targetDate) {
-        String key = "weather:goldenhour:" + String.format(java.util.Locale.US, "%.0f_%.0f_%s", lat, lng, targetDate);
+        String key = "weather:goldenhour:" + String.format(Locale.US, "%.0f_%.0f_%s", lat, lng, targetDate);
         
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
