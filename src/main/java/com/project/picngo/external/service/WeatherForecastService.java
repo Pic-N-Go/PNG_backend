@@ -36,8 +36,17 @@ public class WeatherForecastService {
 
         try {
             // 2. 중기예보 (오전/오후)
-            // 기준 발표 시각을 구합니다. (오늘 오전 6시 기준)
-            String tmFc = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd")) + "0600";
+            // 기준 발표 시각을 동적으로 구합니다. (06시, 18시 발표 기준)
+            java.time.LocalTime nowTime = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
+            java.time.LocalDate todayDate = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+            String tmFc;
+            if (nowTime.isBefore(java.time.LocalTime.of(6, 0))) {
+                tmFc = todayDate.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "1800";
+            } else if (nowTime.isBefore(java.time.LocalTime.of(18, 0))) {
+                tmFc = todayDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "0600";
+            } else {
+                tmFc = todayDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "1800";
+            }
             
             // nx, ny (lat, lng)를 광역구역코드(regId)로 변환
             String regId = getMidTermRegionCode(lat, lng); 
