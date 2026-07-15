@@ -17,9 +17,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -107,16 +112,16 @@ public class WishlistService {
 
         List<WishlistSettingResponse.ExpectedMatchDayDto> expectedMatchDays = new ArrayList<>();
         if (spot != null) {
-            String todayStr = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             List<com.project.picngo.external.dto.WeatherForecastResponse> forecasts = weatherCacheService.getCached7DayForecast(spot.getLatitude(), spot.getLongitude(), todayStr);
             
             Map<String, List<com.project.picngo.external.dto.WeatherForecastResponse>> byDate = forecasts.stream()
                     .collect(Collectors.groupingBy(com.project.picngo.external.dto.WeatherForecastResponse::date));
             
-            java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
+            LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
             for (int i = 0; i <= 7; i++) {
-                java.time.LocalDate target = today.plusDays(i);
-                String targetDateStr = target.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+                LocalDate target = today.plusDays(i);
+                String targetDateStr = target.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
                 List<com.project.picngo.external.dto.WeatherForecastResponse> dayForecasts = byDate.getOrDefault(targetDateStr, List.of());
                 
                 if (dayForecasts.isEmpty() && i > 0) continue; 
@@ -127,7 +132,7 @@ public class WishlistService {
                 } else if (i == 1) {
                     dayLabel = "내일";
                 } else {
-                    dayLabel = target.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.KOREAN);
+                    dayLabel = target.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
                 }
                 
                 String repWeather = "CLEAR";
@@ -152,14 +157,16 @@ public class WishlistService {
                                     repWeather = f.weatherStatus(); // 매칭된 날씨를 대표로 표기
                                     break;
                                 }
-                            } catch (Exception e) {}
+                            } catch (IllegalArgumentException e) {
+                                // 정의되지 않은 날씨 상태는 무시하고 다음으로 진행합니다.
+                            }
                         }
                     }
                 }
                 
                 expectedMatchDays.add(new WishlistSettingResponse.ExpectedMatchDayDto(
                     dayLabel,
-                    target.format(java.time.format.DateTimeFormatter.ofPattern("MM/dd")),
+                    target.format(DateTimeFormatter.ofPattern("MM/dd")),
                     repWeather,
                     isMatched
                 ));
