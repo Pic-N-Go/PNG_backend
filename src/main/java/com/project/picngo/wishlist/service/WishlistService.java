@@ -14,6 +14,7 @@ import com.project.picngo.common.exception.code.WishlistErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -158,7 +160,7 @@ public class WishlistService {
                                     break;
                                 }
                             } catch (IllegalArgumentException e) {
-                                // 정의되지 않은 날씨 상태는 무시하고 다음으로 진행합니다.
+                                log.warn("알 수 없는 기상청 날씨 상태 수신 (스킵 처리): {}", f.weatherStatus());
                             }
                         }
                     }

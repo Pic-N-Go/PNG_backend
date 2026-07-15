@@ -193,7 +193,7 @@ public class NotificationScheduler {
                                 break;
                             }
                         } catch (IllegalArgumentException e) {
-                            // 무시
+                            log.warn("알 수 없는 기상청 날씨 상태 수신 (스킵 처리): {}", forecast.weatherStatus());
                         }
                     }
                 }
