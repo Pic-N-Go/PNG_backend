@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.UUID;
 
@@ -50,8 +51,8 @@ public class S3ImageStorageService implements ImageStorageService {
                 .contentLength(file.getSize())
                 .build();
 
-        try {
-            s3Client.putObject(request, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+        try (InputStream inputStream = file.getInputStream()) {
+            s3Client.putObject(request, RequestBody.fromInputStream(inputStream, file.getSize()));
         } catch (IOException | SdkException e) {
             throw new CustomException(ImageErrorCode.IMAGE_UPLOAD_FAILED);
         }
