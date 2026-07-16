@@ -14,10 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Iterator;
 
 @Service
 @Slf4j
@@ -76,13 +78,17 @@ public class ExifExtractor {
 
             Integer imageWidth = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_WIDTH, TAG_IMAGE_WIDTH);
             Integer imageHeight = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_HEIGHT, TAG_IMAGE_HEIGHT);
-            ImageSize imageSize = readImageSize(file);
 
-            if (imageWidth == null && imageSize != null) {
-                imageWidth = imageSize.width();
-            }
-            if (imageHeight == null && imageSize != null) {
-                imageHeight = imageSize.height();
+            if (imageWidth == null || imageHeight == null) {
+                ImageSize imageSize = readImageSize(file);
+                if (imageSize != null) {
+                    if (imageWidth == null) {
+                        imageWidth = imageSize.width();
+                    }
+                    if (imageHeight == null) {
+                        imageHeight = imageSize.height();
+                    }
+                }
             }
 
             return new PhotoExifInfo(
@@ -175,12 +181,24 @@ public class ExifExtractor {
     }
 
     private ImageSize readImageSize(MultipartFile file) {
-        try (InputStream inputStream = file.getInputStream()) {
-            BufferedImage image = ImageIO.read(inputStream);
-            if (image == null) {
+        try (InputStream inputStream = file.getInputStream();
+             ImageInputStream imageInputStream = ImageIO.createImageInputStream(inputStream)) {
+            if (imageInputStream == null) {
                 return null;
             }
-            return new ImageSize(image.getWidth(), image.getHeight());
+
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(imageInputStream);
+            if (!readers.hasNext()) {
+                return null;
+            }
+
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(imageInputStream, true, true);
+                return new ImageSize(reader.getWidth(0), reader.getHeight(0));
+            } finally {
+                reader.dispose();
+            }
         } catch (Exception e) {
             log.debug("Image size extraction failed", e);
             return null;
