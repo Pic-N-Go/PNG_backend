@@ -1,8 +1,12 @@
 package com.project.picngo.spot.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.spot.domain.enums.TimePeriod;
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,24 +44,33 @@ public class Review extends BaseTimeEntity {
     @Column(length = 100)
     private String equipmentInfo;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TimePeriod timePeriod;
+
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewPhoto> photos = new ArrayList<>();
+
     @Comment("방문 날짜. 사용자 직접 입력, nullable")
     @Column
     private LocalDate visitedAt;
 
     @Builder
-    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, LocalDate visitedAt) {
+    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt) {
         this.spot = spot;
         this.userId = userId;
         this.rating = rating;
         this.content = content;
         this.equipmentInfo = equipmentInfo;
+        this.timePeriod = timePeriod;
         this.visitedAt = visitedAt;
     }
 
-    public void update(Integer rating, String content, String equipmentInfo, LocalDate visitedAt) {
+    public void update(Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt) {
         this.rating = rating;
         this.content = content;
         this.equipmentInfo = equipmentInfo;
+        this.timePeriod = timePeriod;
         this.visitedAt = visitedAt;
     }
 }
