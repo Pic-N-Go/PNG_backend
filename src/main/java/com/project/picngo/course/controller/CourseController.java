@@ -48,20 +48,9 @@ public class CourseController implements CourseControllerApiSpec {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/spots")
-    public ResponseEntity<CourseSpotResponse> addCourseSpot(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotAddRequest request) {
-        return ResponseEntity.ok(courseFacade.addCourseSpot(userDetails.getId(), id, request));
-    }
-
-    @DeleteMapping("/{id}/spots/{spotId}")
-    public ResponseEntity<Void> removeCourseSpot(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @PathVariable Long spotId) {
-        courseFacade.removeCourseSpot(userDetails.getId(), id, spotId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PutMapping("/{id}/spots/order")
-    public ResponseEntity<Void> updateSpotOrder(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotOrderUpdateRequest request) {
-        courseFacade.updateSpotOrder(userDetails.getId(), id, request);
+    @PutMapping("/{id}/spots/sync")
+    public ResponseEntity<Void> syncCourseSpots(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @Valid @RequestBody CourseSpotSyncRequest request) {
+        courseFacade.syncCourseSpots(userDetails.getId(), id, request);
         return ResponseEntity.ok().build();
     }
 

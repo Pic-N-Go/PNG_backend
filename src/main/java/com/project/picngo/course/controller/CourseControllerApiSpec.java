@@ -30,17 +30,11 @@ public interface CourseControllerApiSpec {
     @Operation(summary = "코스 정보 수정", description = "코스의 이름이나 설명을 수정합니다.")
     ResponseEntity<CourseResponse> updateCourse(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseCreateRequest request);
 
-    @Operation(summary = "코스 삭제", description = "특정 코스를 삭제합니다.")
+    @Operation(summary = "코스 삭제", description = "자신의 코스를 삭제합니다.")
     ResponseEntity<Void> deleteCourse(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id);
 
-    @Operation(summary = "코스에 명소 추가", description = "코스에 새로운 명소를 추가하고, 길찾기 소요시간을 갱신합니다.")
-    ResponseEntity<CourseSpotResponse> addCourseSpot(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotAddRequest request);
-
-    @Operation(summary = "코스에서 명소 제거", description = "코스에 포함된 명소를 제거하고 길찾기 소요시간을 재계산합니다.")
-    ResponseEntity<Void> removeCourseSpot(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @PathVariable Long spotId);
-
-    @Operation(summary = "명소 순서 변경", description = "코스 내 명소들의 방문 순서를 변경하고 길찾기 데이터를 재계산합니다.")
-    ResponseEntity<Void> updateSpotOrder(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotOrderUpdateRequest request);
+    @Operation(summary = "코스 스팟 일괄 동기화", description = "특정 일차(Day)의 코스 스팟 리스트를 일괄 동기화(추가/삭제/수정)합니다.")
+    ResponseEntity<Void> syncCourseSpots(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotSyncRequest request);
 
     @Operation(summary = "코스 체크리스트 추가", description = "코스에 새로운 체크리스트 항목을 추가합니다.")
     ResponseEntity<CourseChecklistResponse> addCourseChecklist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseChecklistRequest request);

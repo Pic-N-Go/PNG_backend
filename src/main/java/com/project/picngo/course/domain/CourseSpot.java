@@ -47,6 +47,11 @@ public class CourseSpot {
         this.sequenceOrder = sequenceOrder;
     }
 
+    public void updateOrderAndMemo(Integer sequenceOrder, String memo) {
+        this.sequenceOrder = sequenceOrder;
+        this.memo = memo;
+    }
+
     public void updateTravelTime(Integer travelTimeMinutes) {
         this.travelTimeMinutes = travelTimeMinutes;
     }

@@ -1,8 +1,7 @@
 package com.project.picngo.course.service;
 
-import com.project.picngo.course.dto.CourseSpotAddRequest;
-import com.project.picngo.course.dto.CourseSpotOrderUpdateRequest;
 import com.project.picngo.course.dto.CourseSpotResponse;
+import com.project.picngo.course.dto.CourseSpotSyncRequest;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,24 +21,11 @@ public class CourseFacade {
     private final RouteCacheService routeCacheService;
     private final SpotRepository spotRepository;
 
-    public CourseSpotResponse addCourseSpot(Long userId, Long courseId, CourseSpotAddRequest request) {
-        CourseSpotResponse response = courseService.addCourseSpotInternal(userId, courseId, request);
+
+
+    public void syncCourseSpots(Long userId, Long courseId, CourseSpotSyncRequest request) {
+        courseService.syncCourseSpots(userId, courseId, request);
         recalculateTravelTimesForDay(courseId, request.dayNumber());
-        return response;
-    }
-
-    public void removeCourseSpot(Long userId, Long courseId, Long spotId) {
-        Integer dayNumber = courseService.removeCourseSpotInternal(userId, courseId, spotId);
-        if (dayNumber != null) {
-            recalculateTravelTimesForDay(courseId, dayNumber);
-        }
-    }
-
-    public void updateSpotOrder(Long userId, Long courseId, CourseSpotOrderUpdateRequest request) {
-        Set<Integer> affectedDays = courseService.updateSpotOrderInternal(userId, courseId, request);
-        for (Integer dayNumber : affectedDays) {
-            recalculateTravelTimesForDay(courseId, dayNumber);
-        }
     }
 
     private void recalculateTravelTimesForDay(Long courseId, Integer dayNumber) {

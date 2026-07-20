@@ -101,70 +101,60 @@ public class CourseService {
 
     // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
 
+    // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
+
     @Transactional
-    public CourseSpotResponse addCourseSpotInternal(Long userId, Long courseId, CourseSpotAddRequest request) {
+    public void syncCourseSpots(Long userId, Long courseId, CourseSpotSyncRequest request) {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        // 중복 순서 방지(Shift) 로직: 같은 일차에서 추가되는 순서보다 크거나 같은 기존 스팟들의 순서를 +1씩 밀어줌
-        course.getCourseSpots().stream()
-                .filter(cs -> cs.getDayNumber().equals(request.dayNumber()))
-                .filter(cs -> cs.getSequenceOrder() >= request.sequenceOrder())
-                .forEach(cs -> cs.updateOrder(cs.getSequenceOrder() + 1));
+        Integer dayNumber = request.dayNumber();
+        List<CourseSpotSyncItem> requestSpots = request.spots();
 
-        CourseSpot courseSpot = CourseSpot.builder()
-                .course(course)
-                .spotId(request.spotId())
-                .dayNumber(request.dayNumber())
-                .sequenceOrder(request.sequenceOrder())
-                .memo(request.memo())
-                .travelTimeMinutes(null) // Facade에서 계산 후 업데이트
-                .build();
+        // 1. 기존 스팟 조회 (해당 일차)
+        List<CourseSpot> existingSpots = course.getCourseSpots().stream()
+                .filter(cs -> cs.getDayNumber().equals(dayNumber))
+                .toList();
 
-        CourseSpot saved = courseSpotRepository.save(courseSpot);
-        
-        if (!course.getCourseSpots().contains(saved)) {
-            course.getCourseSpots().add(saved);
-        }
-        
-        return toCourseSpotResponse(saved);
-    }
+        Set<Long> requestSpotIds = requestSpots.stream()
+                .map(CourseSpotSyncItem::courseSpotId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
 
-    @Transactional
-    public Integer removeCourseSpotInternal(Long userId, Long courseId, Long spotId) {
-        Course course = findCourseOrThrow(courseId);
-        validateCourseOwner(course, userId);
-        
-        return course.getCourseSpots().stream()
-                .filter(cs -> cs.getId().equals(spotId))
-                .findFirst()
-                .map(spot -> {
-                    Integer dayNumber = spot.getDayNumber();
-                    course.getCourseSpots().remove(spot);
-                    courseSpotRepository.delete(spot);
-                    return dayNumber;
-                })
-                .orElse(null);
-    }
+        // 2. 삭제 대상 처리: 기존 스팟 중 요청에 없는 것은 삭제
+        List<CourseSpot> spotsToRemove = existingSpots.stream()
+                .filter(cs -> !requestSpotIds.contains(cs.getId()))
+                .toList();
 
-    @Transactional
-    public Set<Integer> updateSpotOrderInternal(Long userId, Long courseId, CourseSpotOrderUpdateRequest request) {
-        Course course = findCourseOrThrow(courseId);
-        validateCourseOwner(course, userId);
+        spotsToRemove.forEach(spot -> {
+            course.getCourseSpots().remove(spot);
+            courseSpotRepository.delete(spot);
+        });
 
-        Map<Long, CourseSpot> spotMap = course.getCourseSpots().stream()
+        // 3. 업데이트 및 추가 대상 처리
+        Map<Long, CourseSpot> existingSpotMap = existingSpots.stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
-        Set<Integer> affectedDays = new HashSet<>();
-        List<Long> orderedIds = request.spotIds();
-        for (int i = 0; i < orderedIds.size(); i++) {
-            CourseSpot spot = spotMap.get(orderedIds.get(i));
-            if (spot != null) {
-                spot.updateOrder(i + 1);
-                affectedDays.add(spot.getDayNumber());
+        for (CourseSpotSyncItem item : requestSpots) {
+            if (item.courseSpotId() != null && existingSpotMap.containsKey(item.courseSpotId())) {
+                // 기존 스팟 업데이트
+                CourseSpot spot = existingSpotMap.get(item.courseSpotId());
+                spot.updateOrderAndMemo(item.sequenceOrder(), item.memo());
+            } else {
+                // 신규 스팟 추가
+                CourseSpot newSpot = CourseSpot.builder()
+                        .course(course)
+                        .spotId(item.spotId())
+                        .dayNumber(dayNumber)
+                        .sequenceOrder(item.sequenceOrder())
+                        .memo(item.memo())
+                        .travelTimeMinutes(null)
+                        .build();
+                
+                CourseSpot saved = courseSpotRepository.save(newSpot);
+                course.getCourseSpots().add(saved);
             }
         }
-        return affectedDays;
     }
 
     public List<CourseSpotResponse> getDaySpots(Long courseId, Integer dayNumber) {
