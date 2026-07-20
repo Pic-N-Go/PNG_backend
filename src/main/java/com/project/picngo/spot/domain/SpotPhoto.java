@@ -28,19 +28,24 @@ public class SpotPhoto {
     @Column
     private Long userId;
 
-    @Comment("사진 URL")
+    @Comment("사진 URL(원본)")
     @Column(nullable = false, length = 500)
     private String photoUrl;
+
+    @Comment("썸네일 URL. TourAPI 사진만 존재, 유저 업로드는 null")
+    @Column(length = 500)
+    private String thumbnailUrl;
 
     @Comment("등록일시")
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public SpotPhoto(Spot spot, Long userId, String photoUrl) {
+    public SpotPhoto(Spot spot, Long userId, String photoUrl, String thumbnailUrl) {
         this.spot = spot;
         this.userId = userId;
         this.photoUrl = photoUrl;
+        this.thumbnailUrl = thumbnailUrl;
         this.createdAt = LocalDateTime.now();
     }
 }

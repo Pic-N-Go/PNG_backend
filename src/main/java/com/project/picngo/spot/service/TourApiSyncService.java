@@ -1,6 +1,7 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.external.TourApiClient;
+import com.project.picngo.external.dto.TourApiImageResponse.ImageItem;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse;
 import com.project.picngo.external.dto.TourApiResponse.Item;
@@ -45,8 +46,10 @@ public class TourApiSyncService {
                 sleep(500);
                 IntroItem intro = tourApiClient.getDetailIntro(item.contentid());
                 sleep(500);
+                List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
+                sleep(500);
 
-                spotUpsertService.upsertSpot(item, detail, intro);
+                spotUpsertService.upsertSpot(item, detail, intro, images);
                 saved++;
             }
 

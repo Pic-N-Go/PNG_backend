@@ -3,7 +3,6 @@ package com.project.picngo.spot.service;
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
-import com.project.picngo.external.TourApiClient;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
@@ -31,7 +30,6 @@ public class SpotService {
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
-    private final TourApiClient tourApiClient;
 
     public SpotDetailResponse getSpotDetail(Long spotId) {
         Spot spot = spotRepository.findById(spotId)
@@ -81,13 +79,10 @@ public class SpotService {
     }
 
     public SpotPhotoResponse getSpotPhotos(Long spotId) {
-        Spot spot = spotRepository.findById(spotId)
-                .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
-
-        if (spot.getTourContentId() == null) {
-            return SpotPhotoResponse.of(spotId, List.of());
+        if (!spotRepository.existsById(spotId)) {
+            throw new CustomException(SpotErrorCode.SPOT_NOT_FOUND);
         }
-
-        return SpotPhotoResponse.of(spotId, tourApiClient.getDetailImages(spot.getTourContentId()));
+        // sync 때 저장한 TourAPI 사진을 DB에서 조회 (실시간 외부 호출 제거)
+        return SpotPhotoResponse.of(spotId, spotPhotoRepository.findBySpotIdAndUserIdIsNullOrderByIdAsc(spotId));
     }
 }
