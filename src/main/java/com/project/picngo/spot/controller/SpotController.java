@@ -2,7 +2,6 @@ package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.*;
-import com.project.picngo.spot.service.BookmarkService;
 import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
@@ -11,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -18,6 +18,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -27,7 +29,6 @@ public class SpotController implements SpotControllerApiSpec {
 
     private final SpotService spotService;
     private final ReviewService reviewService;
-    private final BookmarkService bookmarkService;
     private final PhotogenicService photogenicService;
     private final ChecklistService checklistService;
 
@@ -106,13 +107,11 @@ public class SpotController implements SpotControllerApiSpec {
     }
 
     @GetMapping("/{id}/photogenic-score")
-    public ResponseEntity<PhotogenicResponse> getPhotogenicScore(@PathVariable Long id) {
-        return ResponseEntity.ok(photogenicService.calculate(id));
-    }
-
-    @PostMapping("/{id}/bookmark")
-    public ResponseEntity<BookmarkResponse> toggleBookmark(@PathVariable Long id) {
-        return ResponseEntity.ok(bookmarkService.toggle(id));
+    public ResponseEntity<PhotogenicResponse> getPhotogenicScore(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime time) {
+        return ResponseEntity.ok(photogenicService.calculate(id, date, time));
     }
 
     @GetMapping("/{id}/photos")
@@ -136,6 +135,18 @@ public class SpotController implements SpotControllerApiSpec {
     @DeleteMapping("/{id}/checklist/{itemId}")
     public ResponseEntity<Void> deleteChecklistItem(@PathVariable Long id, @PathVariable Long itemId) {
         checklistService.deleteItem(id, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{id}/checklist/default/{defaultItemId}")
+    public ResponseEntity<Void> hideDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
+        checklistService.hideDefaultItem(id, defaultItemId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/checklist/default/{defaultItemId}/restore")
+    public ResponseEntity<Void> restoreDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
+        checklistService.restoreDefaultItem(id, defaultItemId);
         return ResponseEntity.noContent().build();
     }
 

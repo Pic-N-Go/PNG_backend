@@ -40,7 +40,6 @@ public record TourApiResponse(Response response) {
             String parking,
             String chkbabycarriage,
             String chkpet,
-            String chkhandichief,
-            String toilet
+            String chkhandichief
     ) {}
 }

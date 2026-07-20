@@ -1,7 +1,6 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
-import com.project.picngo.spot.dto.BookmarkResponse;
 import com.project.picngo.spot.dto.ChecklistRequest;
 import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.MapBoundsRequest;
@@ -22,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +30,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Tag(name = "스팟 (Spot)", description = "스팟 관련 (목록, 검색, 지도, 상세, 리뷰 등) API")
@@ -108,14 +110,11 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
     );
 
-    @Operation(summary = "포토제닉 지수 조회", description = "날씨·미세먼지·시즌·골든아워 기반 포토제닉 점수를 반환합니다.")
+    @Operation(summary = "포토제닉 지수 조회", description = "날씨·미세먼지·시즌·골든아워 기반 포토제닉 점수를 반환합니다. date/time 생략 시 현재 시각 기준.")
     ResponseEntity<PhotogenicResponse> getPhotogenicScore(
-            @Parameter(description = "스팟 ID") @PathVariable Long id
-    );
-
-    @Operation(summary = "북마크 토글", description = "북마크를 추가하거나 취소합니다. isBookmarked: true면 추가됨, false면 취소됨.")
-    ResponseEntity<BookmarkResponse> toggleBookmark(
-            @Parameter(description = "스팟 ID") @PathVariable Long id
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "조회 날짜 (yyyy-MM-dd, 생략 시 오늘)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "조회 시각 (HH:mm, 생략 시 현재)") @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime time
     );
 
     @Operation(summary = "스팟 사진 목록 조회", description = "한국관광공사 TourAPI에서 스팟 공식 사진 목록을 실시간 조회합니다. 사용자 등록 스팟은 빈 배열 반환.")
@@ -131,13 +130,25 @@ public interface SpotControllerApiSpec {
     @Operation(summary = "체크리스트 항목 추가", description = "사용자가 체크리스트 항목을 추가합니다. 최대 10개, 내용 20자 이하.")
     ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
             @Parameter(description = "스팟 ID") @PathVariable Long id,
-            @RequestBody ChecklistRequest request
+            @Valid @RequestBody ChecklistRequest request
     );
 
     @Operation(summary = "체크리스트 항목 삭제", description = "사용자가 직접 추가한 항목만 삭제 가능합니다.")
     ResponseEntity<Void> deleteChecklistItem(
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Parameter(description = "항목 ID") @PathVariable Long itemId
+    );
+
+    @Operation(summary = "기본 체크리스트 항목 숨김", description = "시스템 기본 항목을 사용자별로 숨깁니다. 이미 숨긴 항목이어도 204를 반환합니다(멱등).")
+    ResponseEntity<Void> hideDefaultChecklistItem(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
+    );
+
+    @Operation(summary = "기본 체크리스트 항목 복원", description = "숨긴 기본 항목을 다시 표시합니다. 숨겨져 있지 않았어도 204를 반환합니다(멱등).")
+    ResponseEntity<Void> restoreDefaultChecklistItem(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
     );
 
     @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 10장까지 함께 업로드할 수 있습니다.")

@@ -1,8 +1,8 @@
 package com.project.picngo.spot.service;
 
+import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
-import com.project.picngo.external.TourApiClient;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
@@ -39,8 +39,7 @@ public class SpotService {
     private final SpotTagRepository spotTagRepository;
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
-    private final BookmarkRepository bookmarkRepository;
-    private final TourApiClient tourApiClient;
+    private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
 
     public SpotDetailResponse getSpotDetail(Long spotId) {
         Spot spot = spotRepository.findById(spotId)
@@ -53,7 +52,8 @@ public class SpotService {
         Double avgRating = rows.isEmpty() || rows.get(0)[0] == null ? null : (Double) rows.get(0)[0];
         int reviewCount = rows.isEmpty() || rows.get(0)[1] == null ? 0 : ((Long) rows.get(0)[1]).intValue();
         long photoCount = spotPhotoRepository.countBySpotId(spotId);
-        boolean isBookmarked = bookmarkRepository.existsBySpotIdAndUserId(spotId, TEMP_USER_ID);
+        // 북마크 = 1개 이상 컬렉션에 소속
+        boolean isBookmarked = bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId);
 
         return SpotDetailResponse.of(
                 spot, tags, checklist,
@@ -89,14 +89,11 @@ public class SpotService {
     }
 
     public SpotPhotoResponse getSpotPhotos(Long spotId) {
-        Spot spot = spotRepository.findById(spotId)
-                .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
-
-        if (spot.getTourContentId() == null) {
-            return SpotPhotoResponse.of(spotId, List.of());
+        if (!spotRepository.existsById(spotId)) {
+            throw new CustomException(SpotErrorCode.SPOT_NOT_FOUND);
         }
-
-        return SpotPhotoResponse.of(spotId, tourApiClient.getDetailImages(spot.getTourContentId()));
+        // sync 때 저장한 TourAPI 사진을 DB에서 조회 (실시간 외부 호출 제거)
+        return SpotPhotoResponse.of(spotId, spotPhotoRepository.findBySpotIdAndUserIdIsNullOrderByIdAsc(spotId));
     }
 
     public Page<SpotResponse> getSpots(String category, String sort, int page, int size) {
