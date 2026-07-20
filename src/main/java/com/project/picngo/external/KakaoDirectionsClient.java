@@ -49,13 +49,16 @@ public class KakaoDirectionsClient implements DirectionsClient {
                 int minutes = summary.duration() / 60; // 카카오는 초 단위 반환
                 return new DirectionsResponse(minutes, summary.distance());
             } else {
-                log.error("카카오 길찾기 API 비정상 응답: {}", route.result_msg());
+                log.warn("카카오 길찾기 API 비정상 응답: {}", route.result_msg());
+                return null; // 경로 탐색 실패 시 null 반환
             }
         }
-        throw new CustomException(ExternalApiErrorCode.KAKAO_API_ERROR);
+        log.warn("카카오 길찾기 API 빈 응답");
+        return null;
     }
 
     public Integer getTravelTimeMinutes(Double startLat, Double startLng, Double goalLat, Double goalLng) {
-        return getTravelInfo(startLat, startLng, goalLat, goalLng).travelTimeMinutes();
+        DirectionsResponse response = getTravelInfo(startLat, startLng, goalLat, goalLng);
+        return response != null ? response.travelTimeMinutes() : null;
     }
 }

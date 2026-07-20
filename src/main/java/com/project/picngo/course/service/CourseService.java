@@ -12,6 +12,8 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,7 @@ public class CourseService {
     private final CourseSpotRepository courseSpotRepository;
     private final CourseChecklistRepository courseChecklistRepository;
     private final UserRepository userRepository;
+    private final SpotRepository spotRepository;
 
 
     // ==================== 코스 CRUD ====================
@@ -183,6 +186,72 @@ public class CourseService {
         });
     }
 
+    // ==================== 코스 체크리스트 관리 ====================
+
+    @Transactional
+    public CourseChecklistResponse addCourseChecklist(Long userId, Long courseId, CourseChecklistRequest request) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = CourseChecklist.builder()
+                .course(course)
+                .content(request.content())
+                .build();
+
+        CourseChecklist saved = courseChecklistRepository.save(checklist);
+        course.getCourseChecklists().add(saved);
+
+        return toChecklistResponse(saved);
+    }
+
+    @Transactional
+    public CourseChecklistResponse toggleCourseChecklist(Long userId, Long courseId, Long checklistId) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = courseChecklistRepository.findById(checklistId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND));
+
+        if (!checklist.getCourse().getId().equals(courseId)) {
+            throw new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND);
+        }
+
+        checklist.toggleChecked();
+        return toChecklistResponse(checklist);
+    }
+
+    @Transactional
+    public CourseChecklistResponse updateCourseChecklist(Long userId, Long courseId, Long checklistId, CourseChecklistRequest request) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = courseChecklistRepository.findById(checklistId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND));
+
+        if (!checklist.getCourse().getId().equals(courseId)) {
+            throw new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND);
+        }
+
+        checklist.updateContent(request.content());
+        return toChecklistResponse(checklist);
+    }
+
+    @Transactional
+    public void deleteCourseChecklist(Long userId, Long courseId, Long checklistId) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = courseChecklistRepository.findById(checklistId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND));
+
+        if (!checklist.getCourse().getId().equals(courseId)) {
+            throw new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND);
+        }
+
+        course.getCourseChecklists().remove(checklist);
+        courseChecklistRepository.delete(checklist);
+    }
+
     // ==================== Private 헬퍼 메서드 ====================
 
     private Course findCourseOrThrow(Long courseId) {
@@ -215,9 +284,16 @@ public class CourseService {
     }
 
     private CourseSpotResponse toCourseSpotResponse(CourseSpot spot) {
+        Spot actualSpot = spotRepository.findById(spot.getSpotId()).orElse(null);
         return new CourseSpotResponse(
                 spot.getId(),
                 spot.getSpotId(),
+                actualSpot != null ? actualSpot.getName() : null,
+                actualSpot != null ? actualSpot.getLatitude() : null,
+                actualSpot != null ? actualSpot.getLongitude() : null,
+                actualSpot != null && actualSpot.getCategory() != null ? actualSpot.getCategory().name() : null,
+                actualSpot != null ? actualSpot.getThumbnailUrl() : null,
+                actualSpot != null ? actualSpot.getPhotogenicScore() : null,
                 spot.getDayNumber(),
                 spot.getSequenceOrder(),
                 spot.getMemo(),

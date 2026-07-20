@@ -41,4 +41,19 @@ public interface CourseControllerApiSpec {
 
     @Operation(summary = "명소 순서 변경", description = "코스 내 명소들의 방문 순서를 변경하고 길찾기 데이터를 재계산합니다.")
     ResponseEntity<Void> updateSpotOrder(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseSpotOrderUpdateRequest request);
+
+    @Operation(summary = "코스 체크리스트 추가", description = "코스에 새로운 체크리스트 항목을 추가합니다.")
+    ResponseEntity<CourseChecklistResponse> addCourseChecklist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @RequestBody CourseChecklistRequest request);
+
+    @Operation(summary = "코스 체크리스트 완료 토글", description = "코스 체크리스트 항목의 완료 여부를 토글합니다.")
+    ResponseEntity<CourseChecklistResponse> toggleCourseChecklist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @PathVariable Long checklistId);
+
+    @Operation(summary = "코스 체크리스트 내용 수정", description = "코스 체크리스트 항목의 내용을 수정합니다.")
+    ResponseEntity<CourseChecklistResponse> updateCourseChecklist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @PathVariable Long checklistId, @RequestBody CourseChecklistRequest request);
+
+    @Operation(summary = "코스 체크리스트 삭제", description = "코스 체크리스트 항목을 삭제합니다.")
+    ResponseEntity<Void> deleteCourseChecklist(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id, @PathVariable Long checklistId);
+
+    @Operation(summary = "코스 날씨 조회", description = "코스의 방문 일차별 대상 스팟의 기상청 날씨와 일출/일몰 정보를 반환합니다.")
+    ResponseEntity<List<CourseWeatherResponse>> getCourseWeather(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id);
 }

@@ -3,6 +3,9 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: picngo
+  sql:
+    init:
+      mode: always
 
   servlet:
     multipart:
@@ -28,6 +31,7 @@ spring:
     password: ${DB_PASSWORD}
 
   jpa:
+    defer-datasource-initialization: true
     hibernate:
       ddl-auto: update
     show-sql: true

@@ -35,6 +35,10 @@ public class CourseChecklist {
     public void toggleChecked() {
         this.isChecked = !this.isChecked;
     }
+
+    public void updateContent(String content) {
+        this.content = content;
+    }
 }
 
 
