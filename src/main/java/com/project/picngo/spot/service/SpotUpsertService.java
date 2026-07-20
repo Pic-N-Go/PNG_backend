@@ -4,6 +4,7 @@ import com.project.picngo.external.dto.TourApiImageResponse.ImageItem;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse.Item;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.SpotPhoto;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
@@ -45,7 +46,7 @@ public class SpotUpsertService {
                         .overview(detail != null ? detail.overview() : null)
                         .latitude(parseDouble(item.mapy()))
                         .longitude(parseDouble(item.mapx()))
-                        .category(item.cat1())
+                        .category(SpotCategory.ETC)
                         .cat3(item.cat3())
                         .source(SpotSource.TOUR_API)
                         .badge(true)

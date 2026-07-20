@@ -1,8 +1,11 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.ReviewErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
+import com.project.picngo.common.image.dto.ImageUploadResult;
+import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.ReviewPhoto;
 import com.project.picngo.spot.domain.Spot;
@@ -15,30 +18,34 @@ import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ReviewService {
 
-    // ponytail: Spring Security 연동 전까지 하드코딩
-    private static final Long TEMP_USER_ID = 1L;
+    private static final int MAX_REVIEW_PHOTO_COUNT = 10;
 
     private final ReviewRepository reviewRepository;
     private final ReviewPhotoRepository reviewPhotoRepository;
     private final SpotRepository spotRepository;
     private final UserRepository userRepository;
+    private final ImageStorageService imageStorageService;
 
     public ReviewListResponse getReviews(Long spotId, String sort, int page, int size) {
         if (!spotRepository.existsById(spotId)) {
@@ -61,8 +68,11 @@ public class ReviewService {
 
         Map<Long, String> nicknameMap = userRepository.findByIdIn(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getNickname));
-        Map<Long, List<ReviewPhoto>> photoMap = reviewPhotoRepository.findByReview_IdIn(reviewIds).stream()
-                .collect(Collectors.groupingBy(p -> p.getReview().getId()));
+        Map<Long, List<String>> photoMap = reviewPhotoRepository.findByReview_IdIn(reviewIds).stream()
+                .collect(Collectors.groupingBy(
+                        photo -> photo.getReview().getId(),
+                        Collectors.mapping(photo -> imageStorageService.getPresignedUrl(photo.getPhotoUrl()), Collectors.toList())
+                ));
 
         List<ReviewListResponse.ReviewInfo> reviewInfos = reviews.stream()
                 .map(review -> ReviewListResponse.ReviewInfo.of(
@@ -88,45 +98,69 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse createReview(Long spotId, ReviewRequest request) {
+    public ReviewResponse createReview(Long userId, Long spotId, ReviewRequest request, List<MultipartFile> photos) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         Review review = Review.builder()
                 .spot(spot)
-                .userId(TEMP_USER_ID)
+                .userId(userId)
                 .rating(request.rating())
-                .timeSlot(request.timeSlot())
                 .content(request.content())
-                .equipmentInfo(request.equipmentInfo())
+                .equipmentInfo(joinEquipmentInfo(request.equipmentInfo()))
+                .timePeriod(request.timePeriod())
                 .visitedAt(request.visitedAt())
                 .build();
 
-        ReviewResponse saved = ReviewResponse.from(reviewRepository.save(review));
-        updateSpotReviewStats(spot);
-        return saved;
+        Review savedReview = reviewRepository.save(review);
+        List<String> uploadedKeys = new ArrayList<>();
+
+        try {
+            List<String> photoUrls = uploadReviewPhotos(savedReview, photos, uploadedKeys);
+
+            updateSpotReviewStats(spot);
+
+            return ReviewResponse.from(savedReview, photoUrls);
+        } catch (RuntimeException e) {
+            deleteUploadedImages(uploadedKeys);
+            throw e;
+        }
     }
 
     @Transactional
-    public ReviewResponse updateReview(Long reviewId, ReviewRequest request) {
-        Review review = findMyReview(reviewId);
-        review.update(request.rating(), request.content(), request.equipmentInfo(), request.visitedAt(), request.timeSlot());
+    public ReviewResponse updateReview(Long userId, Long reviewId, ReviewRequest request) {
+        Review review = findMyReview(userId, reviewId);
+        review.update(
+                request.rating(),
+                request.content(),
+                joinEquipmentInfo(request.equipmentInfo()),
+                request.timePeriod(),
+                request.visitedAt()
+        );
         return ReviewResponse.from(review);
     }
 
     @Transactional
-    public void deleteReview(Long reviewId) {
-        Review review = findMyReview(reviewId);
+    public void deleteReview(Long userId, Long reviewId) {
+        Review review = findMyReview(userId, reviewId);
         Spot spot = review.getSpot();
+
+        List<String> photoKeys = reviewPhotoRepository.findByReviewId(reviewId).stream()
+                .map(ReviewPhoto::getPhotoUrl)
+                .toList();
+
         reviewRepository.delete(review);
         reviewRepository.flush();
+
+        deleteUploadedImages(photoKeys);
+
         updateSpotReviewStats(spot);
     }
 
-    private Review findMyReview(Long reviewId) {
+    private Review findMyReview(Long userId, Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new CustomException(ReviewErrorCode.REVIEW_NOT_FOUND));
-        if (!review.getUserId().equals(TEMP_USER_ID)) {
+        if (!review.getUserId().equals(userId)) {
             throw new CustomException(ReviewErrorCode.REVIEW_FORBIDDEN);
         }
         return review;
@@ -155,5 +189,57 @@ public class ReviewService {
         reviewRepository.findRatingDistributionBySpotId(spotId)
                 .forEach(row -> distribution.put((Integer) row[0], (Long) row[1]));
         return distribution;
+    }
+
+    private List<String> uploadReviewPhotos(Review review, List<MultipartFile> photos, List<String> uploadedKeys) {
+        if (photos == null || photos.isEmpty()) {
+            return List.of();
+        }
+
+        if (photos.size() > MAX_REVIEW_PHOTO_COUNT) {
+            throw new CustomException(ImageErrorCode.IMAGE_FILE_TOO_MANY);
+        }
+
+        List<String> photoUrls = new ArrayList<>();
+
+        for (MultipartFile photo : photos) {
+            if (photo == null || photo.isEmpty()) {
+                continue;
+            }
+
+            ImageUploadResult uploadResult = imageStorageService.upload(photo, "reviews/" + review.getId());
+            uploadedKeys.add(uploadResult.key());
+
+            ReviewPhoto reviewPhoto = ReviewPhoto.builder()
+                    .review(review)
+                    .photoUrl(uploadResult.key())
+                    .build();
+
+            reviewPhotoRepository.save(reviewPhoto);
+            photoUrls.add(uploadResult.url());
+        }
+
+        return photoUrls;
+    }
+
+    private void deleteUploadedImages(List<String> uploadedKeys) {
+        for (String uploadedKey : uploadedKeys) {
+            try {
+                imageStorageService.delete(uploadedKey);
+            } catch (RuntimeException e) {
+                log.warn("이미지 삭제에 실패했습니다. key={}", uploadedKey, e);;
+            }
+        }
+    }
+
+    private String joinEquipmentInfo(List<String> equipmentInfo) {
+        if (equipmentInfo == null || equipmentInfo.isEmpty()) {
+            return null;
+        }
+
+        String joined = equipmentInfo.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .collect(Collectors.joining(", "));
+        return joined.isBlank() ? null : joined;
     }
 }

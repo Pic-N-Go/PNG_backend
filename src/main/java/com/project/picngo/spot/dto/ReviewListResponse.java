@@ -1,8 +1,7 @@
 package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Review;
-import com.project.picngo.spot.domain.ReviewPhoto;
-import com.project.picngo.spot.domain.enums.TimeSlot;
+import com.project.picngo.spot.domain.enums.TimePeriod;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,23 +30,23 @@ public record ReviewListResponse(
             Long userId,
             String nickname,
             Integer rating,
-            TimeSlot timeSlot,
             String content,
             String equipmentInfo,
+            TimePeriod timePeriod,
             List<String> photos,
             LocalDate visitedAt,
             LocalDateTime createdAt
     ) {
-        public static ReviewInfo of(Review review, String nickname, List<ReviewPhoto> photos) {
+        public static ReviewInfo of(Review review, String nickname, List<String> photos) {
             return new ReviewInfo(
                     review.getId(),
                     review.getUserId(),
                     nickname,
                     review.getRating(),
-                    review.getTimeSlot(),
                     review.getContent(),
                     review.getEquipmentInfo(),
-                    photos.stream().map(ReviewPhoto::getPhotoUrl).toList(),
+                    review.getTimePeriod(),
+                    photos,
                     review.getVisitedAt(),
                     review.getCreatedAt()
             );

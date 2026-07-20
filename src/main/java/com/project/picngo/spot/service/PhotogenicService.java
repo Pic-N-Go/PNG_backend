@@ -88,7 +88,7 @@ public class PhotogenicService {
     private FactorInfo calculateWeather(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
             String dateStr = date.format(DATE_FMT);
-            List<WeatherForecastResponse> forecasts = weatherClient.getForecast(lat, lng, dateStr);
+            List<WeatherForecastResponse> forecasts = weatherClient.getShortTermForecast(lat, lng, dateStr);
             if (forecasts == null || forecasts.isEmpty()) return new FactorInfo("데이터 없음", 0);
 
             WeatherForecastResponse closest = forecasts.stream()

@@ -1,33 +1,22 @@
 package com.project.picngo.spot.controller;
 
-import com.project.picngo.spot.dto.ChecklistRequest;
-import com.project.picngo.spot.dto.ChecklistResponse;
-import com.project.picngo.spot.dto.NearbySpotResponse;
-import com.project.picngo.spot.dto.PhotogenicResponse;
-import com.project.picngo.spot.dto.RecommendedSpotResponse;
-import com.project.picngo.spot.dto.ReviewListResponse;
-import com.project.picngo.spot.dto.ReviewRequest;
-import com.project.picngo.spot.dto.ReviewResponse;
-import com.project.picngo.spot.dto.SpotDetailResponse;
-import com.project.picngo.spot.dto.SpotPhotoResponse;
+import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.spot.dto.*;
 import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -42,6 +31,48 @@ public class SpotController implements SpotControllerApiSpec {
     private final ReviewService reviewService;
     private final PhotogenicService photogenicService;
     private final ChecklistService checklistService;
+
+    @GetMapping
+    public ResponseEntity<Page<SpotResponse>> getSpots(
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(spotService.getSpots(category, sort, page, size));
+    }
+
+    @GetMapping("/popular")
+    public ResponseEntity<List<SpotResponse>> getPopularSpots(
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "10") int size
+    ){
+        return ResponseEntity.ok(spotService.getPopularSpots(category, size));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<SpotResponse>> searchSpots(
+            @RequestParam String keyword,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(spotService.searchSpots(keyword, category, page, size));
+    }
+
+    @GetMapping("/map")
+    public ResponseEntity<List<SpotMapResponse>> getMapSpots(
+            @ParameterObject @Valid MapBoundsRequest request
+    ){
+        return ResponseEntity.ok(spotService.getMapSpots(request));
+    }
+
+    @GetMapping("/{id}/summary")
+    public ResponseEntity<SpotSummaryResponse> getSpotSummary(
+            @PathVariable Long id
+    ){
+        return ResponseEntity.ok(spotService.getSpotSummary(id));
+    }
 
     @GetMapping("/recommended")
     public ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
@@ -119,11 +150,14 @@ public class SpotController implements SpotControllerApiSpec {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/reviews")
+    @PostMapping(value ="/{id}/reviews", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ReviewResponse> createReview(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
-            @Valid @RequestBody ReviewRequest request
+            @Valid @RequestPart("request") ReviewRequest request,
+            @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(reviewService.createReview(id, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(reviewService.createReview(userDetails.getId(), id, request, photos));
     }
 }
