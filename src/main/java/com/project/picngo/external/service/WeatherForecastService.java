@@ -35,18 +35,9 @@ public class WeatherForecastService {
         }
 
         try {
-            // 2. 중기예보 (오전/오후)
-            // 기준 발표 시각을 동적으로 구합니다. (06시, 18시 발표 기준)
-            java.time.LocalTime nowTime = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
+            // 기준 발표 시각을 '무조건 어제 18시'로 고정하여 기상청 지연 업데이트 예방
             java.time.LocalDate todayDate = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
-            String tmFc;
-            if (nowTime.isBefore(java.time.LocalTime.of(6, 0))) {
-                tmFc = todayDate.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "1800";
-            } else if (nowTime.isBefore(java.time.LocalTime.of(18, 0))) {
-                tmFc = todayDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "0600";
-            } else {
-                tmFc = todayDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "1800";
-            }
+            String tmFc = todayDate.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + "1800";
             
             // nx, ny (lat, lng)를 광역구역코드(regId)로 변환
             String regId = getMidTermRegionCode(lat, lng); 
@@ -106,7 +97,7 @@ public class WeatherForecastService {
      * 기상 예보는 광역 단위로 이루어지므로 Bounding Box를 이용한 근사치를 사용합니다.
      */
     private String getMidTermRegionCode(Double lat, Double lng) {
-        if (lat < 33.5) {
+        if (lat < 34.0) {
             return "11G00000"; // 제주도
         }
         if (lat < 36.0) {
