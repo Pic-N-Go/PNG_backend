@@ -33,7 +33,7 @@ public class WeatherCacheService {
     private static final long TTL_HOURS = 3;
 
     public List<WeatherForecastResponse> getCached7DayForecast(Double lat, Double lng, String date) {
-        String key = "weather:forecast:7day:" + String.format(Locale.US, "%.1f_%.1f", lat, lng); // 반경 11.1km 이내 지역은 같은 날씨 데이터 사용
+        String key = "weather:forecast:7days_v5:" + String.format(Locale.US, "%.1f_%.1f", lat, lng);
         
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {

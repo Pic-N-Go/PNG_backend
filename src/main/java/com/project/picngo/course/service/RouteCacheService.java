@@ -41,13 +41,34 @@ public class RouteCacheService {
                 } catch (Exception e) {
                     log.warn("Redis 캐시 저장 실패. Key: {}", cacheKey, e);
                 }
+                return travelTime;
+            } else {
+                return calculateFallbackTime(startLat, startLng, goalLat, goalLng);
             }
-            return travelTime;
         } catch (Exception e) {
             log.error("카카오 길찾기 API 호출 실패", e);
-            // Fallback
+            return calculateFallbackTime(startLat, startLng, goalLat, goalLng);
+        }
+    }
+
+    private Integer calculateFallbackTime(Double startLat, Double startLng, Double goalLat, Double goalLng) {
+        if (startLat == null || startLng == null || goalLat == null || goalLng == null) {
             return 30;
         }
+        
+        int R = 6371; // 지구의 반지름 (km)
+        double dLat = Math.toRadians(goalLat - startLat);
+        double dLon = Math.toRadians(goalLng - startLng);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(startLat)) * Math.cos(Math.toRadians(goalLat)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distanceKm = R * c;
+        
+        // 제주도 평균 이동 속도 약 30km/h (0.5km/min) 로 가정
+        // 최소 이동 시간 5분 보장
+        int minutes = (int) Math.round(distanceKm * 2);
+        return Math.max(5, minutes);
     }
 
     private String generateCacheKey(Double startLat, Double startLng, Double goalLat, Double goalLng) {

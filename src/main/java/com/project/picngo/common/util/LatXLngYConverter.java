@@ -10,6 +10,47 @@ public class LatXLngYConverter {
         public double lng;
         public int x;
         public int y;
+
+        public LatXLngY() {}
+
+        public LatXLngY(int x, int y) {
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    // 제주도 공식 KMA 격자 리스트 (엑셀 기준)
+    private static final int[][] VALID_JEJU_GRIDS = {
+            {53, 38}, {48, 36}, {49, 37}, {59, 38}, {55, 39}, {46, 35}, {48, 48}, {60, 38}, {54, 38}, {52, 38}, {51, 38}, // 제주시
+            {53, 33}, {48, 32}, {56, 33}, {60, 37}, {49, 32}, {58, 34}, {54, 33}, {52, 32}, {51, 32}, {50, 32}  // 서귀포시
+    };
+
+    /**
+     * 계산된 (x, y)가 제주도 바운더리 내에 있을 경우,
+     * 가장 가까운 기상청 공식 행정구역 격자 좌표로 보정(Snap)합니다.
+     */
+    private static void snapToNearestValidJejuGrid(LatXLngY rs) {
+        // 제주도 대략적인 바운더리 (추자도 포함)
+        if (rs.x >= 45 && rs.x <= 65 && rs.y >= 30 && rs.y <= 50) {
+            int bestX = rs.x;
+            int bestY = rs.y;
+            double minDist = Double.MAX_VALUE;
+
+            for (int[] grid : VALID_JEJU_GRIDS) {
+                int vx = grid[0];
+                int vy = grid[1];
+                if (rs.x == vx && rs.y == vy) return; // 이미 유효한 격자면 통과
+
+                double dist = Math.pow(rs.x - vx, 2) + Math.pow(rs.y - vy, 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    bestX = vx;
+                    bestY = vy;
+                }
+            }
+            rs.x = bestX;
+            rs.y = bestY;
+        }
     }
 
     public static LatXLngY convertGrid(double lat_X, double lng_Y) {
@@ -47,6 +88,9 @@ public class LatXLngYConverter {
         theta *= sn;
         rs.x = (int) Math.floor(ra * Math.sin(theta) + XO + 0.5);
         rs.y = (int) Math.floor(ro - ra * Math.cos(theta) + YO + 0.5);
+
+        // 공식 격자로 보정
+        snapToNearestValidJejuGrid(rs);
         return rs;
     }
 }

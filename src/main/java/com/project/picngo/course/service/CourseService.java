@@ -108,13 +108,10 @@ public class CourseService {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        Integer dayNumber = request.dayNumber();
         List<CourseSpotSyncItem> requestSpots = request.spots();
 
-        // 1. 기존 스팟 조회 (해당 일차)
-        List<CourseSpot> existingSpots = course.getCourseSpots().stream()
-                .filter(cs -> cs.getDayNumber().equals(dayNumber))
-                .toList();
+        // 1. 기존 전체 스팟 조회
+        List<CourseSpot> existingSpots = course.getCourseSpots();
 
         Set<Long> requestSpotIds = requestSpots.stream()
                 .map(CourseSpotSyncItem::courseSpotId)
@@ -137,15 +134,15 @@ public class CourseService {
 
         for (CourseSpotSyncItem item : requestSpots) {
             if (item.courseSpotId() != null && existingSpotMap.containsKey(item.courseSpotId())) {
-                // 기존 스팟 업데이트
+                // 기존 스팟 업데이트 (dayNumber, sequenceOrder, memo)
                 CourseSpot spot = existingSpotMap.get(item.courseSpotId());
-                spot.updateOrderAndMemo(item.sequenceOrder(), item.memo());
+                spot.updateDayNumberOrderAndMemo(item.dayNumber(), item.sequenceOrder(), item.memo());
             } else {
                 // 신규 스팟 추가
                 CourseSpot newSpot = CourseSpot.builder()
                         .course(course)
                         .spotId(item.spotId())
-                        .dayNumber(dayNumber)
+                        .dayNumber(item.dayNumber())
                         .sequenceOrder(item.sequenceOrder())
                         .memo(item.memo())
                         .travelTimeMinutes(null)

@@ -79,17 +79,22 @@ public class CourseWeatherService {
                 
                 if (forecastList != null && !forecastList.isEmpty()) {
                     for (WeatherForecastResponse f : forecastList) {
-                        if ("1000".equals(f.time())) {
-                            morning = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
-                        } else if ("1400".equals(f.time())) {
-                            afternoon = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
-                        } else if ("1800".equals(f.time())) {
-                            evening = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                        if (dateString.equals(f.date())) {
+                            if ("1000".equals(f.time())) {
+                                morning = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                            } else if ("1400".equals(f.time())) {
+                                afternoon = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                            } else if ("1800".equals(f.time())) {
+                                evening = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                            }
                         }
                     }
                 }
             } catch (Exception e) {
                 log.warn("코스 날씨 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
+                morning = new WeatherDetail("에러: API 실패", null);
+                afternoon = new WeatherDetail("에러: API 실패", null);
+                evening = new WeatherDetail("에러: API 실패", null);
             }
 
             // 골든아워 조회 (캐시 활용)

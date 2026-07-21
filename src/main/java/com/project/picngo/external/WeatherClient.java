@@ -12,7 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
+import reactor.util.retry.Retry;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,53 +25,89 @@ import java.util.Map;
 @Component
 public class WeatherClient {
 
-    // 기상청 Open API 서비스키
     private final String serviceKey;
-
-    // 기상청 날씨(단,중기)예보 Open API
     private final WebClient kmaWebClient;
-
-    // Sunrise-Sunset API
     private final WebClient sunriseWebClient;
 
-    public WeatherClient(
-            WebClient.Builder webClientBuilder, 
-            @Value("${weather.api.key}") String serviceKey,
-            @Value("${weather.api.kma-url:http://apis.data.go.kr/1360000}") String kmaUrl,
-            @Value("${weather.api.sunrise-url:https://api.sunrise-sunset.org}") String sunriseUrl) {
-        this.kmaWebClient = webClientBuilder.clone().baseUrl(kmaUrl).build();
-        this.sunriseWebClient = webClientBuilder.clone().baseUrl(sunriseUrl).build();
+    public WeatherClient(WebClient.Builder webClientBuilder,
+                         @Value("${weather.api.kma-url:http://apis.data.go.kr/1360000}") String kmaUrl,
+                         @Value("${weather.api.sunrise-url:https://api.sunrise-sunset.org}") String sunriseUrl,
+                         @Value("${weather.api.key}") String serviceKey) {
         this.serviceKey = serviceKey;
+        
+        ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
+                .build();
+
+        this.kmaWebClient = webClientBuilder.clone()
+                .baseUrl(kmaUrl)
+                .exchangeStrategies(exchangeStrategies)
+                .defaultHeader("User-Agent", "Mozilla/5.0")
+                .build();
+                
+        this.sunriseWebClient = webClientBuilder.clone()
+                .baseUrl(sunriseUrl)
+                .build();
+    }
+
+    private String[] getLatestBaseDateAndTime() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        // 무조건 어제 2300 발표 데이터 사용
+        return new String[]{
+                now.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")),
+                "2300"
+        };
     }
 
     public List<WeatherForecastResponse> getShortTermForecast(Double lat, Double lng, String date) {
         LatXLngYConverter.LatXLngY grid = LatXLngYConverter.convertGrid(lat, lng);
 
+        // 테스트용 하드코딩 (제주시청 부근 53, 38)
+        grid.x = 53;
+        grid.y = 38;
+
         KmaWeatherApiResponse apiResponse;
         try {
+            String[] baseDateTime = getLatestBaseDateAndTime();
+            String baseDate = baseDateTime[0];
+            String baseTime = baseDateTime[1];
+
+            String urlStr = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+                    + "?serviceKey=" + serviceKey
+                    + "&pageNo=1"
+                    + "&numOfRows=1000"
+                    + "&dataType=JSON"
+                    + "&base_date=" + baseDate
+                    + "&base_time=" + baseTime
+                    + "&nx=" + grid.x
+                    + "&ny=" + grid.y;
+                    
+            log.info("Requesting KMA API with Dynamic BaseTime: {} {}, grid: {},{}", baseDate, baseTime, grid.x, grid.y);
+            java.net.URI uri = new java.net.URI(urlStr);
+
             apiResponse = kmaWebClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/VilageFcstInfoService_2.0/getVilageFcst")
-                            .queryParam("serviceKey", serviceKey)
-                            .queryParam("pageNo", 1)
-                            .queryParam("numOfRows", 100)
-                            .queryParam("dataType", "JSON")
-                            .queryParam("base_date", java.time.LocalDate.now().minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")))
-                            .queryParam("base_time", "2300")
-                            .queryParam("nx", grid.x)
-                            .queryParam("ny", grid.y)
-                            .build())
+                    .uri(uri)
                     .retrieve()
                     .bodyToMono(KmaWeatherApiResponse.class)
+                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                            .doBeforeRetry(retrySignal -> log.warn("기상청 단기예보 502/타임아웃 발생, 재시도합니다... ({}회차)", retrySignal.totalRetries() + 1)))
                     .block();
+
+            if (apiResponse == null) {
+                log.error("기상청 API 응답이 null입니다.");
+                throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
+            }
         } catch (Exception e) {
             log.error("기상청 단기예보 API 호출 실패", e);
             throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         }
 
         List<WeatherForecastResponse> result = new ArrayList<>();
-        if (apiResponse == null || apiResponse.response() == null || apiResponse.response().body() == null 
+        if (apiResponse.response() == null || apiResponse.response().body() == null 
                 || apiResponse.response().body().items() == null || apiResponse.response().body().items().item() == null) {
-            return result;
+            String errMsg = "API Header Code: " + (apiResponse.response() != null && apiResponse.response().header() != null ? apiResponse.response().header().resultCode() : "NULL");
+            log.error("기상청 응답에 body가 없습니다. {}", errMsg);
+            throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         }
 
         record ForecastKey(String date, String time) {}
@@ -107,17 +146,21 @@ public class WeatherClient {
 
     public KmaMidWeatherApiResponse getMidTermForecast(String regId, String tmFc) {
         try {
+            String urlStr = "http://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
+                    + "?serviceKey=" + serviceKey
+                    + "&pageNo=1"
+                    + "&numOfRows=10"
+                    + "&dataType=JSON"
+                    + "&regId=" + regId
+                    + "&tmFc=" + tmFc;
+            java.net.URI uri = new java.net.URI(urlStr);
+
             return kmaWebClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/MidFcstInfoService/getMidLandFcst")
-                            .queryParam("serviceKey", serviceKey)
-                            .queryParam("pageNo", 1)
-                            .queryParam("numOfRows", 10)
-                            .queryParam("dataType", "JSON")
-                            .queryParam("regId", regId)
-                            .queryParam("tmFc", tmFc)
-                            .build())
+                    .uri(uri)
                     .retrieve()
                     .bodyToMono(KmaMidWeatherApiResponse.class)
+                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                            .doBeforeRetry(retrySignal -> log.warn("기상청 중기예보 에러 발생, 재시도합니다... ({}회차)", retrySignal.totalRetries() + 1)))
                     .block();
         } catch (Exception e) {
             log.error("기상청 중기예보 API 호출 실패", e);
@@ -137,6 +180,7 @@ public class WeatherClient {
                             .build())
                     .retrieve()
                     .bodyToMono(SunriseSunsetApiResponse.class)
+                    .retryWhen(Retry.backoff(2, Duration.ofSeconds(1)))
                     .block();
         } catch (Exception e) {
             log.error("Sunrise API 호출 실패", e);

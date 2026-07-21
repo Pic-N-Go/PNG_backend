@@ -5,6 +5,5 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 public record CourseSpotSyncRequest(
-        @NotNull Integer dayNumber,
         @Valid @NotNull List<CourseSpotSyncItem> spots
 ) {}

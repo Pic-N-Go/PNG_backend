@@ -52,6 +52,12 @@ public class CourseSpot {
         this.memo = memo;
     }
 
+    public void updateDayNumberOrderAndMemo(Integer dayNumber, Integer sequenceOrder, String memo) {
+        this.dayNumber = dayNumber;
+        this.sequenceOrder = sequenceOrder;
+        this.memo = memo;
+    }
+
     public void updateTravelTime(Integer travelTimeMinutes) {
         this.travelTimeMinutes = travelTimeMinutes;
     }
