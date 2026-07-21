@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -112,14 +113,18 @@ public class CourseWeatherService {
                 log.warn("코스 골든아워 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
             }
 
-            // 미세먼지 조회
+            // 미세먼지 조회 (가까운 시일 내의 일정만 조회, 최대 3일 이내)
             String fineDustStatus = "데이터 없음";
-            try {
-                String region = extractRegion(targetSpot.getAddress());
-                Item air = airQualityClient.getAirQuality(region);
-                fineDustStatus = getFineDustStatus(air);
-            } catch (Exception e) {
-                log.warn("코스 미세먼지 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
+            long daysUntilVisit = ChronoUnit.DAYS.between(LocalDate.now(), visitDate);
+            
+            if (daysUntilVisit >= 0 && daysUntilVisit <= 3) {
+                try {
+                    String region = extractRegion(targetSpot.getAddress());
+                    Item air = airQualityClient.getAirQuality(region);
+                    fineDustStatus = getFineDustStatus(air);
+                } catch (Exception e) {
+                    log.warn("코스 미세먼지 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
+                }
             }
 
             weatherResponses.add(new CourseWeatherResponse(
