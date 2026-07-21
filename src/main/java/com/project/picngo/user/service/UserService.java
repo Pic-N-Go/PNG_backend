@@ -93,6 +93,7 @@ public class UserService {
 		return UserResponse.from(user);
 	}
 
+	// 내 프로필 수정
 	@Transactional
 	public UserResponse updateMyProfile(Long userId, UserProfileUpdateRequest request){
 		User user = getById(userId);
@@ -108,6 +109,7 @@ public class UserService {
 		return UserResponse.from(user);
 	}
 
+	// 타 유저 프로필 조회
 	public UserProfileResponse getUserProfile(Long userId) {
 		// 타 유저 프로필은 공개 가능한 정보만 응답
 		return UserProfileResponse.from(getById(userId));
