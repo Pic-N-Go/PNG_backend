@@ -22,7 +22,6 @@ public class KakaoDirectionsClient implements DirectionsClient {
         
         this.webClient = webClientBuilder.baseUrl("https://apis-navi.kakaomobility.com/v1/directions").build();
         this.apiKey = apiKey;
-        log.info("[DEBUG] KAKAO_REST_API_KEY 로딩됨: {}", apiKey != null && !apiKey.isEmpty() ? "로딩 성공 (길이: " + apiKey.length() + ")" : "NULL");
     }
 
     public DirectionsResponse getTravelInfo(Double startLat, Double startLng, Double goalLat, Double goalLng) {
@@ -38,7 +37,7 @@ public class KakaoDirectionsClient implements DirectionsClient {
                     .bodyToMono(KakaoDirectionsApiResponse.class)
                     .block();
         } catch (Exception e) {
-            log.error("카카오 길찾기 API 호출 실패", e);
+            log.warn("카카오 길찾기 API 호출 실패: {}", e.getMessage());
             throw new CustomException(ExternalApiErrorCode.KAKAO_API_ERROR);
         }
 
@@ -49,11 +48,11 @@ public class KakaoDirectionsClient implements DirectionsClient {
                 int minutes = summary.duration() / 60; // 카카오는 초 단위 반환
                 return new DirectionsResponse(minutes, summary.distance());
             } else {
-                log.warn("카카오 길찾기 API 비정상 응답: {}", route.result_msg());
-                return null; // 경로 탐색 실패 시 null 반환
+                log.warn("카카오 길찾기 경로 탐색 실패 (API 응답코드: {})", route.result_code());
+                return null;
             }
         }
-        log.warn("카카오 길찾기 API 빈 응답");
+        log.warn("카카오 길찾기 API 응답값 없음");
         return null;
     }
 

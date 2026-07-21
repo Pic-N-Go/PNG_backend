@@ -82,7 +82,7 @@ public class WeatherClient {
                     + "&nx=" + grid.x
                     + "&ny=" + grid.y;
                     
-            log.info("Requesting KMA API with Dynamic BaseTime: {} {}, grid: {},{}", baseDate, baseTime, grid.x, grid.y);
+            log.debug("Requesting KMA API with Dynamic BaseTime: {} {}, grid: {},{}", baseDate, baseTime, grid.x, grid.y);
             java.net.URI uri = new java.net.URI(urlStr);
 
             apiResponse = kmaWebClient.get()
@@ -98,7 +98,7 @@ public class WeatherClient {
                 throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
             }
         } catch (Exception e) {
-            log.error("기상청 단기예보 API 호출 실패", e);
+            log.warn("기상청 단기예보 API 호출 실패: {}", e.getMessage());
             throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         }
 
@@ -163,7 +163,7 @@ public class WeatherClient {
                             .doBeforeRetry(retrySignal -> log.warn("기상청 중기예보 에러 발생, 재시도합니다... ({}회차)", retrySignal.totalRetries() + 1)))
                     .block();
         } catch (Exception e) {
-            log.error("기상청 중기예보 API 호출 실패", e);
+            log.warn("기상청 중기예보 에러 발생: {}", e.getMessage());
             throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         }
     }
