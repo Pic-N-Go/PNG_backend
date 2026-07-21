@@ -31,7 +31,7 @@ public class WeatherForecastService {
             List<WeatherForecastResponse> shortTerm = weatherClient.getShortTermForecast(lat, lng, date);
             combined.addAll(shortTerm);
         } catch (Exception e) {
-            log.error("단기예보 병합 실패", e);
+            log.warn("단기예보 병합 실패: {}", e.getMessage());
         }
 
         try {
@@ -70,7 +70,7 @@ public class WeatherForecastService {
             }
 
         } catch (Exception e) {
-            log.error("중기예보 병합 실패", e);
+            log.warn("중기예보 병합 실패: {}", e.getMessage());
         }
 
         return combined;
