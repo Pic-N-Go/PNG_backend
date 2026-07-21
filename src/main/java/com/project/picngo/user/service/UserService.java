@@ -6,6 +6,8 @@ import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
+import com.project.picngo.user.dto.UserProfileResponse;
+import com.project.picngo.user.dto.UserProfileUpdateRequest;
 import com.project.picngo.user.dto.UserResponse;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -89,5 +91,25 @@ public class UserService {
 		User user = getById(userId);
 		user.updateSpotCategories(spotCategories);
 		return UserResponse.from(user);
+	}
+
+	@Transactional
+	public UserResponse updateMyProfile(Long userId, UserProfileUpdateRequest request){
+		User user = getById(userId);
+
+		// 닉네임 변경된 경우 중복 검사 진행
+		if(!user.getNickname().equals(request.nickname())
+				&& userRepository.existsByNickname(request.nickname())) {
+			throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
+		}
+
+		user.updateProfile(request.nickname(), request.profileImageUrl());
+
+		return UserResponse.from(user);
+	}
+
+	public UserProfileResponse getUserProfile(Long userId) {
+		// 타 유저 프로필은 공개 가능한 정보만 응답 
+		return UserProfileResponse.from(getById(userId));
 	}
 }
