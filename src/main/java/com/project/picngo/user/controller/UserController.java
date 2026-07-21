@@ -1,6 +1,8 @@
 package com.project.picngo.user.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.user.dto.UserProfileResponse;
+import com.project.picngo.user.dto.UserProfileUpdateRequest;
 import com.project.picngo.user.dto.UserSpotCategoryUpdateRequest;
 import com.project.picngo.user.dto.UserResponse;
 import com.project.picngo.user.service.UserService;
@@ -31,5 +33,22 @@ public class UserController implements UserControllerApiSpec {
 		return ResponseEntity.ok(
 				userService.updateUserSpotCategories(userDetails.getId(), request.spotCategories())
 		);
+	}
+
+	// 내 프로필 수정 API
+	@PutMapping("/me")
+	public ResponseEntity<UserResponse> updateMe(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@RequestBody UserProfileUpdateRequest request
+			){
+		return ResponseEntity.ok(
+				userService.updateMyProfile(userDetails.getId(), request)
+		);
+	}
+
+	// 타 유저 프로필 조회 API
+	@GetMapping("/{id}/profile")
+	public ResponseEntity<UserProfileResponse> getUserProfile(@PathVariable Long id){
+		return ResponseEntity.ok(userService.getUserProfile(id));
 	}
 }
