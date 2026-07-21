@@ -7,7 +7,6 @@ public record SunriseSunsetApiResponse(
     public record Results(
             String sunrise,
             String sunset,
-            String solar_noon,
-            String day_length
+            String solar_noon
     ) {}
 }
