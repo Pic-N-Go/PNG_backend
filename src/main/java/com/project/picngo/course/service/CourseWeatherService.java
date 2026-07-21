@@ -3,9 +3,12 @@ package com.project.picngo.course.service;
 import com.project.picngo.course.domain.Course;
 import com.project.picngo.course.domain.CourseSpot;
 import com.project.picngo.course.dto.CourseWeatherResponse;
+import com.project.picngo.course.dto.WeatherDetail;
 import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
+import com.project.picngo.external.AirQualityClient;
+import com.project.picngo.external.dto.AirQualityResponse.Item;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.external.service.WeatherCacheService;
@@ -32,6 +35,7 @@ public class CourseWeatherService {
     private final CourseRepository courseRepository;
     private final SpotRepository spotRepository;
     private final WeatherCacheService weatherCacheService;
+    private final AirQualityClient airQualityClient;
 
     public List<CourseWeatherResponse> getCourseWeather(Long courseId) {
         Course course = courseRepository.findById(courseId)
@@ -65,18 +69,23 @@ public class CourseWeatherService {
             String dateString = visitDate.format(dateFormatter);
 
             // 날씨 조회 (캐시 활용)
-            String weatherStatus = "알 수 없음";
-            Integer temperature = null;
+            WeatherDetail morning = new WeatherDetail("데이터 없음", null);
+            WeatherDetail afternoon = new WeatherDetail("데이터 없음", null);
+            WeatherDetail evening = new WeatherDetail("데이터 없음", null);
             try {
                 List<WeatherForecastResponse> forecastList = weatherCacheService.getCached7DayForecast(
                         targetSpot.getLatitude(), targetSpot.getLongitude(), dateString
                 );
                 
                 if (forecastList != null && !forecastList.isEmpty()) {
-                    WeatherForecastResponse forecast = forecastList.get(0);
-                    weatherStatus = forecast.weatherStatus();
-                    if (forecast.temperature() != null) {
-                        temperature = forecast.temperature().intValue();
+                    for (WeatherForecastResponse f : forecastList) {
+                        if ("1000".equals(f.time())) {
+                            morning = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                        } else if ("1400".equals(f.time())) {
+                            afternoon = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                        } else if ("1800".equals(f.time())) {
+                            evening = new WeatherDetail(f.weatherStatus(), f.temperature() != null ? f.temperature().intValue() : null);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -98,18 +107,57 @@ public class CourseWeatherService {
                 log.warn("코스 골든아워 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
             }
 
+            // 미세먼지 조회
+            String fineDustStatus = "데이터 없음";
+            try {
+                String region = extractRegion(targetSpot.getAddress());
+                Item air = airQualityClient.getAirQuality(region);
+                fineDustStatus = getFineDustStatus(air);
+            } catch (Exception e) {
+                log.warn("코스 미세먼지 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
+            }
+
             weatherResponses.add(new CourseWeatherResponse(
                     dayNumber,
                     visitDate,
                     targetSpot.getId(),
                     targetSpot.getName(),
-                    weatherStatus,
-                    temperature,
+                    morning,
+                    afternoon,
+                    evening,
                     sunsetTime,
-                    goldenHourEvening
+                    goldenHourEvening,
+                    fineDustStatus
             ));
         }
 
         return weatherResponses;
+    }
+
+    private String getFineDustStatus(Item air) {
+        if (air == null || air.pm10Value() == null || air.pm10Value().equals("-")) {
+            return "데이터 없음";
+        }
+        String grade = air.pm10Grade() != null ? air.pm10Grade() : "";
+        if (grade.isEmpty()) {
+            try {
+                int val = Integer.parseInt(air.pm10Value());
+                grade = val <= 30 ? "1" : val <= 80 ? "2" : val <= 150 ? "3" : "4";
+            } catch (NumberFormatException e) {
+                return "데이터 없음";
+            }
+        }
+        return switch (grade) {
+            case "1" -> "좋음";
+            case "2" -> "보통";
+            case "3" -> "나쁨";
+            default  -> "매우나쁨";
+        };
+    }
+
+    private String extractRegion(String address) {
+        if (address == null) return "";
+        String first = address.split(" ")[0];
+        return first.replace("특별시", "").replace("광역시", "").replace("특별자치시", "").replace("특별자치도", "");
     }
 }

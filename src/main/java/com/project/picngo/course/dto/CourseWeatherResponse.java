@@ -7,8 +7,10 @@ public record CourseWeatherResponse(
         LocalDate date,
         Long targetSpotId,
         String targetSpotName,
-        String weatherStatus,
-        Integer temperature,
+        WeatherDetail morning,
+        WeatherDetail afternoon,
+        WeatherDetail evening,
         String sunsetTime,
-        String goldenHourEvening
+        String goldenHourEvening,
+        String fineDustStatus
 ) {}
