@@ -109,7 +109,7 @@ public class UserService {
 	}
 
 	public UserProfileResponse getUserProfile(Long userId) {
-		// 타 유저 프로필은 공개 가능한 정보만 응답 
+		// 타 유저 프로필은 공개 가능한 정보만 응답
 		return UserProfileResponse.from(getById(userId));
 	}
 }
