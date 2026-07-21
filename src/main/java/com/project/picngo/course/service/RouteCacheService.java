@@ -26,6 +26,7 @@ public class RouteCacheService {
         try {
             String cachedValue = redisTemplate.opsForValue().get(cacheKey);
             if (cachedValue != null) {
+                log.info("캐시 히트(Cache Hit) 발생: 카카오 길찾기 - {}", cacheKey);
                 return Integer.parseInt(cachedValue);
             }
         } catch (Exception e) {

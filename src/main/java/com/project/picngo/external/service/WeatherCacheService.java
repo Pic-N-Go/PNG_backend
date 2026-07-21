@@ -33,11 +33,12 @@ public class WeatherCacheService {
     private static final long TTL_HOURS = 3;
 
     public List<WeatherForecastResponse> getCached7DayForecast(Double lat, Double lng, String date) {
-        String key = "weather:forecast:7days_v5:" + String.format(Locale.US, "%.1f_%.1f", lat, lng);
+        String key = "weather:forecast:7days:" + String.format(Locale.US, "%.1f_%.1f", lat, lng);
         
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
             try {
+                log.info("캐시 히트(Cache Hit) 발생: 단기예보 - {}", key);
                 return objectMapper.readValue(cachedData, new com.fasterxml.jackson.core.type.TypeReference<List<WeatherForecastResponse>>() {});
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
                 log.warn("Redis 단기예보 파싱 실패 (key: {})", key, e);
@@ -61,6 +62,7 @@ public class WeatherCacheService {
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
             try {
+                log.info("캐시 히트(Cache Hit) 발생: 골든아워 - {}", key);
                 return objectMapper.readValue(cachedData, GoldenHourResponse.class);
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
                 log.warn("Redis 골든아워 파싱 실패 (key: {})", key, e);
@@ -84,6 +86,7 @@ public class WeatherCacheService {
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
             try {
+                log.info("캐시 히트(Cache Hit) 발생: 미세먼지 - {}", key);
                 return objectMapper.readValue(cachedData, AirQualityResponse.Item.class);
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
                 log.warn("Redis 미세먼지 파싱 실패 (key: {})", key, e);
