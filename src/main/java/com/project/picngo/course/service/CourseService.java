@@ -21,8 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 @Service
@@ -64,9 +66,7 @@ public class CourseService {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        List<CourseSpotResponse> spots = course.getCourseSpots().stream()
-                .map(this::toCourseSpotResponse)
-                .toList();
+        List<CourseSpotResponse> spots = toCourseSpotResponses(course.getCourseSpots());
 
         List<CourseChecklistResponse> checklists = course.getCourseChecklists().stream()
                 .map(this::toChecklistResponse)
@@ -156,11 +156,11 @@ public class CourseService {
 
     public List<CourseSpotResponse> getDaySpots(Long courseId, Integer dayNumber) {
         Course course = findCourseOrThrow(courseId);
-        return course.getCourseSpots().stream()
+        List<CourseSpot> daySpots = course.getCourseSpots().stream()
                 .filter(cs -> cs.getDayNumber().equals(dayNumber))
                 .sorted((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()))
-                .map(this::toCourseSpotResponse)
                 .toList();
+        return toCourseSpotResponses(daySpots);
     }
 
     @Transactional
@@ -270,8 +270,26 @@ public class CourseService {
         );
     }
 
-    private CourseSpotResponse toCourseSpotResponse(CourseSpot spot) {
-        Spot actualSpot = spotRepository.findById(spot.getSpotId()).orElse(null);
+    private List<CourseSpotResponse> toCourseSpotResponses(List<CourseSpot> courseSpots) {
+        if (courseSpots == null || courseSpots.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> spotIds = courseSpots.stream()
+                .map(CourseSpot::getSpotId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Spot> spotMap = spotRepository.findAllById(spotIds).stream()
+                .collect(Collectors.toMap(Spot::getId, spot -> spot));
+
+        return courseSpots.stream()
+                .map(cs -> toCourseSpotResponse(cs, spotMap.get(cs.getSpotId())))
+                .toList();
+    }
+
+    private CourseSpotResponse toCourseSpotResponse(CourseSpot spot, Spot actualSpot) {
         return new CourseSpotResponse(
                 spot.getId(),
                 spot.getSpotId(),
