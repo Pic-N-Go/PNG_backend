@@ -120,7 +120,7 @@ public class CourseWeatherService {
             if (daysUntilVisit >= 0 && daysUntilVisit <= 3) {
                 try {
                     String region = extractRegion(targetSpot.getAddress());
-                    Item air = airQualityClient.getAirQuality(region);
+                    Item air = weatherCacheService.getCachedAirQuality(region);
                     fineDustStatus = getFineDustStatus(air);
                 } catch (Exception e) {
                     log.warn("코스 미세먼지 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
