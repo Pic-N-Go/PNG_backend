@@ -1,16 +1,14 @@
 package com.project.picngo.user.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
-import com.project.picngo.user.dto.UserProfileResponse;
-import com.project.picngo.user.dto.UserProfileUpdateRequest;
-import com.project.picngo.user.dto.UserSpotCategoryUpdateRequest;
-import com.project.picngo.user.dto.UserResponse;
+import com.project.picngo.user.dto.*;
 import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 
 
 @RestController
@@ -50,5 +48,37 @@ public class UserController implements UserControllerApiSpec {
 	@GetMapping("/{id}/profile")
 	public ResponseEntity<UserProfileResponse> getUserProfile(@PathVariable Long id){
 		return ResponseEntity.ok(userService.getUserProfile(id));
+	}
+
+	// 팔로우 API
+	@PostMapping("/{id}/follow")
+	public ResponseEntity<Void> follow(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@PathVariable Long id
+	){
+		userService.follow(userDetails.getId(), id);
+		return ResponseEntity.ok().build();
+	}
+
+	// 언팔로우 API
+	@DeleteMapping("/{id}/follow")
+	public ResponseEntity<Void> unfollow(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@PathVariable Long id
+	){
+		userService.unfollow(userDetails.getId(), id);
+		return ResponseEntity.ok().build();
+	}
+
+	// 팔로워 목록 조회 API
+	@GetMapping("/{id}/followers")
+	public ResponseEntity<List<FollowUserResponse>> getFollowers(@PathVariable Long id){
+		return ResponseEntity.ok(userService.getFollowers(id));
+	}
+
+	// 팔로잉 목록 조회 API
+	@GetMapping("/{id}/following")
+	public ResponseEntity<List<FollowUserResponse>> getFollowing(@PathVariable Long id){
+		return ResponseEntity.ok(userService.getFollowing(id));
 	}
 }
