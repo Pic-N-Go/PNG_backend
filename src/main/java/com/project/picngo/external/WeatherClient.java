@@ -146,13 +146,14 @@ public class WeatherClient {
 
     public KmaMidWeatherApiResponse getMidTermForecast(String regId, String tmFc) {
         try {
-            String urlStr = "http://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
+            String urlStr = "https://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
                     + "?serviceKey=" + serviceKey
                     + "&pageNo=1"
                     + "&numOfRows=10"
                     + "&dataType=JSON"
                     + "&regId=" + regId
                     + "&tmFc=" + tmFc;
+            log.debug("[KMA MidTerm API Request] URL: {}", urlStr);
             java.net.URI uri = new java.net.URI(urlStr);
 
             return kmaWebClient.get()
