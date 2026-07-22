@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -63,9 +64,12 @@ public class CourseWeatherService {
             
             if (daySpots.isEmpty()) continue;
 
-            // 일차별 첫 번째 스팟을 날씨 조회 타겟으로 선정
-            daySpots.sort((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()));
-            CourseSpot targetCourseSpot = daySpots.get(0);
+            // 일차별 첫 번째 스팟을 날씨 조회 타겟으로 선정 (O(N) min 연산자 사용)
+            CourseSpot targetCourseSpot = daySpots.stream()
+                    .min(Comparator.comparing(CourseSpot::getSequenceOrder))
+                    .orElse(null);
+            
+            if (targetCourseSpot == null) continue;
             
             Spot targetSpot = spotRepository.findById(targetCourseSpot.getSpotId()).orElse(null);
             if (targetSpot == null) continue;
