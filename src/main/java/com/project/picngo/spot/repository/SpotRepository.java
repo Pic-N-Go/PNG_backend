@@ -2,7 +2,7 @@ package com.project.picngo.spot.repository;
 
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotCategory;
-import com.project.picngo.spot.domain.SpotStatus;
+import com.project.picngo.spot.domain.enums.SpotStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -104,4 +104,6 @@ order by s.photogenicScore desc, s.bookmarkCount desc
             Long id,
             SpotStatus status
     );
+
+    List<Spot> findByIdIn(List<Long> ids);
 }

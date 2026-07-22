@@ -12,6 +12,8 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,8 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.stream.Collectors;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +36,7 @@ public class CourseService {
     private final CourseSpotRepository courseSpotRepository;
     private final CourseChecklistRepository courseChecklistRepository;
     private final UserRepository userRepository;
+    private final SpotRepository spotRepository;
 
 
     // ==================== 코스 CRUD ====================
@@ -61,9 +66,7 @@ public class CourseService {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        List<CourseSpotResponse> spots = course.getCourseSpots().stream()
-                .map(this::toCourseSpotResponse)
-                .toList();
+        List<CourseSpotResponse> spots = toCourseSpotResponses(course.getCourseSpots());
 
         List<CourseChecklistResponse> checklists = course.getCourseChecklists().stream()
                 .map(this::toChecklistResponse)
@@ -98,79 +101,66 @@ public class CourseService {
 
     // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
 
+    // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
+
     @Transactional
-    public CourseSpotResponse addCourseSpotInternal(Long userId, Long courseId, CourseSpotAddRequest request) {
+    public void syncCourseSpots(Long userId, Long courseId, CourseSpotSyncRequest request) {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        // 중복 순서 방지(Shift) 로직: 같은 일차에서 추가되는 순서보다 크거나 같은 기존 스팟들의 순서를 +1씩 밀어줌
-        course.getCourseSpots().stream()
-                .filter(cs -> cs.getDayNumber().equals(request.dayNumber()))
-                .filter(cs -> cs.getSequenceOrder() >= request.sequenceOrder())
-                .forEach(cs -> cs.updateOrder(cs.getSequenceOrder() + 1));
+        List<CourseSpotSyncItem> requestSpots = request.spots();
 
-        CourseSpot courseSpot = CourseSpot.builder()
-                .course(course)
-                .spotId(request.spotId())
-                .dayNumber(request.dayNumber())
-                .sequenceOrder(request.sequenceOrder())
-                .memo(request.memo())
-                .travelTimeMinutes(null) // Facade에서 계산 후 업데이트
-                .build();
+        // 1. 기존 전체 스팟 조회
+        List<CourseSpot> existingSpots = course.getCourseSpots();
 
-        CourseSpot saved = courseSpotRepository.save(courseSpot);
-        
-        if (!course.getCourseSpots().contains(saved)) {
-            course.getCourseSpots().add(saved);
-        }
-        
-        return toCourseSpotResponse(saved);
-    }
+        Set<Long> requestSpotIds = requestSpots.stream()
+                .map(CourseSpotSyncItem::courseSpotId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
 
-    @Transactional
-    public Integer removeCourseSpotInternal(Long userId, Long courseId, Long spotId) {
-        Course course = findCourseOrThrow(courseId);
-        validateCourseOwner(course, userId);
-        
-        return course.getCourseSpots().stream()
-                .filter(cs -> cs.getId().equals(spotId))
-                .findFirst()
-                .map(spot -> {
-                    Integer dayNumber = spot.getDayNumber();
-                    course.getCourseSpots().remove(spot);
-                    courseSpotRepository.delete(spot);
-                    return dayNumber;
-                })
-                .orElse(null);
-    }
+        // 2. 삭제 대상 처리: 기존 스팟 중 요청에 없는 것은 삭제
+        List<CourseSpot> spotsToRemove = existingSpots.stream()
+                .filter(cs -> !requestSpotIds.contains(cs.getId()))
+                .toList();
 
-    @Transactional
-    public Set<Integer> updateSpotOrderInternal(Long userId, Long courseId, CourseSpotOrderUpdateRequest request) {
-        Course course = findCourseOrThrow(courseId);
-        validateCourseOwner(course, userId);
+        spotsToRemove.forEach(spot -> {
+            course.getCourseSpots().remove(spot);
+            courseSpotRepository.delete(spot);
+        });
 
-        Map<Long, CourseSpot> spotMap = course.getCourseSpots().stream()
+        // 3. 업데이트 및 추가 대상 처리
+        Map<Long, CourseSpot> existingSpotMap = existingSpots.stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
-        Set<Integer> affectedDays = new HashSet<>();
-        List<Long> orderedIds = request.spotIds();
-        for (int i = 0; i < orderedIds.size(); i++) {
-            CourseSpot spot = spotMap.get(orderedIds.get(i));
-            if (spot != null) {
-                spot.updateOrder(i + 1);
-                affectedDays.add(spot.getDayNumber());
+        for (CourseSpotSyncItem item : requestSpots) {
+            if (item.courseSpotId() != null && existingSpotMap.containsKey(item.courseSpotId())) {
+                // 기존 스팟 업데이트 (dayNumber, sequenceOrder, memo)
+                CourseSpot spot = existingSpotMap.get(item.courseSpotId());
+                spot.updateDayNumberOrderAndMemo(item.dayNumber(), item.sequenceOrder(), item.memo());
+            } else {
+                // 신규 스팟 추가
+                CourseSpot newSpot = CourseSpot.builder()
+                        .course(course)
+                        .spotId(item.spotId())
+                        .dayNumber(item.dayNumber())
+                        .sequenceOrder(item.sequenceOrder())
+                        .memo(item.memo())
+                        .travelTimeMinutes(null)
+                        .build();
+                
+                CourseSpot saved = courseSpotRepository.save(newSpot);
+                course.getCourseSpots().add(saved);
             }
         }
-        return affectedDays;
     }
 
     public List<CourseSpotResponse> getDaySpots(Long courseId, Integer dayNumber) {
         Course course = findCourseOrThrow(courseId);
-        return course.getCourseSpots().stream()
+        List<CourseSpot> daySpots = course.getCourseSpots().stream()
                 .filter(cs -> cs.getDayNumber().equals(dayNumber))
                 .sorted((a, b) -> a.getSequenceOrder().compareTo(b.getSequenceOrder()))
-                .map(this::toCourseSpotResponse)
                 .toList();
+        return toCourseSpotResponses(daySpots);
     }
 
     @Transactional
@@ -181,6 +171,72 @@ public class CourseService {
                 spot.updateTravelTime(travelTimeUpdates.get(spot.getId()));
             }
         });
+    }
+
+    // ==================== 코스 체크리스트 관리 ====================
+
+    @Transactional
+    public CourseChecklistResponse addCourseChecklist(Long userId, Long courseId, CourseChecklistRequest request) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = CourseChecklist.builder()
+                .course(course)
+                .content(request.content())
+                .build();
+
+        CourseChecklist saved = courseChecklistRepository.save(checklist);
+        course.getCourseChecklists().add(saved);
+
+        return toChecklistResponse(saved);
+    }
+
+    @Transactional
+    public CourseChecklistResponse toggleCourseChecklist(Long userId, Long courseId, Long checklistId) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = courseChecklistRepository.findById(checklistId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND));
+
+        if (!checklist.getCourse().getId().equals(courseId)) {
+            throw new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND);
+        }
+
+        checklist.toggleChecked();
+        return toChecklistResponse(checklist);
+    }
+
+    @Transactional
+    public CourseChecklistResponse updateCourseChecklist(Long userId, Long courseId, Long checklistId, CourseChecklistRequest request) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = courseChecklistRepository.findById(checklistId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND));
+
+        if (!checklist.getCourse().getId().equals(courseId)) {
+            throw new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND);
+        }
+
+        checklist.updateContent(request.content());
+        return toChecklistResponse(checklist);
+    }
+
+    @Transactional
+    public void deleteCourseChecklist(Long userId, Long courseId, Long checklistId) {
+        Course course = findCourseOrThrow(courseId);
+        validateCourseOwner(course, userId);
+
+        CourseChecklist checklist = courseChecklistRepository.findById(checklistId)
+                .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND));
+
+        if (!checklist.getCourse().getId().equals(courseId)) {
+            throw new CustomException(CourseErrorCode.COURSE_CHECKLIST_NOT_FOUND);
+        }
+
+        course.getCourseChecklists().remove(checklist);
+        courseChecklistRepository.delete(checklist);
     }
 
     // ==================== Private 헬퍼 메서드 ====================
@@ -214,10 +270,35 @@ public class CourseService {
         );
     }
 
-    private CourseSpotResponse toCourseSpotResponse(CourseSpot spot) {
+    private List<CourseSpotResponse> toCourseSpotResponses(List<CourseSpot> courseSpots) {
+        if (courseSpots == null || courseSpots.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> spotIds = courseSpots.stream()
+                .map(CourseSpot::getSpotId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Spot> spotMap = spotRepository.findAllById(spotIds).stream()
+                .collect(Collectors.toMap(Spot::getId, spot -> spot));
+
+        return courseSpots.stream()
+                .map(cs -> toCourseSpotResponse(cs, spotMap.get(cs.getSpotId())))
+                .toList();
+    }
+
+    private CourseSpotResponse toCourseSpotResponse(CourseSpot spot, Spot actualSpot) {
         return new CourseSpotResponse(
                 spot.getId(),
                 spot.getSpotId(),
+                actualSpot != null ? actualSpot.getName() : null,
+                actualSpot != null ? actualSpot.getLatitude() : null,
+                actualSpot != null ? actualSpot.getLongitude() : null,
+                actualSpot != null && actualSpot.getCategory() != null ? actualSpot.getCategory().name() : null,
+                actualSpot != null ? actualSpot.getThumbnailUrl() : null,
+                actualSpot != null ? actualSpot.getPhotogenicScore() : null,
                 spot.getDayNumber(),
                 spot.getSequenceOrder(),
                 spot.getMemo(),
