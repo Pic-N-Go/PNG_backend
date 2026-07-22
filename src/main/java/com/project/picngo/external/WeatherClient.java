@@ -62,10 +62,6 @@ public class WeatherClient {
     public List<WeatherForecastResponse> getShortTermForecast(Double lat, Double lng, String date) {
         LatXLngYConverter.LatXLngY grid = LatXLngYConverter.convertGrid(lat, lng);
 
-        // 테스트용 하드코딩 (제주시청 부근 53, 38)
-        grid.x = 53;
-        grid.y = 38;
-
         KmaWeatherApiResponse apiResponse;
         try {
             String[] baseDateTime = getLatestBaseDateAndTime();
