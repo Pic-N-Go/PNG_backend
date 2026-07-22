@@ -33,23 +33,24 @@ public class RouteCacheService {
             log.warn("Redis 캐시 조회 실패, API 호출로 전환합니다. Key: {}", cacheKey, e);
         }
 
+        Integer travelTime = null;
         try {
-            Integer travelTime = directionsClient.getTravelTimeMinutes(startLat, startLng, goalLat, goalLng);
-            
-            if (travelTime != null) {
-                try {
-                    redisTemplate.opsForValue().set(cacheKey, String.valueOf(travelTime), CACHE_TTL);
-                } catch (Exception e) {
-                    log.warn("Redis 캐시 저장 실패. Key: {}", cacheKey, e);
-                }
-                return travelTime;
-            } else {
-                return calculateFallbackTime(startLat, startLng, goalLat, goalLng);
-            }
+            travelTime = directionsClient.getTravelTimeMinutes(startLat, startLng, goalLat, goalLng);
         } catch (Exception e) {
             log.error("카카오 길찾기 API 호출 실패", e);
-            return calculateFallbackTime(startLat, startLng, goalLat, goalLng);
         }
+
+        if (travelTime == null) {
+            travelTime = calculateFallbackTime(startLat, startLng, goalLat, goalLng);
+        }
+
+        try {
+            redisTemplate.opsForValue().set(cacheKey, String.valueOf(travelTime), CACHE_TTL);
+        } catch (Exception e) {
+            log.warn("Redis 캐시 저장 실패. Key: {}", cacheKey, e);
+        }
+
+        return travelTime;
     }
 
     private Integer calculateFallbackTime(Double startLat, Double startLng, Double goalLat, Double goalLng) {
