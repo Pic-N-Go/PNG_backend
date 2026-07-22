@@ -6,6 +6,7 @@ import com.project.picngo.course.dto.CourseWeatherResponse;
 import com.project.picngo.course.dto.WeatherDetail;
 import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.external.AirQualityClient;
 import com.project.picngo.external.dto.AirQualityResponse.Item;
@@ -38,9 +39,13 @@ public class CourseWeatherService {
     private final WeatherCacheService weatherCacheService;
     private final AirQualityClient airQualityClient;
 
-    public List<CourseWeatherResponse> getCourseWeather(Long courseId) {
+    public List<CourseWeatherResponse> getCourseWeather(Long userId, Long courseId) {
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new CustomException(CourseErrorCode.COURSE_NOT_FOUND));
+
+        if (!userId.equals(course.getUserId())) {
+            throw new CustomException(AuthErrorCode.FORBIDDEN_ACCESS);
+        }
 
         if (course.getStartDate() == null) {
             return List.of();

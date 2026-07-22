@@ -77,7 +77,6 @@ public class CourseController implements CourseControllerApiSpec {
 
     @GetMapping("/{id}/weather")
     public ResponseEntity<List<CourseWeatherResponse>> getCourseWeather(@AuthenticationPrincipal CustomUserDetails userDetails, @PathVariable Long id) {
-        // 본인 소유 확인 로직이 필요하다면 CourseWeatherService 내부에 추가하거나 여기서 호출 전 검증
-        return ResponseEntity.ok(courseWeatherService.getCourseWeather(id));
+        return ResponseEntity.ok(courseWeatherService.getCourseWeather(userDetails.getId(), id));
     }
 }
