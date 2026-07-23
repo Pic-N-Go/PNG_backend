@@ -72,7 +72,7 @@ class NotificationSchedulerTest {
                 .address("서울특별시 종로구 사직로 161")
                 .latitude(37.5796)
                 .longitude(126.9770)
-                .category(com.project.picngo.spot.domain.SpotCategory.NIGHT_VIEW)
+                .categories(java.util.Set.of(com.project.picngo.common.domain.SpotCategory.NIGHT_VIEW))
                 .source(com.project.picngo.spot.domain.enums.SpotSource.USER)
                 .build();
         savedSpot = spotRepository.save(spot);

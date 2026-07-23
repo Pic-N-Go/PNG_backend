@@ -3,13 +3,16 @@ package com.project.picngo.spot.domain;
 import com.project.picngo.common.domain.BaseTimeEntity;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.common.domain.SpotCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Comment;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -45,10 +48,12 @@ public class Spot extends BaseTimeEntity {
     @Column(nullable = false)
     private Double longitude;
 
-    @Comment("카테고리. TourAPI: cat1/cat2/cat3")
+    @Comment("사진테마 카테고리(다중). cat3 + overview 키워드로 태깅. 태그 없으면 ETC")
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "spot_categories", joinColumns = @JoinColumn(name = "spot_id"))
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private SpotCategory category;
+    @Column(name = "category", length = 50)
+    private Set<SpotCategory> categories = new HashSet<>();
 
     @Comment("TourAPI cat3 소분류 코드. 체크리스트 매핑에 사용 (예: A0201=해수욕장)")
     @Column(length = 10)
@@ -136,6 +141,13 @@ public class Spot extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean toilet = false;
 
+    public void updateCategories(Set<SpotCategory> categories) {
+        this.categories.clear();
+        if (categories != null) {
+            this.categories.addAll(categories);
+        }
+    }
+
     public void updateFromTourApi(String overview, String parking, String usetime,
                                    String restdate, String infocenter,
                                    String wheelchairAccess, String strollerAccess, String petFriendly) {
@@ -170,7 +182,7 @@ public class Spot extends BaseTimeEntity {
             String overview,
             Double latitude,
             Double longitude,
-            SpotCategory category,
+            Set<SpotCategory> categories,
             String cat3,
             SpotSource source,
             Boolean badge,
@@ -199,7 +211,7 @@ public class Spot extends BaseTimeEntity {
         this.overview = overview;
         this.latitude = latitude;
         this.longitude = longitude;
-        this.category = category;
+        this.categories = (categories != null) ? new HashSet<>(categories) : new HashSet<>();
         this.cat3 = cat3;
         this.source = source;
         this.badge = badge == null ? false : badge;

@@ -2,11 +2,13 @@ package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Spot;
 
+import java.util.List;
+
 public record RecommendedSpotResponse(
         Long id,
         String name,
         String address,
-        String category,
+        List<String> categories,
         String thumbnailUrl,
         Boolean badge,
         Double latitude,
@@ -19,7 +21,7 @@ public record RecommendedSpotResponse(
                 spot.getId(),
                 spot.getName(),
                 spot.getAddress(),
-                spot.getCategory().name(),
+                spot.getCategories().stream().map(Enum::name).toList(),
                 spot.getThumbnailUrl(),
                 spot.getBadge(),
                 spot.getLatitude(),

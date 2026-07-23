@@ -1,8 +1,10 @@
 package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotSource;
+
+import java.util.Set;
 
 public record SpotResponse(
         Long id,
@@ -12,7 +14,7 @@ public record SpotResponse(
         String overview,
         Double latitude,
         Double longitude,
-        SpotCategory category,
+        Set<SpotCategory> categories,
         SpotSource source,
         Boolean badge,
         String imageUrl,
@@ -31,7 +33,7 @@ public record SpotResponse(
                 spot.getOverview(),
                 spot.getLatitude(),
                 spot.getLongitude(),
-                spot.getCategory(),
+                spot.getCategories(),
                 spot.getSource(),
                 spot.getBadge(),
                 spot.getImageUrl(),

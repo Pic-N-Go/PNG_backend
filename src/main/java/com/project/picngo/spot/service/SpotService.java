@@ -6,7 +6,7 @@ import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;

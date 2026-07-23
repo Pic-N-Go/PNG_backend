@@ -1,7 +1,7 @@
 package com.project.picngo.spot.repository;
 
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -41,9 +41,15 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             Pageable pageable
     );
 
+    // categories(Set)에 :category가 포함된 스팟. 파생 메서드로 표현 불가 → member of
+    @Query("""
+select s from Spot s
+where :category member of s.categories
+and s.status = :status and s.isActive = true
+""")
     Page<Spot> findAllByCategoryAndStatusAndIsActiveTrue(
-            SpotCategory category,
-            SpotStatus status,
+            @Param("category") SpotCategory category,
+            @Param("status") SpotStatus status,
             Pageable pageable
     );
 
@@ -52,9 +58,14 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             Pageable pageable
     );
 
+    @Query("""
+select s from Spot s
+where :category member of s.categories
+and s.status = :status and s.isActive = true
+""")
     List<Spot> findListByCategoryAndStatusAndIsActiveTrue(
-            SpotCategory category,
-            SpotStatus status,
+            @Param("category") SpotCategory category,
+            @Param("status") SpotStatus status,
             Pageable pageable
     );
 
@@ -65,7 +76,7 @@ select s
 from Spot s
 where s.status = :status
 and s.isActive = true
-and (:category is null or s.category = :category)
+and (:category is null or :category member of s.categories)
 and (
 lower(s.name) like lower(concat('%', :keyword, '%'))
 or lower(s.address) like lower(concat('%', :keyword, '%'))
@@ -85,7 +96,7 @@ select s
 from Spot s
 where s.status = :status
 and s.isActive = true
-and (:category is null or s.category = :category)
+and (:category is null or :category member of s.categories)
 and s.latitude between :southWestLat and :northEastLat
 and s.longitude between :southWestLng and :northEastLng
 order by s.photogenicScore desc, s.bookmarkCount desc
