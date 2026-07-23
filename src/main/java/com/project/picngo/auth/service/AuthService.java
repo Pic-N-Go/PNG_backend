@@ -9,10 +9,12 @@ import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.UserResponse;
 import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -81,6 +83,12 @@ public class AuthService {
 
 	private TokenResponse createTokenResponse(User user) {
 		String accessToken = jwtTokenProvider.createAccessToken(user);
+		log.info("\n==================================================" +
+				"\n[🔑 로그인 성공 JWT 토큰 수신]" +
+				"\n- UserId: {} ({})" +
+				"\n- Access Token: Bearer {}" +
+				"\n==================================================",
+				user.getId(), user.getEmail(), accessToken);
 		return TokenResponse.bearer(
 			accessToken,
 			jwtTokenProvider.getAccessTokenExpirationSeconds(),

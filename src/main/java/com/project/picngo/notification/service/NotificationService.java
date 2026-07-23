@@ -36,6 +36,12 @@ public class NotificationService {
 
     @Transactional
     public void updateFcmToken(Long userId, String token) {
+        log.info("\n==================================================" +
+                "\n[📱 FCM 기기 토큰 등록/갱신 성공]" +
+                "\n- UserId: {}" +
+                "\n- FCM Token: {}" +
+                "\n==================================================",
+                userId, token);
         NotificationSetting setting = notificationSettingRepository.findByUserId(userId)
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
         setting.updateFcmToken(token);
