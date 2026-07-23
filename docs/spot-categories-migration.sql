@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS spot_categories (
     CONSTRAINT fk_spot_categories_spot FOREIGN KEY (spot_id) REFERENCES spot(id)
 );
 
+-- 백필 전체를 하나의 트랜잭션으로 (중간 실패 시 부분 태깅 방지)
+START TRANSACTION;
 DELETE FROM spot_categories;
 
 -- 1) 장소형 (cat3 정확 매핑)
@@ -41,6 +43,7 @@ INSERT INTO spot_categories (spot_id, category) SELECT id, 'CITY'
 INSERT INTO spot_categories (spot_id, category)
 SELECT s.id, 'ETC' FROM spot s
 WHERE NOT EXISTS (SELECT 1 FROM spot_categories sc WHERE sc.spot_id = s.id);
+COMMIT;
 
 -- 4) 옛 단일 category 컬럼 제거. ⚠️ 1회성(재실행 시 "컬럼 없음" 에러 정상 — MySQL은 DROP IF EXISTS 미지원).
 --    손실 0: category 값 = LEFT(cat3,3)로 4,465건 전건 일치 확인됨 → 필요 시 cat3에서 복원 가능.

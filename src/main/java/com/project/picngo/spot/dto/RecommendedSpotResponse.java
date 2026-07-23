@@ -21,7 +21,7 @@ public record RecommendedSpotResponse(
                 spot.getId(),
                 spot.getName(),
                 spot.getAddress(),
-                spot.getCategories().stream().map(Enum::name).toList(),
+                spot.getCategoryNames(),
                 spot.getThumbnailUrl(),
                 spot.getBadge(),
                 spot.getLatitude(),

@@ -296,7 +296,7 @@ public class CourseService {
                 actualSpot != null ? actualSpot.getName() : null,
                 actualSpot != null ? actualSpot.getLatitude() : null,
                 actualSpot != null ? actualSpot.getLongitude() : null,
-                actualSpot != null ? actualSpot.getCategories().stream().map(Enum::name).toList() : null,
+                actualSpot != null ? actualSpot.getCategoryNames() : null,
                 actualSpot != null ? actualSpot.getThumbnailUrl() : null,
                 actualSpot != null ? actualSpot.getPhotogenicScore() : null,
                 spot.getDayNumber(),

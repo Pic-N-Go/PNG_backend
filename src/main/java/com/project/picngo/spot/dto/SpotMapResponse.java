@@ -16,7 +16,7 @@ public record SpotMapResponse ( Long id,
         return new SpotMapResponse(
                 spot.getId(),
                 spot.getName(),
-                spot.getCategories().stream().map(Enum::name).toList(),
+                spot.getCategoryNames(),
                 spot.getLatitude(),
                 spot.getLongitude(),
                 spot.getThumbnailUrl(),

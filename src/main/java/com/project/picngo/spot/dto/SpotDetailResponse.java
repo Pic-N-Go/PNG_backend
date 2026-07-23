@@ -73,7 +73,7 @@ public record SpotDetailResponse(
                 spot.getImageUrl(),
                 spot.getLatitude(),
                 spot.getLongitude(),
-                spot.getCategories().stream().map(Enum::name).toList(),
+                spot.getCategoryNames(),
                 spot.getOverview(),
                 tags.stream().map(SpotTag::getTag).toList(),
                 ConvenienceInfo.from(spot),

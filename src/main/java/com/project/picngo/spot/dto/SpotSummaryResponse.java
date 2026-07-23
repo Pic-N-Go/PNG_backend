@@ -1,15 +1,14 @@
 package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.common.domain.SpotCategory;
 
-import java.util.Set;
+import java.util.List;
 
 public record SpotSummaryResponse(
         Long id,
         String name,
         String address,
-        Set<SpotCategory> categories,
+        List<String> categories,
         Double latitude,
         Double longitude,
         String thumbnailUrl,
@@ -23,7 +22,7 @@ public record SpotSummaryResponse(
                 spot.getId(),
                 spot.getName(),
                 spot.getAddress(),
-                spot.getCategories(),
+                spot.getCategoryNames(),
                 spot.getLatitude(),
                 spot.getLongitude(),
                 spot.getThumbnailUrl(),

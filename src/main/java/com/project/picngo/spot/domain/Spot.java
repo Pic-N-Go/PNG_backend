@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Comment;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 @Entity
@@ -146,6 +147,11 @@ public class Spot extends BaseTimeEntity {
         if (categories != null) {
             this.categories.addAll(categories);
         }
+    }
+
+    // 응답용 카테고리 이름. Set 순서가 비결정적이라 정렬된 List로 고정 (응답 안정성)
+    public List<String> getCategoryNames() {
+        return categories.stream().map(Enum::name).sorted().toList();
     }
 
     public void updateFromTourApi(String overview, String parking, String usetime,
