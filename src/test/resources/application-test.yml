@@ -23,6 +23,15 @@ air:
   quality:
     key: "test-key"
 
+tour:
+  api:
+    key: "test-key"
+
+kakao:
+  rest:
+    api:
+      key: "test-key"
+
 weather:
   api:
     key: "test-key"
