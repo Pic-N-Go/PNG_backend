@@ -32,4 +32,10 @@ public interface NotificationControllerApiSpec {
 
     @Operation(summary = "알림 수신 설정 변경", description = "푸시 알림 수신 여부 및 방해금지 시간(DND)을 변경합니다.")
     ResponseEntity<Void> updateSettings(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody NotificationSettingUpdateRequest request);
+
+    @Operation(summary = "[테스트용] 푸시 알림 즉시 발송", description = "로그인한 사용자의 기기로 테스트 푸시 알림을 즉시 발송합니다.")
+    ResponseEntity<Void> sendTestNotification(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody(required = false) com.project.picngo.notification.dto.NotificationTestRequest request);
+
+    @Operation(summary = "[테스트용] 알림 스케줄러 강제 실행", description = "위시리스트 알림 스케줄러를 수동으로 강제 실행합니다.")
+    ResponseEntity<Void> triggerScheduler();
 }

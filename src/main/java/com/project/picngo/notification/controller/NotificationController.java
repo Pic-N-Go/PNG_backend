@@ -3,6 +3,8 @@ package com.project.picngo.notification.controller;
 import com.project.picngo.notification.dto.FcmTokenRequest;
 import com.project.picngo.notification.dto.NotificationResponse;
 import com.project.picngo.notification.dto.NotificationSettingUpdateRequest;
+import com.project.picngo.notification.dto.NotificationTestRequest;
+import com.project.picngo.notification.service.NotificationScheduler;
 import com.project.picngo.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import java.util.List;
 public class NotificationController implements NotificationControllerApiSpec {
 
     private final NotificationService notificationService;
+    private final NotificationScheduler notificationScheduler;
 
     @GetMapping
     public ResponseEntity<List<NotificationResponse>> getNotifications(@AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -45,6 +48,18 @@ public class NotificationController implements NotificationControllerApiSpec {
     @PutMapping("/settings")
     public ResponseEntity<Void> updateSettings(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody NotificationSettingUpdateRequest request) {
         notificationService.updateSettings(userDetails.getId(), request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/test")
+    public ResponseEntity<Void> sendTestNotification(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody(required = false) NotificationTestRequest request) {
+        notificationService.sendTestPushNotification(userDetails.getId(), request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/test/scheduler")
+    public ResponseEntity<Void> triggerScheduler() {
+        notificationScheduler.triggerAllSchedulersManually();
         return ResponseEntity.ok().build();
     }
 }

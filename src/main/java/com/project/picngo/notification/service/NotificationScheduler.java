@@ -269,4 +269,11 @@ public class NotificationScheduler {
             return !now.isBefore(start) || now.isBefore(end);
         }
     }
+
+    public void triggerAllSchedulersManually() {
+        log.info("테스트용 수동 스케줄러 강제 실행 시작...");
+        processFixedTimeNotification(TimeCondition.DAYTIME);
+        processGoldenHourNotification(TimeCondition.SUNSET);
+        log.info("테스트용 수동 스케줄러 강제 실행 완료.");
+    }
 }

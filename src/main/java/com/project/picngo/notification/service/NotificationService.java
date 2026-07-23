@@ -6,6 +6,7 @@ import com.project.picngo.notification.domain.Notification;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.dto.NotificationResponse;
 import com.project.picngo.notification.dto.NotificationSettingUpdateRequest;
+import com.project.picngo.notification.dto.NotificationTestRequest;
 import com.project.picngo.notification.repository.NotificationRepository;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -85,6 +86,17 @@ public class NotificationService {
                 .deepLink(deepLink)
                 .build();
         notificationRepository.save(notification);
+    }
+
+    public void sendTestPushNotification(Long userId, NotificationTestRequest request) {
+        String title = (request != null && request.title() != null && !request.title().isBlank())
+                ? request.title() : "픽앤고 테스트 알림 🔔";
+        String content = (request != null && request.content() != null && !request.content().isBlank())
+                ? request.content() : "프론트엔드 푸시 알림 수신 성공 테스트 메시지입니다!";
+        String deepLink = (request != null && request.deepLink() != null && !request.deepLink().isBlank())
+                ? request.deepLink() : "/wishlist/1";
+
+        sendPushNotification(userId, "TEST", title, content, deepLink);
     }
 
     @Scheduled(cron = "0 0 3 * * *")
