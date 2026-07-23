@@ -272,7 +272,9 @@ public class NotificationScheduler {
 
     public void triggerAllSchedulersManually() {
         log.info("테스트용 수동 스케줄러 강제 실행 시작...");
-        processFixedTimeNotification(TimeCondition.DAYTIME);
+        processFixedTimeNotification(TimeCondition.MORNING);
+        processFixedTimeNotification(TimeCondition.AFTERNOON);
+        processGoldenHourNotification(TimeCondition.SUNRISE);
         processGoldenHourNotification(TimeCondition.SUNSET);
         log.info("테스트용 수동 스케줄러 강제 실행 완료.");
     }
