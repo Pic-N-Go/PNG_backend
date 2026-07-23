@@ -29,7 +29,8 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
-        return notificationRepository.findAllByUserId(userId).stream()
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(7);
+        return notificationRepository.findAllRecentNotificationsByUserId(userId, cutoff).stream()
                 .map(NotificationResponse::from)
                 .toList();
     }
