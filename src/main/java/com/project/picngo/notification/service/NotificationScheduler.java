@@ -85,9 +85,9 @@ public class NotificationScheduler {
 
     // --- 공통 로직 ---
 
-    // 고정된 시간대 알림 처리
+    // 고정된 시간대 알림 처리 (위시리스트 날씨 매칭)
     private void processFixedTimeNotification(TimeCondition timeCondition) {
-        List<NotificationSetting> activeSettings = getActiveSettings();
+        List<NotificationSetting> activeSettings = getActiveWishlistSettings();
 
         for (NotificationSetting setting : activeSettings) {
             Long userId = setting.getUserId();
@@ -102,9 +102,9 @@ public class NotificationScheduler {
         }
     }
 
-    // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머
+    // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머 (골든아워)
     private void processGoldenHourNotification(TimeCondition timeCondition) {
-        List<NotificationSetting> activeSettings = getActiveSettings(); // 알림을 보내야하는 유저들 목록 조회
+        List<NotificationSetting> activeSettings = getActiveGoldenHourSettings(); // 골든아워 알림 수신 동의 유저들 목록 조회
 
         for (NotificationSetting setting : activeSettings) {
             Long userId = setting.getUserId();
@@ -247,8 +247,14 @@ public class NotificationScheduler {
         }
     }
 
-    private List<NotificationSetting> getActiveSettings() {
-        return notificationSettingRepository.findActiveSettingsWithToken().stream()
+    private List<NotificationSetting> getActiveWishlistSettings() {
+        return notificationSettingRepository.findActiveWishlistSettingsWithToken().stream()
+                .filter(setting -> !isDndActive(setting))
+                .toList();
+    }
+
+    private List<NotificationSetting> getActiveGoldenHourSettings() {
+        return notificationSettingRepository.findActiveGoldenHourSettingsWithToken().stream()
                 .filter(setting -> !isDndActive(setting))
                 .toList();
     }

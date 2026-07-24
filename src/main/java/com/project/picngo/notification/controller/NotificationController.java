@@ -45,6 +45,11 @@ public class NotificationController implements NotificationControllerApiSpec {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/settings")
+    public ResponseEntity<com.project.picngo.notification.dto.NotificationSettingResponse> getSettings(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(notificationService.getSettings(userDetails.getId()));
+    }
+
     @PutMapping("/settings")
     public ResponseEntity<Void> updateSettings(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody NotificationSettingUpdateRequest request) {
         notificationService.updateSettings(userDetails.getId(), request);

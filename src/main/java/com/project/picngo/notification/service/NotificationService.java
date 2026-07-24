@@ -5,6 +5,7 @@ import com.project.picngo.common.exception.code.NotificationErrorCode;
 import com.project.picngo.notification.domain.Notification;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.dto.NotificationResponse;
+import com.project.picngo.notification.dto.NotificationSettingResponse;
 import com.project.picngo.notification.dto.NotificationSettingUpdateRequest;
 import com.project.picngo.notification.dto.NotificationTestRequest;
 import com.project.picngo.notification.repository.NotificationRepository;
@@ -65,18 +66,31 @@ public class NotificationService {
         notificationRepository.markAllAsReadByUserId(userId);
     }
 
+    @Transactional(readOnly = true)
+    public NotificationSettingResponse getSettings(Long userId) {
+        NotificationSetting setting = notificationSettingRepository.findByUserId(userId).orElse(null);
+        return NotificationSettingResponse.from(setting);
+    }
+
     @Transactional
     public void updateSettings(Long userId, NotificationSettingUpdateRequest request) {
         NotificationSetting setting = notificationSettingRepository.findByUserId(userId)
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
         
-        setting.updateSettings(request.isAllPushEnabled(), request.dndStartTime(), request.dndEndTime());
+        setting.updateSettings(
+                request.isWishlistPushEnabled(),
+                request.isGoldenHourPushEnabled(),
+                request.isCommunityPushEnabled(),
+                request.dndStartTime(),
+                request.dndEndTime()
+        );
     }
 
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
         notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
-            if (Boolean.TRUE.equals(setting.getIsAllPushEnabled()) && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
+            boolean isPushEnabled = isPushEnabledForType(setting, type);
+            if (isPushEnabled && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
                 try {
                     fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink);
                 } catch (Exception e) {
@@ -93,6 +107,23 @@ public class NotificationService {
                 .deepLink(deepLink)
                 .build();
         notificationRepository.save(notification);
+    }
+
+    /**
+     * 알림 발송 직전, 알림 종류(type)에 따라 유저의 해당 토글 수신 동의 여부(isWishlistPushEnabled 등)를 검사하는 이중 안전장치 메서드
+     */
+    private boolean isPushEnabledForType(NotificationSetting setting, String type) {
+        if (setting == null) return false;
+        if ("GOLDEN_HOUR".equalsIgnoreCase(type)) {
+            return Boolean.TRUE.equals(setting.getIsGoldenHourPushEnabled());
+        } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "WISHLIST".equalsIgnoreCase(type)) {
+            return Boolean.TRUE.equals(setting.getIsWishlistPushEnabled());
+        } else if ("COMMUNITY".equalsIgnoreCase(type)) {
+            return Boolean.TRUE.equals(setting.getIsCommunityPushEnabled());
+        } else if ("TEST".equalsIgnoreCase(type)) {
+            return true;
+        }
+        return true;
     }
 
     public void sendTestPushNotification(Long userId, NotificationTestRequest request) {

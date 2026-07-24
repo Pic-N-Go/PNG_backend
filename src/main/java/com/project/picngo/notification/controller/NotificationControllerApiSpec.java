@@ -30,6 +30,9 @@ public interface NotificationControllerApiSpec {
     @Operation(summary = "모든 알림 읽음 처리", description = "사용자의 안 읽은 모든 알림을 읽음 상태로 변경합니다.")
     ResponseEntity<Void> markAllAsRead(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
 
+    @Operation(summary = "알림 수신 설정 조회", description = "로그인한 사용자의 알림 수신 설정(위시리스트, 골든아워, 커뮤니티 토글 및 DND 시간)을 조회합니다.")
+    ResponseEntity<com.project.picngo.notification.dto.NotificationSettingResponse> getSettings(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails);
+
     @Operation(summary = "알림 수신 설정 변경", description = "푸시 알림 수신 여부 및 방해금지 시간(DND)을 변경합니다.")
     ResponseEntity<Void> updateSettings(@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody NotificationSettingUpdateRequest request);
 
