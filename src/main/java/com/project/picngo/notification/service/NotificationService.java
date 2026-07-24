@@ -134,6 +134,7 @@ public class NotificationService {
         return true;
     }
 
+    // TODO: 운영 배포 전 또는 프론트엔드 알림 테스트 완료 후 테스트용 알림 발송 메서드 삭제 필요
     public void sendTestPushNotification(Long userId, NotificationTestRequest request) {
         String title = (request != null && request.title() != null && !request.title().isBlank())
                 ? request.title() : "픽앤고 테스트 알림 🔔";

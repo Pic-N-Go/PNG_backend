@@ -56,6 +56,7 @@ public class NotificationController implements NotificationControllerApiSpec {
         return ResponseEntity.ok().build();
     }
 
+    // TODO: 운영 배포 전 또는 프론트엔드 알림 테스트 완료 후 테스트용 알림 발송 및 스케줄러 강제 실행 API 삭제 필요
     @PostMapping("/test")
     public ResponseEntity<Void> sendTestNotification(@AuthenticationPrincipal CustomUserDetails userDetails, @RequestBody(required = false) NotificationTestRequest request) {
         notificationService.sendTestPushNotification(userDetails.getId(), request);
