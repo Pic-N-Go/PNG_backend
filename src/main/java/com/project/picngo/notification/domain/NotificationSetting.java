@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
+import java.time.ZoneId;
 
 @Entity
 @Getter
@@ -67,6 +68,22 @@ public class NotificationSetting {
         }
         this.dndStartTime = dndStartTime;
         this.dndEndTime = dndEndTime;
+    }
+
+    public boolean isDndActive() {
+        if (!Boolean.TRUE.equals(this.isDndEnabled)) {
+            return false;
+        }
+        if (this.dndStartTime == null || this.dndEndTime == null) {
+            return false;
+        }
+
+        LocalTime now = LocalTime.now(ZoneId.of("Asia/Seoul"));
+        if (this.dndStartTime.isBefore(this.dndEndTime)) {
+            return !now.isBefore(this.dndStartTime) && now.isBefore(this.dndEndTime);
+        } else {
+            return !now.isBefore(this.dndStartTime) || now.isBefore(this.dndEndTime);
+        }
     }
 }
 

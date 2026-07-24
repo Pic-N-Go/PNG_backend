@@ -249,34 +249,14 @@ public class NotificationScheduler {
 
     private List<NotificationSetting> getActiveWishlistSettings() {
         return notificationSettingRepository.findActiveWishlistSettingsWithToken().stream()
-                .filter(setting -> !isDndActive(setting))
+                .filter(setting -> !setting.isDndActive())
                 .toList();
     }
 
     private List<NotificationSetting> getActiveGoldenHourSettings() {
         return notificationSettingRepository.findActiveGoldenHourSettingsWithToken().stream()
-                .filter(setting -> !isDndActive(setting))
+                .filter(setting -> !setting.isDndActive())
                 .toList();
-    }
-
-    // 방해 금지 시간 (DND) 활성 여부 확인 및 활성 설정 필터링
-    private boolean isDndActive(NotificationSetting setting) {
-        if (!Boolean.TRUE.equals(setting.getIsDndEnabled())) {
-            return false;
-        }
-        if (setting.getDndStartTime() == null || setting.getDndEndTime() == null) {
-            return false;
-        }
-        
-        LocalTime now = LocalTime.now(ZoneId.of("Asia/Seoul"));
-        LocalTime start = setting.getDndStartTime();
-        LocalTime end = setting.getDndEndTime();
-
-        if (start.isBefore(end)) {
-            return !now.isBefore(start) && now.isBefore(end);
-        } else {
-            return !now.isBefore(start) || now.isBefore(end);
-        }
     }
 
     public void triggerAllSchedulersManually() {

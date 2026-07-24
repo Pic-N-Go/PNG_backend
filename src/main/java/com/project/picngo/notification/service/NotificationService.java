@@ -95,7 +95,8 @@ public class NotificationService {
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
         notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
             boolean isPushEnabled = isPushEnabledForType(setting, type);
-            if (isPushEnabled && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
+            boolean isDnd = setting.isDndActive();
+            if (isPushEnabled && !isDnd && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
                 try {
                     fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink, spotId);
                 } catch (Exception e) {
@@ -127,7 +128,8 @@ public class NotificationService {
         } else if ("COMMUNITY".equalsIgnoreCase(type)) {
             return Boolean.TRUE.equals(setting.getIsCommunityPushEnabled());
         } else if ("TEST".equalsIgnoreCase(type)) {
-            return true;
+            // 테스트 알림 발송 시: 위시리스트 + 골든아워 알림이 둘 다 켜져있는지 검사
+            return Boolean.TRUE.equals(setting.getIsWishlistPushEnabled()) && Boolean.TRUE.equals(setting.getIsGoldenHourPushEnabled());
         }
         return true;
     }
