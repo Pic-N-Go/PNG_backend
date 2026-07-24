@@ -81,6 +81,7 @@ public class NotificationService {
                 request.isWishlistPushEnabled(),
                 request.isGoldenHourPushEnabled(),
                 request.isCommunityPushEnabled(),
+                request.isDndEnabled(),
                 request.dndStartTime(),
                 request.dndEndTime()
         );

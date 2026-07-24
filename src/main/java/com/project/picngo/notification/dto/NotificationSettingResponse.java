@@ -16,6 +16,9 @@ public record NotificationSettingResponse(
         @Schema(description = "커뮤니티 알림 수신 여부", example = "true")
         Boolean isCommunityPushEnabled,
 
+        @Schema(description = "방해금지 기능 활성화 여부", example = "false")
+        Boolean isDndEnabled,
+
         @Schema(description = "방해금지 시작 시간 (HH:mm)", example = "23:00")
         LocalTime dndStartTime,
 
@@ -24,12 +27,13 @@ public record NotificationSettingResponse(
 ) {
     public static NotificationSettingResponse from(NotificationSetting setting) {
         if (setting == null) {
-            return new NotificationSettingResponse(true, true, true, null, null);
+            return new NotificationSettingResponse(true, true, true, false, null, null);
         }
         return new NotificationSettingResponse(
                 setting.getIsWishlistPushEnabled(),
                 setting.getIsGoldenHourPushEnabled(),
                 setting.getIsCommunityPushEnabled(),
+                setting.getIsDndEnabled(),
                 setting.getDndStartTime(),
                 setting.getDndEndTime()
         );

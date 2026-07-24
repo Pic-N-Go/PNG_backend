@@ -261,6 +261,9 @@ public class NotificationScheduler {
 
     // 방해 금지 시간 (DND) 활성 여부 확인 및 활성 설정 필터링
     private boolean isDndActive(NotificationSetting setting) {
+        if (!Boolean.TRUE.equals(setting.getIsDndEnabled())) {
+            return false;
+        }
         if (setting.getDndStartTime() == null || setting.getDndEndTime() == null) {
             return false;
         }

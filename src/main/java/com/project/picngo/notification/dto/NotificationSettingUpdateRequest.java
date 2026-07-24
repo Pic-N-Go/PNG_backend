@@ -6,6 +6,7 @@ public record NotificationSettingUpdateRequest(
         Boolean isWishlistPushEnabled,
         Boolean isGoldenHourPushEnabled,
         Boolean isCommunityPushEnabled,
+        Boolean isDndEnabled,
         LocalTime dndStartTime,
         LocalTime dndEndTime
 ) {}

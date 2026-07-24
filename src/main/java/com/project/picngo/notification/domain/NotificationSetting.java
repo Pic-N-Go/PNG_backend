@@ -31,24 +31,28 @@ public class NotificationSetting {
     @Column(nullable = false)
     private Boolean isCommunityPushEnabled = true;
 
+    @Column(nullable = false)
+    private Boolean isDndEnabled = false;
+
     private LocalTime dndStartTime;
 
     private LocalTime dndEndTime;
 
     @Builder
-    public NotificationSetting(Long userId, String fcmToken, Boolean isWishlistPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled) {
+    public NotificationSetting(Long userId, String fcmToken, Boolean isWishlistPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, Boolean isDndEnabled) {
         this.userId = userId;
         this.fcmToken = fcmToken;
         this.isWishlistPushEnabled = isWishlistPushEnabled != null ? isWishlistPushEnabled : true;
         this.isGoldenHourPushEnabled = isGoldenHourPushEnabled != null ? isGoldenHourPushEnabled : true;
         this.isCommunityPushEnabled = isCommunityPushEnabled != null ? isCommunityPushEnabled : true;
+        this.isDndEnabled = isDndEnabled != null ? isDndEnabled : false;
     }
 
     public void updateFcmToken(String fcmToken) {
         this.fcmToken = fcmToken;
     }
 
-    public void updateSettings(Boolean isWishlistPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, LocalTime dndStartTime, LocalTime dndEndTime) {
+    public void updateSettings(Boolean isWishlistPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, Boolean isDndEnabled, LocalTime dndStartTime, LocalTime dndEndTime) {
         if (isWishlistPushEnabled != null) {
             this.isWishlistPushEnabled = isWishlistPushEnabled;
         }
@@ -57,6 +61,9 @@ public class NotificationSetting {
         }
         if (isCommunityPushEnabled != null) {
             this.isCommunityPushEnabled = isCommunityPushEnabled;
+        }
+        if (isDndEnabled != null) {
+            this.isDndEnabled = isDndEnabled;
         }
         this.dndStartTime = dndStartTime;
         this.dndEndTime = dndEndTime;
