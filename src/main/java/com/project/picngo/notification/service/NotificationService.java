@@ -89,11 +89,15 @@ public class NotificationService {
 
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
+        sendPushNotification(userId, type, title, content, deepLink, null);
+    }
+
+    public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
         notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
             boolean isPushEnabled = isPushEnabledForType(setting, type);
             if (isPushEnabled && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
                 try {
-                    fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink);
+                    fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink, spotId);
                 } catch (Exception e) {
                     log.warn("Failed to send FCM push to userId: {}", userId, e);
                 }
@@ -106,6 +110,7 @@ public class NotificationService {
                 .title(title)
                 .content(content)
                 .deepLink(deepLink)
+                .spotId(spotId)
                 .build();
         notificationRepository.save(notification);
     }

@@ -143,7 +143,7 @@ public class NotificationScheduler {
                                 String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
                                 String title = "🌅 골든아워 알림";
                                 String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
-                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId());
+                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId());
                             }
                         }
 
@@ -238,7 +238,7 @@ public class NotificationScheduler {
                     String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
                     String title = "☁️ 날씨 조건 매칭 알림";
                     String content = String.format("%s %s에 설정하신 날씨 조건이 충족될 예정입니다!", dayStr, spot.getName());
-                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId());
+                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId(), spot.getId());
                 }
             }
 

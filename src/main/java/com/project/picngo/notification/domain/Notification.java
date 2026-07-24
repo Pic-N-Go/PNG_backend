@@ -38,17 +38,20 @@ public class Notification {
 
     private String deepLink;
 
+    private Long spotId;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Notification(Long userId, String type, String title, String content, String deepLink) {
+    public Notification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
         this.userId = userId;
         this.type = type;
         this.title = title;
         this.content = content;
         this.deepLink = deepLink;
+        this.spotId = spotId;
         this.isRead = false;
     }
 
