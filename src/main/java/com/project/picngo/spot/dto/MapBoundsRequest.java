@@ -26,10 +26,11 @@ public record MapBoundsRequest(
         Double northEastLng,
 
         @io.swagger.v3.oas.annotations.Parameter(
-                description = "스팟 카테고리 (단일 선택)",
-                schema = @io.swagger.v3.oas.annotations.media.Schema(
-                        implementation = com.project.picngo.common.domain.SpotCategory.class))
-        String category,
+                description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 (하나라도 해당하는 스팟이 조회됨).",
+                array = @io.swagger.v3.oas.annotations.media.ArraySchema(
+                        schema = @io.swagger.v3.oas.annotations.media.Schema(
+                                implementation = com.project.picngo.common.domain.SpotCategory.class)))
+        java.util.List<String> category,
 
         @jakarta.validation.constraints.Min(value = 1, message = "크기는 1 이상이어야 합니다.")
         @jakarta.validation.constraints.Max(value = 200, message = "크기는 200 이하여야 합니다.")

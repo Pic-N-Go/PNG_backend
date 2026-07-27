@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,14 +50,15 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
             Pageable pageable
     );
 
-    // categories(Set)에 :category가 포함된 스팟. 파생 메서드로 표현 불가 → member of
+    // 요청한 카테고리 중 하나라도 가진 스팟(OR 조합). 스팟이 다중 태그라 AND면 교집합이 거의 안 남는다.
+    // 파생 메서드로 표현 불가 → 컬렉션 상관 서브쿼리
     @Query("""
 select s from Spot s
-where :category member of s.categories
+where exists (select c from s.categories c where c in :categories)
 and s.status = :status and s.isActive = true
 """)
-    Page<Spot> findAllByCategoryAndStatusAndIsActiveTrue(
-            @Param("category") SpotCategory category,
+    Page<Spot> findAllByCategoriesAndStatusAndIsActiveTrue(
+            @Param("categories") Collection<SpotCategory> categories,
             @Param("status") SpotStatus status,
             Pageable pageable
     );
@@ -68,23 +70,21 @@ and s.status = :status and s.isActive = true
 
     @Query("""
 select s from Spot s
-where :category member of s.categories
+where exists (select c from s.categories c where c in :categories)
 and s.status = :status and s.isActive = true
 """)
-    List<Spot> findListByCategoryAndStatusAndIsActiveTrue(
-            @Param("category") SpotCategory category,
+    List<Spot> findListByCategoriesAndStatusAndIsActiveTrue(
+            @Param("categories") Collection<SpotCategory> categories,
             @Param("status") SpotStatus status,
             Pageable pageable
     );
 
-    // 키워드로 스팟 이름, 주소, 설명 검색
-    // 카테고리가 null이면 전체 카테고리 검색
+    // 키워드로 스팟 이름, 주소, 설명 검색 (카테고리 필터 없음)
     @Query("""
 select s
 from Spot s
 where s.status = :status
 and s.isActive = true
-and (:category is null or :category member of s.categories)
 and (
 lower(s.name) like lower(concat('%', :keyword, '%'))
 or lower(s.address) like lower(concat('%', :keyword, '%'))
@@ -93,18 +93,37 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
 """)
     Page<Spot> searchSpots(
             @Param("keyword") String keyword,
-            @Param("category") SpotCategory category,
             @Param("status") SpotStatus status,
             Pageable pageable
     );
 
-    // 지도 화면의 현재 영역 안에 있는 스팟 조회
+    // 위와 동일하되 요청한 카테고리 중 하나라도 가진 스팟으로 한정(OR 조합).
+    // 컬렉션 파라미터는 null을 넘기면 IN 절 렌더링이 깨지므로, 필터 없는 경우는 위 메서드로 분기한다.
     @Query("""
 select s
 from Spot s
 where s.status = :status
 and s.isActive = true
-and (:category is null or :category member of s.categories)
+and exists (select c from s.categories c where c in :categories)
+and (
+lower(s.name) like lower(concat('%', :keyword, '%'))
+or lower(s.address) like lower(concat('%', :keyword, '%'))
+or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
+)
+""")
+    Page<Spot> searchSpotsByCategories(
+            @Param("keyword") String keyword,
+            @Param("categories") Collection<SpotCategory> categories,
+            @Param("status") SpotStatus status,
+            Pageable pageable
+    );
+
+    // 지도 화면의 현재 영역 안에 있는 스팟 조회 (카테고리 필터 없음)
+    @Query("""
+select s
+from Spot s
+where s.status = :status
+and s.isActive = true
 and s.latitude between :southWestLat and :northEastLat
 and s.longitude between :southWestLng and :northEastLng
 order by s.photogenicScore desc, s.bookmarkCount desc
@@ -114,7 +133,27 @@ order by s.photogenicScore desc, s.bookmarkCount desc
             @Param("southWestLng") Double southWestLng,
             @Param("northEastLat") Double northEastLat,
             @Param("northEastLng") Double northEastLng,
-            @Param("category") SpotCategory category,
+            @Param("status") SpotStatus status,
+            Pageable pageable
+    );
+
+    // 위와 동일하되 요청한 카테고리 중 하나라도 가진 스팟으로 한정(OR 조합).
+    @Query("""
+select s
+from Spot s
+where s.status = :status
+and s.isActive = true
+and exists (select c from s.categories c where c in :categories)
+and s.latitude between :southWestLat and :northEastLat
+and s.longitude between :southWestLng and :northEastLng
+order by s.photogenicScore desc, s.bookmarkCount desc
+""")
+    List<Spot> findSpotsInMapBoundsByCategories(
+            @Param("southWestLat") Double southWestLat,
+            @Param("southWestLng") Double southWestLng,
+            @Param("northEastLat") Double northEastLat,
+            @Param("northEastLng") Double northEastLng,
+            @Param("categories") Collection<SpotCategory> categories,
             @Param("status") SpotStatus status,
             Pageable pageable
     );
