@@ -46,5 +46,7 @@ WHERE NOT EXISTS (SELECT 1 FROM spot_categories sc WHERE sc.spot_id = s.id);
 COMMIT;
 
 -- 4) 옛 단일 category 컬럼 제거. ⚠️ 1회성(재실행 시 "컬럼 없음" 에러 정상 — MySQL은 DROP IF EXISTS 미지원).
---    손실 0: category 값 = LEFT(cat3,3)로 4,465건 전건 일치 확인됨 → 필요 시 cat3에서 복원 가능.
+--    손실 0: TourAPI 스팟은 SpotUpsertService가 전건 SpotCategory.ETC로 하드코딩해 넣던 값이라 실질 정보가 없음
+--    (cat3 → category 매핑 로직은 존재한 적 없음). 실제 값을 가진 건 data.sql 데모 스팟 4건뿐이고
+--    해당 4건은 data.sql의 spot_categories INSERT로 이관 완료.
 ALTER TABLE spot DROP COLUMN category;
