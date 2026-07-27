@@ -145,11 +145,11 @@ UNION ALL
 SELECT id, 'SUNSET' FROM wishlist
 ON DUPLICATE KEY UPDATE time_condition=VALUES(time_condition);
 
--- 위시리스트 날씨 조건 (SUNNY, CLOUD_LESS)
+-- 위시리스트 날씨 조건 (CLEAR, CLOUDY)
 INSERT INTO wishlist_weather_conditions (wishlist_id, weather_condition)
-SELECT id, 'SUNNY' FROM wishlist
+SELECT id, 'CLEAR' FROM wishlist
 UNION ALL
-SELECT id, 'CLOUD_LESS' FROM wishlist
+SELECT id, 'CLOUDY' FROM wishlist
 ON DUPLICATE KEY UPDATE weather_condition=VALUES(weather_condition);
 
 -- ============================================================
