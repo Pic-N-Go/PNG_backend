@@ -47,12 +47,15 @@ public class NotificationCacheService {
 
         if (cachedJson != null) {
             try {
-                return objectMapper.readValue(cachedJson, NotificationSettingResponse.class);
+                NotificationSettingResponse response = objectMapper.readValue(cachedJson, NotificationSettingResponse.class);
+                log.info("🟢 [Redis Setting Cache HIT] 유저 알림 설정 캐시 히트 (userId: {}, DND 활성: {})", userId, response.isDndActive());
+                return response;
             } catch (JsonProcessingException e) {
                 log.warn("Redis 알림 설정 파싱 실패 (userId: {})", userId, e);
             }
         }
 
+        log.info("🔴 [Redis Setting Cache MISS] 유저 알림 설정 캐시 미스 -> DB 조회 (userId: {})", userId);
         NotificationSetting setting = notificationSettingRepository.findByUserId(userId).orElse(null);
         NotificationSettingResponse response = NotificationSettingResponse.from(setting);
 
@@ -105,10 +108,12 @@ public class NotificationCacheService {
         Set<String> members = redisTemplate.opsForSet().members(key);
 
         if (members != null && !members.isEmpty()) {
-            return members.stream().map(Long::valueOf).collect(Collectors.toSet());
+            Set<Long> userIds = members.stream().map(Long::valueOf).collect(Collectors.toSet());
+            log.info("🟢 [Redis Active Set HIT] 유형별 활성 유저 Set 캐시 히트 (type: {}, count: {})", type, userIds.size());
+            return userIds;
         }
 
-        // Cache Miss 시 DB에서 쿼리하여 Redis Set 워밍업
+        log.info("🔴 [Redis Active Set MISS] 유형별 활성 유저 Set 캐시 미스 -> DB 조회 및 레디스 워밍업 (type: {})", type);
         List<NotificationSetting> dbSettings = switch (type.toLowerCase()) {
             case "wishlist" -> notificationSettingRepository.findActiveWishlistSettingsWithToken();
             case "goldenhour" -> notificationSettingRepository.findActiveGoldenHourSettingsWithToken();

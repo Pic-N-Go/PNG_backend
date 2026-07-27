@@ -96,17 +96,22 @@ public class NotificationService {
     }
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
-        notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
+        NotificationSettingResponse setting = notificationCacheService.getCachedSetting(userId);
+        if (setting != null) {
             boolean isPushEnabled = isPushEnabledForType(setting, type);
             boolean isDnd = setting.isDndActive();
-            if (isPushEnabled && !isDnd && setting.getFcmToken() != null && !setting.getFcmToken().isEmpty()) {
-                try {
-                    fcmService.sendMessage(setting.getFcmToken(), title, content, deepLink, spotId);
-                } catch (Exception e) {
-                    log.warn("Failed to send FCM push to userId: {}", userId, e);
-                }
+            if (isPushEnabled && !isDnd) {
+                notificationSettingRepository.findByUserId(userId).ifPresent(entity -> {
+                    if (entity.getFcmToken() != null && !entity.getFcmToken().isEmpty()) {
+                        try {
+                            fcmService.sendMessage(entity.getFcmToken(), title, content, deepLink, spotId);
+                        } catch (Exception e) {
+                            log.warn("Failed to send FCM push to userId: {}", userId, e);
+                        }
+                    }
+                });
             }
-        });
+        }
 
         Notification notification = Notification.builder()
                 .userId(userId)
@@ -122,17 +127,17 @@ public class NotificationService {
     /**
      * 알림 발송 직전, 알림 종류(type)에 따라 유저의 해당 토글 수신 동의 여부(isWishlistPushEnabled 등)를 검사하는 이중 안전장치 메서드
      */
-    private boolean isPushEnabledForType(NotificationSetting setting, String type) {
+    private boolean isPushEnabledForType(NotificationSettingResponse setting, String type) {
         if (setting == null) return false;
         if ("GOLDEN_HOUR".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.getIsGoldenHourPushEnabled());
+            return Boolean.TRUE.equals(setting.isGoldenHourPushEnabled());
         } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "WISHLIST".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.getIsWishlistPushEnabled());
+            return Boolean.TRUE.equals(setting.isWishlistPushEnabled());
         } else if ("COMMUNITY".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.getIsCommunityPushEnabled());
+            return Boolean.TRUE.equals(setting.isCommunityPushEnabled());
         } else if ("TEST".equalsIgnoreCase(type)) {
             // 테스트 알림 발송 시: 위시리스트 + 골든아워 알림이 둘 다 켜져있는지 검사
-            return Boolean.TRUE.equals(setting.getIsWishlistPushEnabled()) && Boolean.TRUE.equals(setting.getIsGoldenHourPushEnabled());
+            return Boolean.TRUE.equals(setting.isWishlistPushEnabled()) && Boolean.TRUE.equals(setting.isGoldenHourPushEnabled());
         }
         return true;
     }
