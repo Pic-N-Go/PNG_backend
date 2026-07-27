@@ -109,14 +109,6 @@ public class NotificationScheduler {
         for (Long userId : activeUserIds) {
             List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
 
-            for (Wishlist wishlist : userWishlists) {계산하는 타이머 (골든아워)
-    private void processGoldenHourNotification(TimeCondition timeCondition) {
-        List<NotificationSetting> activeSettings = getActiveGoldenHourSettings(); // 골든아워 알림 수신 동의 유저들 목록 조회
-
-        for (NotificationSetting setting : activeSettings) {
-            Long userId = setting.getUserId();
-            List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
-
             for (Wishlist wishlist : userWishlists) {
                 if (wishlist.getTimeConditions().contains(timeCondition)) {
                     try {
