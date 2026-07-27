@@ -2,8 +2,7 @@ package com.project.picngo.external;
 
 import java.util.Map;
 
-// 카카오 region_1depth_name → 에어코리아 sidoName 정규화.
-// NotificationScheduler에 동일 하드코딩이 남아있음 → 후속으로 이 매퍼로 교체 권장.
+// 카카오 region_1depth_name("충청북도") 또는 스팟 전체 주소("충청북도 청주시 ...") → 에어코리아 sidoName("충북") 정규화.
 public final class SidoNameMapper {
 
     private SidoNameMapper() {}
@@ -22,7 +21,12 @@ public final class SidoNameMapper {
         if (region1depthName == null || region1depthName.length() < 2) {
             return null;
         }
-        String override = OVERRIDES.get(region1depthName);
-        return override != null ? override : region1depthName.substring(0, 2);
+        // 전체 주소도 받으므로 정확일치가 아닌 prefix 매칭 (OVERRIDES 6개뿐이라 순회로 충분)
+        for (Map.Entry<String, String> entry : OVERRIDES.entrySet()) {
+            if (region1depthName.startsWith(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return region1depthName.substring(0, 2);
     }
 }

@@ -30,6 +30,15 @@ class SidoNameMapperTest {
     }
 
     @Test
+    @DisplayName("전체 주소를 넘겨도 시도명으로 정규화된다 (NotificationScheduler 경로)")
+    void normalizesFullAddress() {
+        assertThat(SidoNameMapper.normalize("충청북도 청주시 상당구 문화동")).isEqualTo("충북");
+        assertThat(SidoNameMapper.normalize("경상남도 통영시 산양읍")).isEqualTo("경남");
+        assertThat(SidoNameMapper.normalize("서울특별시 종로구 사직로 161")).isEqualTo("서울");
+        assertThat(SidoNameMapper.normalize("제주특별자치도 서귀포시 성산읍")).isEqualTo("제주");
+    }
+
+    @Test
     @DisplayName("null 또는 2글자 미만이면 null")
     void nullOrTooShort() {
         assertThat(SidoNameMapper.normalize(null)).isNull();
