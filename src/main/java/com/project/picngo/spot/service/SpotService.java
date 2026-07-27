@@ -62,8 +62,8 @@ public class SpotService {
         );
     }
 
-    public List<RecommendedSpotResponse> getRecommendedSpots(int limit) {
-        return spotRepository.findRecommendedSpots(Math.min(limit, 20))
+    public List<RecommendedSpotResponse> getRecommendedSpots(Long userId, int limit) {
+        return spotRepository.findRecommendedSpots(userId, Math.min(limit, 20))
                 .stream()
                 .map(RecommendedSpotResponse::from)
                 .toList();

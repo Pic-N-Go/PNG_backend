@@ -76,9 +76,10 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping("/recommended")
     public ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "10") int limit
     ) {
-        return ResponseEntity.ok(spotService.getRecommendedSpots(limit));
+        return ResponseEntity.ok(spotService.getRecommendedSpots(userDetails.getId(), limit));
     }
 
     @GetMapping("/nearby")

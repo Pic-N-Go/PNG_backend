@@ -89,8 +89,13 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
-    @Operation(summary = "추천 스팟 조회", description = "리뷰+북마크 합산 인기 스팟 중 랜덤으로 반환합니다. limit 기본값 10, 최대 20.")
+    @Operation(
+            summary = "추천 스팟 조회",
+            description = "로그인 유저의 관심테마와 겹치는 스팟을 우선 노출하고, 나머지는 리뷰+북마크 합산 인기순으로 채웁니다. "
+                    + "관심테마를 등록하지 않은 유저는 인기순만 반환됩니다. 로그인 필요. limit 기본값 10, 최대 20."
+    )
     ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "결과 수 (최대 20)") @RequestParam(defaultValue = "10") int limit
     );
 

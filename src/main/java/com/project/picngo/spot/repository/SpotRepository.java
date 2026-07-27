@@ -28,13 +28,21 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     List<Spot> findNearbySpots(@Param("lat") Double lat, @Param("lng") Double lng,
                                @Param("radiusKm") Double radiusKm, @Param("limit") int limit);
 
+    // 유저 관심테마와 겹치는 스팟을 앞으로, 나머지는 기존 인기순.
+    // 관심테마가 없는 유저(소셜 가입 등)는 EXISTS가 전부 0이라 인기순으로 자연 폴백된다.
+    // ponytail: 행마다 EXISTS + 전체 정렬. 스팟 수천 건 규모에선 충분, 수십만 건 되면 매칭 스팟만 먼저 뽑아 합치는 방식으로 교체
     @Query(value = """
-            SELECT * FROM spot
-            WHERE is_active = true
-            ORDER BY (review_count + bookmark_count) DESC, RAND()
+            SELECT s.* FROM spot s
+            WHERE s.is_active = true
+            ORDER BY EXISTS (
+                SELECT 1 FROM spot_categories sc
+                JOIN user_spot_categories uc ON uc.category = sc.category
+                WHERE sc.spot_id = s.id AND uc.user_id = :userId
+            ) DESC,
+            (s.review_count + s.bookmark_count) DESC, RAND()
             LIMIT :limit
             """, nativeQuery = true)
-    List<Spot> findRecommendedSpots(@Param("limit") int limit);
+    List<Spot> findRecommendedSpots(@Param("userId") Long userId, @Param("limit") int limit);
 
     Page<Spot> findAllByStatusAndIsActiveTrue(
             SpotStatus status,
