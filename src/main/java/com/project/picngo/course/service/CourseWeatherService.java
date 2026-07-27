@@ -9,6 +9,7 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.external.AirQualityClient;
+import com.project.picngo.external.SidoNameMapper;
 import com.project.picngo.external.dto.AirQualityResponse.Item;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
@@ -127,12 +128,14 @@ public class CourseWeatherService {
             long daysUntilVisit = ChronoUnit.DAYS.between(LocalDate.now(), visitDate);
             
             if (daysUntilVisit >= 0 && daysUntilVisit <= 3) {
-                try {
-                    String region = extractRegion(targetSpot.getAddress());
-                    Item air = weatherCacheService.getCachedAirQuality(region);
-                    fineDustStatus = getFineDustStatus(air);
-                } catch (Exception e) {
-                    log.warn("코스 미세먼지 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
+                String region = SidoNameMapper.normalize(targetSpot.getAddress());
+                if (region != null) {
+                    try {
+                        Item air = weatherCacheService.getCachedAirQuality(region);
+                        fineDustStatus = getFineDustStatus(air);
+                    } catch (Exception e) {
+                        log.warn("코스 미세먼지 조회 실패 (courseId: {}, dayNumber: {})", courseId, dayNumber, e);
+                    }
                 }
             }
 
@@ -172,11 +175,5 @@ public class CourseWeatherService {
             case "3" -> "나쁨";
             default  -> "매우나쁨";
         };
-    }
-
-    private String extractRegion(String address) {
-        if (address == null) return "";
-        String first = address.split(" ")[0];
-        return first.replace("특별시", "").replace("광역시", "").replace("특별자치시", "").replace("특별자치도", "");
     }
 }
