@@ -1,6 +1,7 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.dto.ChecklistRequest;
 import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.MapBoundsRequest;
@@ -17,6 +18,7 @@ import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
@@ -42,7 +44,8 @@ public interface SpotControllerApiSpec {
             description = "승인된 스팟 목록을 카테고리, 정렬, 페이지 조건에 따라 조회합니다."
     )
     ResponseEntity<Page<SpotResponse>> getSpots(
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category,
+            @Parameter(description = "스팟 카테고리 (단일 선택)", schema = @Schema(implementation = SpotCategory.class))
+            @RequestParam(required = false) String category,
             @Parameter(description = "정렬 기준: latest, popular, score") @RequestParam(defaultValue = "latest") String sort,
             @Parameter(description = "페이지 번호") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
@@ -53,7 +56,8 @@ public interface SpotControllerApiSpec {
             description = "북마크 수와 리뷰 수를 기준으로 인기 스팟 목록을 조회합니다."
     )
     ResponseEntity<List<SpotResponse>> getPopularSpots(
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category,
+            @Parameter(description = "스팟 카테고리 (단일 선택)", schema = @Schema(implementation = SpotCategory.class))
+            @RequestParam(required = false) String category,
             @Parameter(description = "조회할 개수") @RequestParam(defaultValue = "10") int size
     );
 
@@ -63,7 +67,8 @@ public interface SpotControllerApiSpec {
     )
     ResponseEntity<Page<SpotResponse>> searchSpots(
             @Parameter(description = "검색어") @RequestParam String keyword,
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category,
+            @Parameter(description = "스팟 카테고리 (단일 선택)", schema = @Schema(implementation = SpotCategory.class))
+            @RequestParam(required = false) String category,
             @Parameter(description = "페이지 번호") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
     );

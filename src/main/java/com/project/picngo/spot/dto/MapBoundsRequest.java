@@ -25,6 +25,10 @@ public record MapBoundsRequest(
         @DecimalMax(value = "180.0", message = "경도는 180.0 이하여야 합니다.")
         Double northEastLng,
 
+        @io.swagger.v3.oas.annotations.Parameter(
+                description = "스팟 카테고리 (단일 선택)",
+                schema = @io.swagger.v3.oas.annotations.media.Schema(
+                        implementation = com.project.picngo.common.domain.SpotCategory.class))
         String category,
 
         @jakarta.validation.constraints.Min(value = 1, message = "크기는 1 이상이어야 합니다.")
