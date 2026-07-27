@@ -112,16 +112,8 @@ FROM (
     UNION ALL SELECT 71 UNION ALL SELECT 72 UNION ALL SELECT 73 UNION ALL SELECT 74 UNION ALL SELECT 75 UNION ALL SELECT 76 UNION ALL SELECT 77 UNION ALL SELECT 78 UNION ALL SELECT 79 UNION ALL SELECT 80
     UNION ALL SELECT 81 UNION ALL SELECT 82 UNION ALL SELECT 83 UNION ALL SELECT 84 UNION ALL SELECT 85 UNION ALL SELECT 86 UNION ALL SELECT 87 UNION ALL SELECT 88 UNION ALL SELECT 89 UNION ALL SELECT 90
     UNION ALL SELECT 91 UNION ALL SELECT 92 UNION ALL SELECT 93 UNION ALL SELECT 94 UNION ALL SELECT 95 UNION ALL SELECT 96 UNION ALL SELECT 97 UNION ALL SELECT 98 UNION ALL SELECT 99 UNION ALL SELECT 100
-) AS numbers
-ON DUPLICATE KEY UPDATE id=id;
-
--- 101번 팀원 전용 테스트 계정
-INSERT INTO users (id, email, nickname, role, provider, provider_id, created_at, updated_at)
-VALUES (101, 'team101@example.com', '팀원테스터101', 'USER', 'KAKAO', 'kakao_101', NOW(), NOW())
-ON DUPLICATE KEY UPDATE id=id;
-
 -- ============================================================
--- 알림 수신 설정 (1~101번 유저 전원 동의 설정)
+-- 알림 수신 설정 (1~100번 유저 전원 동의 설정)
 -- ============================================================
 INSERT INTO notification_setting (user_id, fcm_token, is_wishlist_push_enabled, is_golden_hour_push_enabled, is_community_push_enabled, is_dnd_enabled, dnd_start_time, dnd_end_time, created_at, updated_at)
 SELECT id, CONCAT('dummy_fcm_token_', id), true, true, true, false, '23:00:00', '07:00:00', NOW(), NOW()
