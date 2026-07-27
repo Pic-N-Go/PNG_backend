@@ -112,8 +112,9 @@ public class CourseWeatherService {
             String sunsetTime = null;
             String goldenHourEvening = null;
             try {
+                // sunrise-sunset API는 yyyy-MM-dd를 요구 (dateString은 기상청 응답 비교용 yyyyMMdd)
                 GoldenHourResponse goldenHour = weatherCacheService.getCachedGoldenHour(
-                        targetSpot.getLatitude(), targetSpot.getLongitude(), dateString
+                        targetSpot.getLatitude(), targetSpot.getLongitude(), visitDate.toString()
                 );
                 if (goldenHour != null) {
                     sunsetTime = goldenHour.sunsetTime();
