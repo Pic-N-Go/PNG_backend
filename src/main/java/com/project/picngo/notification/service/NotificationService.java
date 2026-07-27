@@ -27,6 +27,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
     private final FcmService fcmService;
+    private final NotificationCacheService notificationCacheService;
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
@@ -47,6 +48,7 @@ public class NotificationService {
         NotificationSetting setting = notificationSettingRepository.findByUserId(userId)
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
         setting.updateFcmToken(token);
+        notificationCacheService.updateCachedSetting(userId, setting);
     }
 
     @Transactional
@@ -68,8 +70,7 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public NotificationSettingResponse getSettings(Long userId) {
-        NotificationSetting setting = notificationSettingRepository.findByUserId(userId).orElse(null);
-        return NotificationSettingResponse.from(setting);
+        return notificationCacheService.getCachedSetting(userId);
     }
 
     @Transactional
@@ -85,6 +86,8 @@ public class NotificationService {
                 request.dndStartTime(),
                 request.dndEndTime()
         );
+
+        notificationCacheService.updateCachedSetting(userId, setting);
     }
 
 

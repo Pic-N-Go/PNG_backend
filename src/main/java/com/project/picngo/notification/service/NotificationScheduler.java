@@ -35,6 +35,7 @@ public class NotificationScheduler {
     private final SpotRepository spotRepository;
     private final WeatherCacheService weatherCacheService;
     private final NotificationService notificationService;
+    private final NotificationCacheService notificationCacheService;
 
     // [A. 고정 시간대 스케줄러]
     // 해당 시간에 스케줄러가 돌아가며, 조건이 맞는 스팟들에 대해 알림 발송
@@ -53,8 +54,8 @@ public class NotificationScheduler {
         processFixedTimeNotification(TimeCondition.MORNING);
     }
 
-    // 10시에 오후 알림 발송
-    @Scheduled(cron = "0 0 10 * * *")
+    // 11시에 오후 알림 발송
+    @Scheduled(cron = "0 0 11 * * *")
     public void scheduleAfternoonNotification() {
         log.info("오후(AFTERNOON) 알림 스케줄러 실행...");
         processFixedTimeNotification(TimeCondition.AFTERNOON);
@@ -87,10 +88,9 @@ public class NotificationScheduler {
 
     // 고정된 시간대 알림 처리 (위시리스트 날씨 매칭)
     private void processFixedTimeNotification(TimeCondition timeCondition) {
-        List<NotificationSetting> activeSettings = getActiveWishlistSettings();
+        List<Long> activeUserIds = getActiveWishlistUserIds();
 
-        for (NotificationSetting setting : activeSettings) {
-            Long userId = setting.getUserId();
+        for (Long userId : activeUserIds) {
             List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
             
             for (Wishlist wishlist : userWishlists) {
@@ -103,6 +103,13 @@ public class NotificationScheduler {
     }
 
     // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머 (골든아워)
+    private void processGoldenHourNotification(TimeCondition timeCondition) {
+        List<Long> activeUserIds = getActiveGoldenHourUserIds();
+
+        for (Long userId : activeUserIds) {
+            List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
+
+            for (Wishlist wishlist : userWishlists) {계산하는 타이머 (골든아워)
     private void processGoldenHourNotification(TimeCondition timeCondition) {
         List<NotificationSetting> activeSettings = getActiveGoldenHourSettings(); // 골든아워 알림 수신 동의 유저들 목록 조회
 
@@ -247,15 +254,23 @@ public class NotificationScheduler {
         }
     }
 
-    private List<NotificationSetting> getActiveWishlistSettings() {
-        return notificationSettingRepository.findActiveWishlistSettingsWithToken().stream()
-                .filter(setting -> !setting.isDndActive())
+    private List<Long> getActiveWishlistUserIds() {
+        Set<Long> userIds = notificationCacheService.getActiveUserIds("wishlist");
+        return userIds.stream()
+                .filter(userId -> {
+                    com.project.picngo.notification.dto.NotificationSettingResponse setting = notificationCacheService.getCachedSetting(userId);
+                    return setting == null || !setting.isDndActive();
+                })
                 .toList();
     }
 
-    private List<NotificationSetting> getActiveGoldenHourSettings() {
-        return notificationSettingRepository.findActiveGoldenHourSettingsWithToken().stream()
-                .filter(setting -> !setting.isDndActive())
+    private List<Long> getActiveGoldenHourUserIds() {
+        Set<Long> userIds = notificationCacheService.getActiveUserIds("goldenhour");
+        return userIds.stream()
+                .filter(userId -> {
+                    com.project.picngo.notification.dto.NotificationSettingResponse setting = notificationCacheService.getCachedSetting(userId);
+                    return setting == null || !setting.isDndActive();
+                })
                 .toList();
     }
 

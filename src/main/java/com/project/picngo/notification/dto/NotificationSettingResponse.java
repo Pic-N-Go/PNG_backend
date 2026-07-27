@@ -38,4 +38,20 @@ public record NotificationSettingResponse(
                 setting.getDndEndTime()
         );
     }
+
+    public boolean isDndActive() {
+        if (!Boolean.TRUE.equals(this.isDndEnabled)) {
+            return false;
+        }
+        if (this.dndStartTime == null || this.dndEndTime == null) {
+            return false;
+        }
+
+        LocalTime now = LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        if (this.dndStartTime.isBefore(this.dndEndTime)) {
+            return !now.isBefore(this.dndStartTime) && now.isBefore(this.dndEndTime);
+        } else {
+            return !now.isBefore(this.dndStartTime) || now.isBefore(this.dndEndTime);
+        }
+    }
 }
