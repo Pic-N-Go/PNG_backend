@@ -45,7 +45,12 @@ SELECT s.id, 'ETC' FROM spot s
 WHERE NOT EXISTS (SELECT 1 FROM spot_categories sc WHERE sc.spot_id = s.id);
 COMMIT;
 
--- 4) 옛 단일 category 컬럼 제거. ⚠️ 1회성(재실행 시 "컬럼 없음" 에러 정상 — MySQL은 DROP IF EXISTS 미지원).
+-- 4) 유저 관심테마에서 삭제된 enum 값 제거.
+--    User.spotCategories도 같은 SpotCategory를 @Enumerated(STRING)으로 쓴다.
+--    PORTRAIT/PET 행이 남아 있으면 해당 유저 조회 시 enum 역직렬화로 터진다.
+DELETE FROM user_spot_categories WHERE category IN ('PORTRAIT', 'PET');
+
+-- 5) 옛 단일 category 컬럼 제거. ⚠️ 1회성(재실행 시 "컬럼 없음" 에러 정상 — MySQL은 DROP IF EXISTS 미지원).
 --    손실 0: TourAPI 스팟은 SpotUpsertService가 전건 SpotCategory.ETC로 하드코딩해 넣던 값이라 실질 정보가 없음
 --    (cat3 → category 매핑 로직은 존재한 적 없음). 실제 값을 가진 건 data.sql 데모 스팟 4건뿐이고
 --    해당 4건은 data.sql의 spot_categories INSERT로 이관 완료.
