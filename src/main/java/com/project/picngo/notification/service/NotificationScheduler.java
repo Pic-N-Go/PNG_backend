@@ -206,18 +206,9 @@ public class NotificationScheduler {
                 
                 if (aqCondition != null && aqCondition != com.project.picngo.wishlist.domain.enums.AirQualityCondition.NONE) {
                     try {
-                        String address = spot.getAddress();
-                        String sidoName = "서울";
-                        if (address != null && address.length() >= 2) {
-                            if (address.startsWith("충청북도")) sidoName = "충북";
-                            else if (address.startsWith("충청남도")) sidoName = "충남";
-                            else if (address.startsWith("전라북도")) sidoName = "전북";
-                            else if (address.startsWith("전라남도")) sidoName = "전남";
-                            else if (address.startsWith("경상북도")) sidoName = "경북";
-                            else if (address.startsWith("경상남도")) sidoName = "경남";
-                            else sidoName = address.substring(0, 2);
-                        }
-                        
+                        String sidoName = com.project.picngo.external.SidoNameMapper.normalize(spot.getAddress());
+                        if (sidoName == null) sidoName = "서울"; // 주소 없음/짧음 → 기존 기본값 유지
+
                         com.project.picngo.external.dto.AirQualityResponse.Item aqItem = weatherCacheService.getCachedAirQuality(sidoName);
                         
                         if (aqItem != null && aqItem.pm10Grade() != null) {
