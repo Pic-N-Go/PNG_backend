@@ -63,9 +63,24 @@ public class NotificationController implements NotificationControllerApiSpec {
         return ResponseEntity.ok().build();
     }
 
+    private final com.project.picngo.user.repository.UserRepository userRepository;
+    private final com.project.picngo.auth.service.JwtTokenProvider jwtTokenProvider;
+
     @PostMapping("/test/scheduler")
     public ResponseEntity<Void> triggerScheduler() {
         notificationScheduler.triggerAllSchedulersManually();
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/test/tokens")
+    public ResponseEntity<String> getTestTokens() {
+        StringBuilder sb = new StringBuilder("token\n");
+        userRepository.findAll().stream()
+                .limit(100)
+                .forEach(user -> {
+                    String token = jwtTokenProvider.createAccessToken(user);
+                    sb.append(token).append("\n");
+                });
+        return ResponseEntity.ok(sb.toString());
     }
 }
