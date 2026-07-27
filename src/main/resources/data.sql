@@ -77,21 +77,89 @@ UPDATE season_event SET eligible_cat3 = 'A01010100,A01010200,A01010300,A01010400
 
 -- 개명 전 잔존 row 정리 (예: '벚꽃 시즌' -> '벚꽃') — NOT EXISTS 가드는 새 이름 기준이라 옛 이름 row가 안 지워지고 남아있었음
 DELETE FROM season_event WHERE name IN ('벚꽃 시즌', '단풍 시즌', '설경 시즌');
--- 유저 데이터 (테스트용 계정)
-INSERT INTO users (id, email, nickname, role, provider, provider_id, created_at, updated_at)
-VALUES (1, 'test@example.com', '테스터', 'USER', 'KAKAO', 'kakao_1234', NOW(), NOW())
-ON DUPLICATE KEY UPDATE id=1;
 
--- 스팟 데이터 (제주도 샘플 스팟)
+-- ============================================================
+-- 스팟 초기 데이터 (제주 주요 스팟 6건)
+-- ============================================================
 INSERT INTO spot (id, name, address, latitude, longitude, category, source, badge, status, bookmark_count, review_count, photogenic_score, is_active, review_average, toilet, created_at, updated_at)
 VALUES
-(1, '성산일출봉', '제주특별자치도 서귀포시 성산읍 일출로 284-12', 33.4580, 126.9425, 'MOUNTAIN', 'TOUR_API', true, 'APPROVED', 0, 0, 95, true, 4.5, true, NOW(), NOW()),
-(2, '함덕해수욕장', '제주특별자치도 제주시 조천읍 조함해안로 525', 33.5433, 126.6692, 'BEACH', 'TOUR_API', true, 'APPROVED', 0, 0, 90, true, 4.8, true, NOW(), NOW()),
-(3, '오설록 티 뮤지엄', '제주특별자치도 서귀포시 안덕면 신화역사로 15', 33.3060, 126.2895, 'ETC', 'TOUR_API', true, 'APPROVED', 0, 0, 85, true, 4.2, true, NOW(), NOW()),
-(4, '카멜리아힐', '제주특별자치도 서귀포시 안덕면 병악로 166', 33.2840, 126.3533, 'PARK', 'TOUR_API', true, 'APPROVED', 0, 0, 88, true, 4.6, true, NOW(), NOW())
+(1, '성산일출봉', '제주특별자치도 서귀포시 성산읍 일출로 284-12', 33.4580, 126.9425, 'MOUNTAIN', 'TOUR_API', true, 'APPROVED', 150, 42, 95, true, 4.5, true, NOW(), NOW()),
+(2, '함덕해수욕장', '제주특별자치도 제주시 조천읍 조함해안로 525', 33.5433, 126.6692, 'BEACH', 'TOUR_API', true, 'APPROVED', 120, 38, 90, true, 4.8, true, NOW(), NOW()),
+(3, '오설록 티 뮤지엄', '제주특별자치도 서귀포시 안덕면 신화역사로 15', 33.3060, 126.2895, 'ETC', 'TOUR_API', true, 'APPROVED', 98, 25, 85, true, 4.2, true, NOW(), NOW()),
+(4, '카멜리아힐', '제주특별자치도 서귀포시 안덕면 병악로 166', 33.2840, 126.3533, 'PARK', 'TOUR_API', true, 'APPROVED', 110, 30, 88, true, 4.6, true, NOW(), NOW()),
+(5, '협재해수욕장', '제주특별자치도 제주시 한림읍 한림로 329', 33.3940, 126.2397, 'BEACH', 'TOUR_API', true, 'APPROVED', 140, 50, 92, true, 4.7, true, NOW(), NOW()),
+(6, '우도봉', '제주특별자치도 제주시 우도면 연평리', 33.4947, 126.9608, 'MOUNTAIN', 'TOUR_API', true, 'APPROVED', 85, 20, 89, true, 4.4, true, NOW(), NOW())
 ON DUPLICATE KEY UPDATE id=id;
 
--- 코스 데이터 (제주도 2박 3일 출사 코스)
+-- ============================================================
+-- 유저 초기 데이터 (1~100번 더미 유저 + 101번 팀원 테스트 계정)
+-- ============================================================
+INSERT INTO users (id, email, nickname, role, provider, provider_id, created_at, updated_at)
+VALUES (1, 'test@example.com', '메인테스터', 'USER', 'KAKAO', 'kakao_1', NOW(), NOW())
+ON DUPLICATE KEY UPDATE id=id;
+
+-- 유저 2~100번 (100명)
+INSERT INTO users (id, email, nickname, role, provider, provider_id, created_at, updated_at)
+SELECT n, CONCAT('user', n, '@example.com'), CONCAT('테스트유저', n), 'USER', 'KAKAO', CONCAT('kakao_', n), NOW(), NOW()
+FROM (
+    SELECT 2 AS n UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+    UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18 UNION ALL SELECT 19 UNION ALL SELECT 20
+    UNION ALL SELECT 21 UNION ALL SELECT 22 UNION ALL SELECT 23 UNION ALL SELECT 24 UNION ALL SELECT 25 UNION ALL SELECT 26 UNION ALL SELECT 27 UNION ALL SELECT 28 UNION ALL SELECT 29 UNION ALL SELECT 30
+    UNION ALL SELECT 31 UNION ALL SELECT 32 UNION ALL SELECT 33 UNION ALL SELECT 34 UNION ALL SELECT 35 UNION ALL SELECT 36 UNION ALL SELECT 37 UNION ALL SELECT 38 UNION ALL SELECT 39 UNION ALL SELECT 40
+    UNION ALL SELECT 41 UNION ALL SELECT 42 UNION ALL SELECT 43 UNION ALL SELECT 44 UNION ALL SELECT 45 UNION ALL SELECT 46 UNION ALL SELECT 47 UNION ALL SELECT 48 UNION ALL SELECT 49 UNION ALL SELECT 50
+    UNION ALL SELECT 51 UNION ALL SELECT 52 UNION ALL SELECT 53 UNION ALL SELECT 54 UNION ALL SELECT 55 UNION ALL SELECT 56 UNION ALL SELECT 57 UNION ALL SELECT 58 UNION ALL SELECT 59 UNION ALL SELECT 60
+    UNION ALL SELECT 61 UNION ALL SELECT 62 UNION ALL SELECT 63 UNION ALL SELECT 64 UNION ALL SELECT 65 UNION ALL SELECT 66 UNION ALL SELECT 67 UNION ALL SELECT 68 UNION ALL SELECT 69 UNION ALL SELECT 70
+    UNION ALL SELECT 71 UNION ALL SELECT 72 UNION ALL SELECT 73 UNION ALL SELECT 74 UNION ALL SELECT 75 UNION ALL SELECT 76 UNION ALL SELECT 77 UNION ALL SELECT 78 UNION ALL SELECT 79 UNION ALL SELECT 80
+    UNION ALL SELECT 81 UNION ALL SELECT 82 UNION ALL SELECT 83 UNION ALL SELECT 84 UNION ALL SELECT 85 UNION ALL SELECT 86 UNION ALL SELECT 87 UNION ALL SELECT 88 UNION ALL SELECT 89 UNION ALL SELECT 90
+    UNION ALL SELECT 91 UNION ALL SELECT 92 UNION ALL SELECT 93 UNION ALL SELECT 94 UNION ALL SELECT 95 UNION ALL SELECT 96 UNION ALL SELECT 97 UNION ALL SELECT 98 UNION ALL SELECT 99 UNION ALL SELECT 100
+) AS numbers
+ON DUPLICATE KEY UPDATE id=id;
+
+-- 101번 팀원 전용 테스트 계정
+INSERT INTO users (id, email, nickname, role, provider, provider_id, created_at, updated_at)
+VALUES (101, 'team101@example.com', '팀원테스터101', 'USER', 'KAKAO', 'kakao_101', NOW(), NOW())
+ON DUPLICATE KEY UPDATE id=id;
+
+-- ============================================================
+-- 알림 수신 설정 (1~101번 유저 전원 동의 설정)
+-- ============================================================
+INSERT INTO notification_setting (user_id, fcm_token, is_wishlist_push_enabled, is_golden_hour_push_enabled, is_community_push_enabled, is_dnd_enabled, dnd_start_time, dnd_end_time, created_at, updated_at)
+SELECT id, CONCAT('dummy_fcm_token_', id), true, true, true, false, '23:00:00', '07:00:00', NOW(), NOW()
+FROM users
+ON DUPLICATE KEY UPDATE fcm_token = VALUES(fcm_token);
+
+-- ============================================================
+-- 위시리스트 (1~101번 유저 전원 스팟 1번 성산일출봉 & 2번 함덕 등록)
+-- ============================================================
+INSERT INTO wishlist (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
+SELECT id, id, 1, '성산일출봉 출사 및 골든아워 촬영', 'NONE', 0, true, NOW(), NOW()
+FROM users
+ON DUPLICATE KEY UPDATE spot_id=1;
+
+INSERT INTO wishlist (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
+SELECT id + 1000, id, 2, '함덕 에메랄드 바다 풍경', 'NONE', 0, true, NOW(), NOW()
+FROM users
+ON DUPLICATE KEY UPDATE spot_id=2;
+
+-- 위시리스트 시간 조건 (성산일출봉: MORNING, SUNRISE, SUNSET / 함덕: MORNING, AFTERNOON, SUNSET)
+INSERT INTO wishlist_time_conditions (wishlist_id, time_condition)
+SELECT id, 'MORNING' FROM wishlist
+UNION ALL
+SELECT id, 'SUNRISE' FROM wishlist WHERE spot_id = 1
+UNION ALL
+SELECT id, 'SUNSET' FROM wishlist
+ON DUPLICATE KEY UPDATE time_condition=VALUES(time_condition);
+
+-- 위시리스트 날씨 조건 (SUNNY, CLOUD_LESS)
+INSERT INTO wishlist_weather_conditions (wishlist_id, weather_condition)
+SELECT id, 'SUNNY' FROM wishlist
+UNION ALL
+SELECT id, 'CLOUD_LESS' FROM wishlist
+ON DUPLICATE KEY UPDATE weather_condition=VALUES(weather_condition);
+
+-- ============================================================
+-- 코스 및 코스 스팟 데이터 (1번 테스터 & 101번 팀원 계정 코스)
+-- ============================================================
 INSERT INTO course (id, user_id, title, start_date, end_date, created_at, updated_at)
 VALUES (1, 1, '제주도 2박 3일 풍경 출사', '2026-08-01', '2026-08-03', NOW(), NOW())
 ON DUPLICATE KEY UPDATE id=1;
