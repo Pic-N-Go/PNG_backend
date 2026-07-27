@@ -4,7 +4,7 @@ import com.google.firebase.messaging.FirebaseMessaging;
 import com.project.picngo.config.FcmConfig;
 import com.project.picngo.external.KakaoRegionClient;
 import com.project.picngo.external.service.WeatherCacheService;
-import com.project.picngo.external.service.WeatherService;
+import com.project.picngo.external.service.CurrentWeatherService;
 import com.project.picngo.notification.service.FcmService;
 import com.project.picngo.spot.dto.CurrentWeatherResponse;
 import com.project.picngo.spot.dto.CurrentWeatherResponse.AirGrade;
@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WeatherControllerTest {
 
     @Autowired MockMvc mockMvc;
-    @MockitoBean WeatherService weatherService;
+    @MockitoBean CurrentWeatherService currentWeatherService;
     @MockitoBean KakaoRegionClient kakaoRegionClient;
     @MockitoBean WeatherCacheService weatherCacheService;
 
@@ -42,7 +42,7 @@ class WeatherControllerTest {
     @WithMockUser
     @DisplayName("좌표로 현재 날씨를 200으로 반환한다")
     void returnsCurrentWeather() throws Exception {
-        when(weatherService.getCurrentWeather(any(), any())).thenReturn(
+        when(currentWeatherService.getCurrentWeather(any(), any())).thenReturn(
                 new CurrentWeatherResponse("서울", "맑음", 28.0,
                         new AirGrade("좋음", 25.0), new AirGrade("보통", 0.03), "19:12"));
 

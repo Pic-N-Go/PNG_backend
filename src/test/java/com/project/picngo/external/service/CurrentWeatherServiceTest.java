@@ -13,10 +13,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class WeatherServiceTest {
+class CurrentWeatherServiceTest {
 
     // 협력자는 null로 주입 — assemble()는 순수 함수라 협력자 불필요
-    private final WeatherService service = new WeatherService(null, null);
+    private final CurrentWeatherService service = new CurrentWeatherService(null, null);
 
     @Test
     @DisplayName("현재 시각에 가장 가까운 예보를 한글 날씨로 매핑한다")
@@ -44,7 +44,7 @@ class WeatherServiceTest {
     }
 
     @Test
-    @DisplayName("오전 골든아워 전이면 오전(일출-30분), 지났으면 저녁(일몰-30분)")
+    @DisplayName("오전 골든아워 전이면 오전(일출-30분), 지났으면 저녁(일몰-30분), 저녁도 지났으면 null")
     void nextGoldenHour() {
         GoldenHourResponse gh = new GoldenHourResponse(
                 "2026-07-20T05:15:00+09:00", "2026-07-20T19:42:00+09:00", null, null);
@@ -58,6 +58,11 @@ class WeatherServiceTest {
         CurrentWeatherResponse evening = service.assemble("서울", List.of(), null, gh,
                 LocalDate.of(2026, 7, 20), LocalTime.of(14, 0));
         assertThat(evening.goldenHour()).isEqualTo("19:12");
+
+        // 20:00 → 저녁 골든아워(19:12)도 지남 → 지난 시각을 "다음"으로 주지 않고 null
+        CurrentWeatherResponse afterSunset = service.assemble("서울", List.of(), null, gh,
+                LocalDate.of(2026, 7, 20), LocalTime.of(20, 0));
+        assertThat(afterSunset.goldenHour()).isNull();
     }
 
     @Test

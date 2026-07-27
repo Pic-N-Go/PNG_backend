@@ -23,7 +23,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class WeatherService {
+public class CurrentWeatherService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -97,7 +97,7 @@ public class WeatherService {
         }
     }
 
-    // 현재 시각 기준 다음 골든아워(일출-30분 / 일몰-30분). 둘 다 지났으면 저녁 값.
+    // 현재 시각 기준 다음 골든아워(일출-30분 / 일몰-30분). 오늘 둘 다 지났으면 null.
     private String nextGoldenHour(GoldenHourResponse gh, LocalTime now) {
         if (gh == null || gh.sunriseTime() == null || gh.sunsetTime() == null) return null;
         try {
@@ -106,7 +106,10 @@ public class WeatherService {
             LocalTime morning = sunrise.minusMinutes(30);
             LocalTime evening = sunset.minusMinutes(30);
             if (now.isBefore(morning)) return morning.format(HH_MM);
-            return evening.format(HH_MM);
+            if (now.isBefore(evening)) return evening.format(HH_MM);
+            // ponytail: 오늘 골든아워가 다 지나면 null. 내일 일출 값을 주려면 getCachedGoldenHour를
+            // 내일 날짜로 한 번 더 호출해야 하므로, 프론트에 "오늘 종료" 표시가 필요해지면 그때 추가.
+            return null;
         } catch (Exception e) {
             log.warn("골든아워 파싱 실패: {}", e.getMessage());
             return null;
