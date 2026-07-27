@@ -9,6 +9,7 @@ public record NotificationResponse(
         String content,
         Boolean isRead,
         String deepLink,
+        Long spotId,
         LocalDateTime createdAt
 ) {
     public static NotificationResponse from(com.project.picngo.notification.domain.Notification notification) {
@@ -19,6 +20,7 @@ public record NotificationResponse(
                 notification.getContent(),
                 notification.getIsRead(),
                 notification.getDeepLink(),
+                notification.getSpotId(),
                 notification.getCreatedAt()
         );
     }

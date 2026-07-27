@@ -17,6 +17,10 @@ public class FcmService {
     private final FirebaseMessaging firebaseMessaging;
 
     public void sendMessage(String targetToken, String title, String body, String deepLink) {
+        sendMessage(targetToken, title, body, deepLink, null);
+    }
+
+    public void sendMessage(String targetToken, String title, String body, String deepLink, Long spotId) {
         if (targetToken == null || targetToken.isEmpty()) {
             log.warn("FCM Token이 없어 알림을 보낼 수 없습니다.");
             throw new CustomException(NotificationErrorCode.FCM_TOKEN_NOT_FOUND);
@@ -33,6 +37,9 @@ public class FcmService {
 
         if (deepLink != null && !deepLink.isEmpty()) {
             messageBuilder.putData("deepLink", deepLink);
+        }
+        if (spotId != null) {
+            messageBuilder.putData("spotId", String.valueOf(spotId));
         }
 
         try {

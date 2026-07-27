@@ -13,6 +13,10 @@ import java.util.List;
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
     List<Notification> findAllByUserId(Long userId);
 
+    // 최근 7일치 알림만 최신순으로 조회
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND n.createdAt >= :cutoff ORDER BY n.createdAt DESC")
+    List<Notification> findAllRecentNotificationsByUserId(@Param("userId") Long userId, @Param("cutoff") LocalDateTime cutoff);
+
     // 일일이 하나씩 읽음 처리하지 않고, UPDATE 쿼리 한 방으로 내 알림을 전부 '읽음(isRead = true)' 상태로 변경
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.userId = :userId AND n.isRead = false")

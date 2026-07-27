@@ -12,9 +12,18 @@ public interface NotificationSettingRepository extends JpaRepository<Notificatio
     // 특정 유저 1명의 설정을 찾아볼 때
     Optional<NotificationSetting> findByUserId(Long userId);
 
-    // 모든 유저 중에서 알림을 켜두었고 (isAllPushEnabled가 true) fcmToken이 null이 아니고 빈 문자열이 아닌 유저 목록 조회
-    // 전체 공지용 알림 보낼 때 사용
-    // 알림을 보내야하는 유저를 찾을 때 사용
-    @Query("SELECT n FROM NotificationSetting n WHERE n.isAllPushEnabled = true AND n.fcmToken IS NOT NULL AND n.fcmToken != ''")
-    List<NotificationSetting> findActiveSettingsWithToken();
+    // 위시리스트 알림이 켜져있고 FCM 토큰이 존재하는 유저 목록 조회
+    // TODO 캐싱 작업 필수
+    @Query("SELECT n FROM NotificationSetting n WHERE n.isWishlistPushEnabled = true AND n.fcmToken IS NOT NULL AND n.fcmToken != ''")
+    List<NotificationSetting> findActiveWishlistSettingsWithToken();
+
+    // 골든아워 알림이 켜져있고 FCM 토큰이 존재하는 유저 목록 조회
+    // TODO 캐싱 작업 필수
+    @Query("SELECT n FROM NotificationSetting n WHERE n.isGoldenHourPushEnabled = true AND n.fcmToken IS NOT NULL AND n.fcmToken != ''")
+    List<NotificationSetting> findActiveGoldenHourSettingsWithToken();
+
+    // 커뮤니티 알림이 켜져있고 FCM 토큰이 존재하는 유저 목록 조회
+    // TODO 캐싱 작업 필수
+    @Query("SELECT n FROM NotificationSetting n WHERE n.isCommunityPushEnabled = true AND n.fcmToken IS NOT NULL AND n.fcmToken != ''")
+    List<NotificationSetting> findActiveCommunitySettingsWithToken();
 }

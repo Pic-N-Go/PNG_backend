@@ -85,9 +85,9 @@ public class NotificationScheduler {
 
     // --- 공통 로직 ---
 
-    // 고정된 시간대 알림 처리
+    // 고정된 시간대 알림 처리 (위시리스트 날씨 매칭)
     private void processFixedTimeNotification(TimeCondition timeCondition) {
-        List<NotificationSetting> activeSettings = getActiveSettings();
+        List<NotificationSetting> activeSettings = getActiveWishlistSettings();
 
         for (NotificationSetting setting : activeSettings) {
             Long userId = setting.getUserId();
@@ -102,9 +102,9 @@ public class NotificationScheduler {
         }
     }
 
-    // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머
+    // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머 (골든아워)
     private void processGoldenHourNotification(TimeCondition timeCondition) {
-        List<NotificationSetting> activeSettings = getActiveSettings(); // 알림을 보내야하는 유저들 목록 조회
+        List<NotificationSetting> activeSettings = getActiveGoldenHourSettings(); // 골든아워 알림 수신 동의 유저들 목록 조회
 
         for (NotificationSetting setting : activeSettings) {
             Long userId = setting.getUserId();
@@ -143,7 +143,7 @@ public class NotificationScheduler {
                                 String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
                                 String title = "🌅 골든아워 알림";
                                 String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
-                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId());
+                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId());
                             }
                         }
 
@@ -229,7 +229,7 @@ public class NotificationScheduler {
                     String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
                     String title = "☁️ 날씨 조건 매칭 알림";
                     String content = String.format("%s %s에 설정하신 날씨 조건이 충족될 예정입니다!", dayStr, spot.getName());
-                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId());
+                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId(), spot.getId());
                 }
             }
 
@@ -238,26 +238,25 @@ public class NotificationScheduler {
         }
     }
 
-    private List<NotificationSetting> getActiveSettings() {
-        return notificationSettingRepository.findActiveSettingsWithToken().stream()
-                .filter(setting -> !isDndActive(setting))
+    private List<NotificationSetting> getActiveWishlistSettings() {
+        return notificationSettingRepository.findActiveWishlistSettingsWithToken().stream()
+                .filter(setting -> !setting.isDndActive())
                 .toList();
     }
 
-    // 방해 금지 시간 (DND) 활성 여부 확인 및 활성 설정 필터링
-    private boolean isDndActive(NotificationSetting setting) {
-        if (setting.getDndStartTime() == null || setting.getDndEndTime() == null) {
-            return false;
-        }
-        
-        LocalTime now = LocalTime.now(ZoneId.of("Asia/Seoul"));
-        LocalTime start = setting.getDndStartTime();
-        LocalTime end = setting.getDndEndTime();
+    private List<NotificationSetting> getActiveGoldenHourSettings() {
+        return notificationSettingRepository.findActiveGoldenHourSettingsWithToken().stream()
+                .filter(setting -> !setting.isDndActive())
+                .toList();
+    }
 
-        if (start.isBefore(end)) {
-            return !now.isBefore(start) && now.isBefore(end);
-        } else {
-            return !now.isBefore(start) || now.isBefore(end);
-        }
+    // TODO: 운영 배포 전 또는 프론트엔드 알림 테스트 완료 후 테스트용 수동 스케줄러 강제 실행 메서드 삭제 필요
+    public void triggerAllSchedulersManually() {
+        log.info("테스트용 수동 스케줄러 강제 실행 시작...");
+        processFixedTimeNotification(TimeCondition.MORNING);
+        processFixedTimeNotification(TimeCondition.AFTERNOON);
+        processGoldenHourNotification(TimeCondition.SUNRISE);
+        processGoldenHourNotification(TimeCondition.SUNSET);
+        log.info("테스트용 수동 스케줄러 강제 실행 완료.");
     }
 }
