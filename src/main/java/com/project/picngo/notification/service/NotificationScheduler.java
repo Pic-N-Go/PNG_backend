@@ -143,6 +143,7 @@ public class NotificationScheduler {
                                 String title = "🌅 골든아워 알림";
                                 String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
                                 notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId());
+                                break; // 동일 유저 중복 골든아워 알림 폭탄 방지 (1건 발송 후 루프 탈출)
                             }
                         }
 
