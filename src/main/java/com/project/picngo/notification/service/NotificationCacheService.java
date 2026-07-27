@@ -30,7 +30,10 @@ public class NotificationCacheService {
     public NotificationCacheService(StringRedisTemplate redisTemplate, NotificationSettingRepository notificationSettingRepository) {
         this.redisTemplate = redisTemplate;
         this.notificationSettingRepository = notificationSettingRepository;
-        this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+        this.objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
     /**
