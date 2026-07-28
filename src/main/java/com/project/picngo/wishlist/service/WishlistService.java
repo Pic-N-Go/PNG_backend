@@ -7,6 +7,8 @@ import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.spot.repository.SpotTagRepository;
 import com.project.picngo.wishlist.domain.Wishlist;
+import com.project.picngo.wishlist.domain.enums.TimeCondition;
+import com.project.picngo.wishlist.domain.enums.WeatherCondition;
 import com.project.picngo.wishlist.dto.*;
 import com.project.picngo.wishlist.repository.WishlistRepository;
 import com.project.picngo.common.exception.CustomException;
@@ -27,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -41,6 +44,7 @@ public class WishlistService {
     private final SpotRepository spotRepository;
     private final SpotTagRepository spotTagRepository;
     private final NotificationSettingRepository notificationSettingRepository;
+    private final WeatherMatchService weatherMatchService;
 
     public List<WishlistSettingResponse> getWishlists(Long userId) {
         validateUserExists(userId);
@@ -59,7 +63,8 @@ public class WishlistService {
     @Transactional
     public WishlistSettingResponse updateWishlistSettings(Long userId, Long spotId, WishlistSettingUpdateRequest request) {
         validateUserExists(userId);
-        
+        validateAlertTimingDays(request.alertTimingDays());
+
         Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
                 .orElseGet(() -> Wishlist.builder()
                         .userId(userId)
@@ -90,6 +95,15 @@ public class WishlistService {
     private void validateUserExists(Long userId) {
         if (!userRepository.existsById(userId)) {
             throw new CustomException(UserErrorCode.USER_NOT_FOUND);
+        }
+    }
+
+    // 알림 시점은 당일(0)/1일 전(1)/3일 전(3)만 허용
+    private static final Set<Integer> ALLOWED_ALERT_TIMING_DAYS = Set.of(0, 1, 3);
+
+    private void validateAlertTimingDays(Integer alertTimingDays) {
+        if (alertTimingDays != null && !ALLOWED_ALERT_TIMING_DAYS.contains(alertTimingDays)) {
+            throw new CustomException(WishlistErrorCode.INVALID_ALERT_TIMING);
         }
     }
 
@@ -139,30 +153,23 @@ public class WishlistService {
                 
                 String repWeather = "CLEAR";
                 boolean isMatched = false;
-                
+
                 if (!dayForecasts.isEmpty()) {
+                    // 대표 날씨(화면 표시용): 낮 시간대(10/14/18) 중간값, 없으면 전체 중간값
                     List<com.project.picngo.external.dto.WeatherForecastResponse> daytime = dayForecasts.stream()
                         .filter(f -> f.time().equals("1000") || f.time().equals("1400") || f.time().equals("1800"))
                         .toList();
-                        
-                    if (daytime.isEmpty()) daytime = dayForecasts; 
-                    
-                    repWeather = daytime.get(daytime.size() / 2).weatherStatus(); 
-                    
-                    if (wishlist.getWeatherConditions() != null && wishlist.getWeatherConditions().contains(com.project.picngo.wishlist.domain.enums.WeatherCondition.NONE)) {
-                        isMatched = true;
-                    } else if (wishlist.getWeatherConditions() != null) {
-                        for (var f : daytime) {
-                            try {
-                                if (wishlist.getWeatherConditions().contains(com.project.picngo.wishlist.domain.enums.WeatherCondition.valueOf(f.weatherStatus()))) {
-                                    isMatched = true;
-                                    repWeather = f.weatherStatus(); // 매칭된 날씨를 대표로 표기
-                                    break;
-                                }
-                            } catch (IllegalArgumentException e) {
-                                log.warn("알 수 없는 기상청 날씨 상태 수신 (스킵 처리): {}", f.weatherStatus());
-                            }
-                        }
+                    if (daytime.isEmpty()) daytime = dayForecasts;
+                    repWeather = daytime.get(daytime.size() / 2).weatherStatus();
+
+                    // 매치 판정: 알림 스케줄러와 동일한 공용 매칭 로직(시간대 반영)을 사용
+                    Set<TimeCondition> timeConditions = wishlist.getTimeConditions();
+                    Set<WeatherCondition> weatherConditions = wishlist.getWeatherConditions();
+                    if (timeConditions == null || timeConditions.isEmpty()) {
+                        isMatched = weatherMatchService.matchesAnyTime(forecasts, targetDateStr, weatherConditions);
+                    } else {
+                        isMatched = timeConditions.stream()
+                            .anyMatch(tc -> weatherMatchService.matches(forecasts, targetDateStr, tc, weatherConditions));
                     }
                 }
                 

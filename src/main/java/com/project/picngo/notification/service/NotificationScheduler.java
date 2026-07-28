@@ -12,6 +12,7 @@ import com.project.picngo.wishlist.domain.Wishlist;
 import com.project.picngo.wishlist.domain.enums.TimeCondition;
 import com.project.picngo.wishlist.domain.enums.WeatherCondition;
 import com.project.picngo.wishlist.repository.WishlistRepository;
+import com.project.picngo.wishlist.service.WeatherMatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -44,6 +45,7 @@ public class NotificationScheduler {
     private final NotificationService notificationService;
     private final NotificationCacheService notificationCacheService;
     private final ThreadPoolTaskExecutor weatherWarmupExecutor;
+    private final WeatherMatchService weatherMatchService;
 
     // [A. 고정 시간대 스케줄러]
     // 해당 시간에 스케줄러가 돌아가며, 조건이 맞는 스팟들에 대해 알림 발송
@@ -117,7 +119,7 @@ public class NotificationScheduler {
             if (wishlist.getTimeConditions().contains(timeCondition)) {
                 Spot spot = spotMap.get(wishlist.getSpotId());
                 if (spot != null) {
-                    checkWeatherAndNotify(wishlist.getUserId(), wishlist, spot);
+                    checkWeatherAndNotify(wishlist.getUserId(), wishlist, spot, timeCondition);
                     matchedCount++;
                 }
             }
@@ -226,44 +228,27 @@ public class NotificationScheduler {
     }
 
     // 날씨 및 미세먼지 조건 확인 후 알림 발송
-    private void checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot) {
+    private void checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
         try {
             Double lat = spot.getLatitude();
             Double lng = spot.getLongitude();
-            
+
             int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+            // DAWN(새벽)은 밤 22시에 트리거되므로 대상 새벽은 '다음 날'이다. 그래서 하루를 더해 보정
+            int targetOffset = timeCondition == TimeCondition.DAWN ? dDay + 1 : dDay;
             String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            String targetDateStr = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(dDay).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-            
+            String targetDateStr = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(targetOffset).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
             // 캐싱된 7일 예보 조회
             List<WeatherForecastResponse> combinedForecast = weatherCacheService.getCached7DayForecast(lat, lng, todayStr);
-            
+
             Set<WeatherCondition> userConditions = wishlist.getWeatherConditions();
             if (userConditions == null || userConditions.isEmpty()) {
                 return;
             }
 
-            // 다중 조건 매칭 로직 (타겟 날짜의 10시, 14시, 18시만 확인)
-            boolean isMatched = false;
-            if (userConditions.contains(WeatherCondition.NONE)) {
-                isMatched = true;
-            } else {
-                for (WeatherForecastResponse forecast : combinedForecast) {
-                    if (forecast.date().equals(targetDateStr) && 
-                       (forecast.time().equals("1000") || forecast.time().equals("1400") || forecast.time().equals("1800"))) {
-                        
-                        try {
-                            WeatherCondition apiWeather = WeatherCondition.valueOf(forecast.weatherStatus());
-                            if (userConditions.contains(apiWeather)) {
-                                isMatched = true;
-                                break;
-                            }
-                        } catch (IllegalArgumentException e) {
-                            log.warn("알 수 없는 기상청 날씨 상태 수신 (스킵 처리): {}", forecast.weatherStatus());
-                        }
-                    }
-                }
-            }
+            // 촬영 시간대(timeCondition)에 해당하는 예보 슬롯으로 날씨 조건 일치 여부 판정 (공용 매칭 로직)
+            boolean isMatched = weatherMatchService.matches(combinedForecast, targetDateStr, timeCondition, userConditions);
 
             if (isMatched) {
                 // 미세먼지 조건 필터링
