@@ -15,16 +15,21 @@ import com.project.picngo.wishlist.repository.WishlistRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -38,6 +43,7 @@ public class NotificationScheduler {
     private final WeatherCacheService weatherCacheService;
     private final NotificationService notificationService;
     private final NotificationCacheService notificationCacheService;
+    private final ThreadPoolTaskExecutor weatherWarmupExecutor;
 
     // [A. 고정 시간대 스케줄러]
     // 해당 시간에 스케줄러가 돌아가며, 조건이 맞는 스팟들에 대해 알림 발송
@@ -102,6 +108,10 @@ public class NotificationScheduler {
         Map<Long, Spot> spotMap = spotRepository.findByIdIn(spotIds).stream()
                 .collect(Collectors.toMap(Spot::getId, s -> s));
 
+        // 3. 병목 해결: 매칭 대상 스팟의 날씨 예보를 '고유 좌표 단위'로 병렬 사전 워밍업.
+        //    이후 매칭 루프의 getCached7DayForecast()는 전부 캐시 히트가 되어 외부 API 직렬 호출이 사라진다.
+        prewarmForecastCache(allWishlists, spotMap, timeCondition);
+
         int matchedCount = 0;
         for (Wishlist wishlist : allWishlists) {
             if (wishlist.getTimeConditions().contains(timeCondition)) {
@@ -116,6 +126,50 @@ public class NotificationScheduler {
         log.info("\n==================================================" +
                 "\n⏱️ [{}] 스케줄러 실행 및 푸시 발송 완료 (총 소요시간: {} ms / {} 건 매칭)" +
                 "\n==================================================", timeCondition, (endTime - startTime), matchedCount);
+    }
+
+    /**
+     * 매칭 대상 스팟들의 7일 예보를 사전에 병렬로 조회하여 Redis 캐시를 채운다.
+     * <p>
+     * 날씨 예보 캐시 키는 좌표를 소수점 1자리로 반올림한 값({@code %.1f_%.1f})만 사용하므로,
+     * 그 키 기준으로 중복을 먼저 제거하여 '고유 좌표당 정확히 1번'만 외부 API를 호출한다.
+     * (중복 제거 후 병렬 호출이므로 동일 좌표를 동시에 여러 번 조회하는 캐시 스탬피드도 방지된다.)
+     */
+    private void prewarmForecastCache(List<Wishlist> allWishlists, Map<Long, Spot> spotMap, TimeCondition timeCondition) {
+        String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+
+        // 시간 조건이 일치하는 스팟만, 캐시 키(반올림 좌표) 기준으로 중복 제거
+        Map<String, Spot> distinctByCacheKey = new LinkedHashMap<>();
+        for (Wishlist wishlist : allWishlists) {
+            if (!wishlist.getTimeConditions().contains(timeCondition)) continue;
+            Spot spot = spotMap.get(wishlist.getSpotId());
+            if (spot == null || spot.getLatitude() == null || spot.getLongitude() == null) continue;
+            String cacheKey = String.format(Locale.US, "%.1f_%.1f", spot.getLatitude(), spot.getLongitude());
+            distinctByCacheKey.putIfAbsent(cacheKey, spot);
+        }
+
+        if (distinctByCacheKey.isEmpty()) return;
+
+        long warmStart = System.currentTimeMillis();
+        List<CompletableFuture<Void>> futures = distinctByCacheKey.values().stream()
+                .map(spot -> CompletableFuture.runAsync(() -> {
+                    try {
+                        // 캐시에 없으면 이 시점에 외부 API를 호출하여 Redis에 적재된다.
+                        weatherCacheService.getCached7DayForecast(spot.getLatitude(), spot.getLongitude(), todayStr);
+                    } catch (Exception e) {
+                        log.warn("날씨 예보 사전 워밍업 실패 (spotId: {})", spot.getId(), e);
+                    }
+                }, weatherWarmupExecutor))
+                .toList();
+
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("날씨 예보 사전 워밍업 대기 중 타임아웃/오류 발생 (일부 좌표는 매칭 루프에서 개별 조회될 수 있음)", e);
+        }
+
+        log.info("🔥 날씨 예보 사전 병렬 워밍업 완료 (고유 좌표 {}개, 소요: {} ms)",
+                distinctByCacheKey.size(), (System.currentTimeMillis() - warmStart));
     }
 
     // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머 (골든아워)
