@@ -11,5 +11,6 @@ public record NotificationPushDto(
         String title,
         String content,
         String deepLink,
-        Long spotId
+        Long spotId,
+        String dedupeKey
 ) implements Serializable {}

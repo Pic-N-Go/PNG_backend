@@ -214,7 +214,9 @@ public class NotificationScheduler {
                                 String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
                                 String title = "🌅 골든아워 알림";
                                 String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
-                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId());
+                                // 멱등키: 같은 날·같은 스팟·같은 일출/일몰 알림 중복 방지
+                                String ghDedupeKey = String.format("GOLDEN_HOUR:%d:%d:%s:%s", userId, spot.getId(), targetDate, timeCondition);
+                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId(), ghDedupeKey);
                                 break; // 동일 유저 중복 골든아워 알림 폭탄 방지 (1건 발송 후 루프 탈출)
                             }
                         }
@@ -276,17 +278,34 @@ public class NotificationScheduler {
                 }
 
                 if (isAirQualityMatched) {
-                    log.info("유저 {} 의 스팟 {} 에 대한 날씨 및 미세먼지 조건이 일치합니다! (D-{})", userId, spot.getId(), dDay);
-                    String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
-                    String title = "☁️ 날씨 조건 매칭 알림";
-                    String content = String.format("%s %s에 설정하신 날씨 조건이 충족될 예정입니다!", dayStr, spot.getName());
-                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId(), spot.getId());
+                    log.info("유저 {} 의 스팟 {} 에 대한 날씨 및 미세먼지 조건이 일치합니다! ({} / D-{})", userId, spot.getId(), timeCondition, dDay);
+                    // 시간대별로 메시지를 구분해 유저가 어느 촬영 시간대 알림인지 알 수 있게 한다.
+                    String whenStr = targetOffset == 0 ? "오늘" : (targetOffset == 1 ? "내일" : targetOffset + "일 뒤");
+                    String timeLabel = timeConditionLabel(timeCondition);
+                    String title = String.format("☁️ %s 날씨 조건 알림", timeLabel);
+                    String content = String.format("%s %s %s의 날씨가 설정하신 조건과 일치할 예정입니다!", whenStr, timeLabel, spot.getName());
+                    // 멱등키: 같은 날·같은 스팟이라도 촬영 시간대별로 별개 알림 → timeCondition까지 포함
+                    String dedupeKey = String.format("WEATHER_MATCH:%d:%d:%s:%s", userId, spot.getId(), targetDateStr, timeCondition);
+                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId(), spot.getId(), dedupeKey);
                 }
             }
 
         } catch (Exception e) {
             log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);
         }
+    }
+
+    // 촬영 시간대 → 사용자 노출용 한글 라벨 (알림 메시지 구분용)
+    private String timeConditionLabel(TimeCondition timeCondition) {
+        return switch (timeCondition) {
+            case DAWN -> "새벽";
+            case MORNING -> "오전";
+            case AFTERNOON -> "오후";
+            case NIGHT -> "야간";
+            case SUNRISE -> "일출";
+            case SUNSET -> "일몰";
+            default -> "";
+        };
     }
 
     private List<Long> getActiveWishlistUserIds() {

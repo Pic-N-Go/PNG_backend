@@ -95,17 +95,21 @@ public class NotificationService {
 
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
-        sendPushNotification(userId, type, title, content, deepLink, null);
+        sendPushNotification(userId, type, title, content, deepLink, null, null);
     }
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
+        sendPushNotification(userId, type, title, content, deepLink, spotId, null);
+    }
+
+    public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId, String dedupeKey) {
         NotificationSettingResponse setting = notificationCacheService.getCachedSetting(userId);
         if (setting != null) {
             boolean isPushEnabled = isPushEnabledForType(setting, type);
             boolean isDnd = setting.isDndActive();
             if (isPushEnabled && !isDnd) {
                 // RabbitMQ 비동기 메시지 큐 이벤트 발송 (소요 시간 0.001초 만에 큐로 발송 완료!)
-                notificationPushProducer.sendPushEvent(new NotificationPushDto(userId, type, title, content, deepLink, spotId));
+                notificationPushProducer.sendPushEvent(new NotificationPushDto(userId, type, title, content, deepLink, spotId, dedupeKey));
             }
         }
     }
