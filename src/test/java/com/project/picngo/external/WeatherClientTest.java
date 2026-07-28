@@ -6,8 +6,10 @@ import com.project.picngo.common.exception.code.ExternalApiErrorCode;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.KmaWeatherApiResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -35,8 +37,9 @@ class WeatherClientTest {
         // MockWebServer의 URL을 BaseUrl로 주입하여 실제 KMA API 대신 가짜 서버로 요청이 가도록 설정
         String mockUrl = mockWebServer.url("/").toString();
         WebClient.Builder webClientBuilder = WebClient.builder();
-        
-        weatherClient = new WeatherClient(webClientBuilder, "dummy-test-key", mockUrl, mockUrl);
+
+        // 생성자 순서: (builder, kmaUrl, sunriseUrl, serviceKey)
+        weatherClient = new WeatherClient(webClientBuilder, mockUrl, mockUrl, "dummy-test-key");
     }
 
     @AfterEach
@@ -92,10 +95,13 @@ class WeatherClientTest {
     @Test
     @DisplayName("기상청 단기예보 API 호출 중 서버 에러가 발생하면 CustomException을 던진다")
     void 기상청_단기예보조회_API에러시_예외발생() {
-        // given: 서버 에러 500 응답 설정
-        mockWebServer.enqueue(new MockResponse()
-                .setResponseCode(500)
-                .setBody("Internal Server Error"));
+        // given: 항상 500을 반환 (프로덕션 재시도로 여러 번 호출되므로 단일 enqueue 대신 dispatcher 사용)
+        mockWebServer.setDispatcher(new Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                return new MockResponse().setResponseCode(500).setBody("Internal Server Error");
+            }
+        });
 
         // when & then
         assertThatThrownBy(() -> weatherClient.getShortTermForecast(37.5665, 126.9780, "20260702"))
