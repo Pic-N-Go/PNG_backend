@@ -1,6 +1,7 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.dto.ChecklistRequest;
 import com.project.picngo.spot.dto.ChecklistResponse;
 import com.project.picngo.spot.dto.MapBoundsRequest;
@@ -17,6 +18,8 @@ import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springdoc.core.annotations.ParameterObject;
@@ -42,7 +45,11 @@ public interface SpotControllerApiSpec {
             description = "승인된 스팟 목록을 카테고리, 정렬, 페이지 조건에 따라 조회합니다."
     )
     ResponseEntity<Page<SpotResponse>> getSpots(
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category,
+            @Parameter(
+                    description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 "
+                            + "(하나라도 해당하는 스팟이 조회됨). 예: category=BEACH&category=CAFE 또는 category=BEACH,CAFE",
+                    array = @ArraySchema(schema = @Schema(implementation = SpotCategory.class)))
+            @RequestParam(required = false) List<String> category,
             @Parameter(description = "정렬 기준: latest, popular, score") @RequestParam(defaultValue = "latest") String sort,
             @Parameter(description = "페이지 번호") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
@@ -53,7 +60,11 @@ public interface SpotControllerApiSpec {
             description = "북마크 수와 리뷰 수를 기준으로 인기 스팟 목록을 조회합니다."
     )
     ResponseEntity<List<SpotResponse>> getPopularSpots(
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category,
+            @Parameter(
+                    description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 "
+                            + "(하나라도 해당하는 스팟이 조회됨). 예: category=BEACH&category=CAFE 또는 category=BEACH,CAFE",
+                    array = @ArraySchema(schema = @Schema(implementation = SpotCategory.class)))
+            @RequestParam(required = false) List<String> category,
             @Parameter(description = "조회할 개수") @RequestParam(defaultValue = "10") int size
     );
 
@@ -63,7 +74,11 @@ public interface SpotControllerApiSpec {
     )
     ResponseEntity<Page<SpotResponse>> searchSpots(
             @Parameter(description = "검색어") @RequestParam String keyword,
-            @Parameter(description = "스팟 카테고리") @RequestParam(required = false) String category,
+            @Parameter(
+                    description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 "
+                            + "(하나라도 해당하는 스팟이 조회됨). 예: category=BEACH&category=CAFE 또는 category=BEACH,CAFE",
+                    array = @ArraySchema(schema = @Schema(implementation = SpotCategory.class)))
+            @RequestParam(required = false) List<String> category,
             @Parameter(description = "페이지 번호") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
     );
@@ -84,8 +99,13 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
-    @Operation(summary = "추천 스팟 조회", description = "리뷰+북마크 합산 인기 스팟 중 랜덤으로 반환합니다. limit 기본값 10, 최대 20.")
+    @Operation(
+            summary = "추천 스팟 조회",
+            description = "로그인 유저의 관심테마와 겹치는 스팟을 우선 노출하고, 나머지는 리뷰+북마크 합산 인기순으로 채웁니다. "
+                    + "관심테마를 등록하지 않은 유저는 인기순만 반환됩니다. 로그인 필요. limit 기본값 10, 최대 20."
+    )
     ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "결과 수 (최대 20)") @RequestParam(defaultValue = "10") int limit
     );
 

@@ -6,7 +6,7 @@ import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
@@ -62,8 +62,8 @@ public class SpotService {
         );
     }
 
-    public List<RecommendedSpotResponse> getRecommendedSpots(int limit) {
-        return spotRepository.findRecommendedSpots(Math.min(limit, 20))
+    public List<RecommendedSpotResponse> getRecommendedSpots(Long userId, int limit) {
+        return spotRepository.findRecommendedSpots(userId, Math.min(limit, 20))
                 .stream()
                 .map(RecommendedSpotResponse::from)
                 .toList();
@@ -96,30 +96,30 @@ public class SpotService {
         return SpotPhotoResponse.of(spotId, spotPhotoRepository.findBySpotIdAndUserIdIsNullOrderByIdAsc(spotId));
     }
 
-    public Page<SpotResponse> getSpots(String category, String sort, int page, int size) {
-        SpotCategory spotCategory = parseCategory(category);
+    public Page<SpotResponse> getSpots(List<String> category, String sort, int page, int size) {
+        List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(page, size, sort);
 
-        if (spotCategory == null) {
+        if (spotCategories == null) {
             return spotRepository.findAllByStatusAndIsActiveTrue(
                     SpotStatus.APPROVED,
                     pageable
             ).map(SpotResponse::from);
         }
 
-        return spotRepository.findAllByCategoryAndStatusAndIsActiveTrue(
-                spotCategory,
+        return spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(
+                spotCategories,
                 SpotStatus.APPROVED,
                 pageable
         ).map(SpotResponse::from);
     }
 
     // 북마크 수와 리뷰 수를 기준으로 인기스팟 조회
-    public List<SpotResponse> getPopularSpots(String category, int size){
-        SpotCategory spotCategory = parseCategory(category);
+    public List<SpotResponse> getPopularSpots(List<String> category, int size){
+        List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(0, size, "popular");
 
-        if (spotCategory == null) {
+        if (spotCategories == null) {
             return spotRepository.findListByStatusAndIsActiveTrue(
                     SpotStatus.APPROVED,
                     pageable
@@ -128,8 +128,8 @@ public class SpotService {
                     .toList();
         }
 
-        return spotRepository.findListByCategoryAndStatusAndIsActiveTrue(
-                spotCategory,
+        return spotRepository.findListByCategoriesAndStatusAndIsActiveTrue(
+                spotCategories,
                 SpotStatus.APPROVED,
                 pageable
         ).stream()
@@ -138,17 +138,25 @@ public class SpotService {
     }
 
     // 키워드로 스팟 검색하기
-    public Page<SpotResponse> searchSpots(String keyword, String category, int page, int size) {
+    public Page<SpotResponse> searchSpots(String keyword, List<String> category, int page, int size) {
         if (keyword == null || keyword.isBlank()) {
             throw new CustomException(SpotErrorCode.SEARCH_KEYWORD_REQUIRED);
         }
 
-        SpotCategory spotCategory = parseCategory(category);
+        List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(page, size, "latest");
 
-        return spotRepository.searchSpots(
+        if (spotCategories == null) {
+            return spotRepository.searchSpots(
+                    keyword.trim(),
+                    SpotStatus.APPROVED,
+                    pageable
+            ).map(SpotResponse::from);
+        }
+
+        return spotRepository.searchSpotsByCategories(
                 keyword.trim(),
-                spotCategory,
+                spotCategories,
                 SpotStatus.APPROVED,
                 pageable
         ).map(SpotResponse::from);
@@ -174,11 +182,23 @@ public class SpotService {
         return Sort.by(Sort.Direction.DESC, "createdAt");
     }
 
-    private SpotCategory parseCategory(String category) {
-        if (category == null || category.isBlank()) {
+    // 카테고리 다중 선택. 값이 없으면 null을 돌려주고 호출부가 필터 없는 쿼리로 분기한다.
+    // (컬렉션 파라미터에 null/빈 리스트를 넘기면 IN 절 렌더링이 깨지므로 빈 리스트를 만들지 않는다.)
+    private List<SpotCategory> parseCategories(List<String> categories) {
+        if (categories == null || categories.isEmpty()) {
             return null;
         }
 
+        List<SpotCategory> parsed = categories.stream()
+                .filter(c -> c != null && !c.isBlank())
+                .map(this::parseCategory)
+                .distinct()
+                .toList();
+
+        return parsed.isEmpty() ? null : parsed;
+    }
+
+    private SpotCategory parseCategory(String category) {
         try {
             return SpotCategory.valueOf(category.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
@@ -195,17 +215,27 @@ public class SpotService {
                 request.northEastLng()
         );
 
-        SpotCategory spotCategory = parseCategory(request.category());
+        List<SpotCategory> spotCategories = parseCategories(request.category());
+        Pageable mapPageable = PageRequest.of(0, request.getSizeOrDefault());
 
-        return spotRepository.findSpotsInMapBounds(
-                request.southWestLat(),
-                request.southWestLng(),
-                request.northEastLat(),
-                request.northEastLng(),
-                spotCategory,
-                SpotStatus.APPROVED,
-                org.springframework.data.domain.PageRequest.of(0, request.getSizeOrDefault())
-        ).stream()
+        List<Spot> spots = (spotCategories == null)
+                ? spotRepository.findSpotsInMapBounds(
+                        request.southWestLat(),
+                        request.southWestLng(),
+                        request.northEastLat(),
+                        request.northEastLng(),
+                        SpotStatus.APPROVED,
+                        mapPageable)
+                : spotRepository.findSpotsInMapBoundsByCategories(
+                        request.southWestLat(),
+                        request.southWestLng(),
+                        request.northEastLat(),
+                        request.northEastLng(),
+                        spotCategories,
+                        SpotStatus.APPROVED,
+                        mapPageable);
+
+        return spots.stream()
                 .map(SpotMapResponse::from)
                 .toList();
     }

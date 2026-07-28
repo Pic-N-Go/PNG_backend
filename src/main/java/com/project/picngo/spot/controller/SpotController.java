@@ -34,7 +34,7 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping
     public ResponseEntity<Page<SpotResponse>> getSpots(
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
@@ -44,7 +44,7 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping("/popular")
     public ResponseEntity<List<SpotResponse>> getPopularSpots(
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "10") int size
     ){
         return ResponseEntity.ok(spotService.getPopularSpots(category, size));
@@ -53,7 +53,7 @@ public class SpotController implements SpotControllerApiSpec {
     @GetMapping("/search")
     public ResponseEntity<Page<SpotResponse>> searchSpots(
             @RequestParam String keyword,
-            @RequestParam(required = false) String category,
+            @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
@@ -76,9 +76,10 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping("/recommended")
     public ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "10") int limit
     ) {
-        return ResponseEntity.ok(spotService.getRecommendedSpots(limit));
+        return ResponseEntity.ok(spotService.getRecommendedSpots(userDetails.getId(), limit));
     }
 
     @GetMapping("/nearby")
