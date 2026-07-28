@@ -22,8 +22,10 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -88,18 +90,32 @@ public class NotificationScheduler {
 
     // 고정된 시간대 알림 처리 (위시리스트 날씨 매칭)
     private void processFixedTimeNotification(TimeCondition timeCondition) {
+        long startTime = System.currentTimeMillis();
         List<Long> activeUserIds = getActiveWishlistUserIds();
+        if (activeUserIds.isEmpty()) return;
 
-        for (Long userId : activeUserIds) {
-            List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
-            
-            for (Wishlist wishlist : userWishlists) {
-                if (wishlist.getTimeConditions().contains(timeCondition)) {
-                    log.info("유저 {} 의 스팟 {} 에 대해 {} 알림 조건 충족 확인 중...", userId, wishlist.getSpotId(), timeCondition);
-                    checkWeatherAndNotify(userId, wishlist);
+        // 1. N+1 문제 해결: activeUserIds 목록으로 위시리스트 및 조건들을 단 1번의 쿼리로 일괄 배치 조회
+        List<Wishlist> allWishlists = wishlistRepository.findAllByUserIdInAndIsActiveTrue(activeUserIds);
+
+        // 2. N+1 문제 해결: 스팟 ID 수집 후 단 1번의 IN 쿼리로 스팟 정보를 인메모리 맵에 일괄 로딩
+        List<Long> spotIds = allWishlists.stream().map(Wishlist::getSpotId).distinct().toList();
+        Map<Long, Spot> spotMap = spotRepository.findByIdIn(spotIds).stream()
+                .collect(Collectors.toMap(Spot::getId, s -> s));
+
+        int matchedCount = 0;
+        for (Wishlist wishlist : allWishlists) {
+            if (wishlist.getTimeConditions().contains(timeCondition)) {
+                Spot spot = spotMap.get(wishlist.getSpotId());
+                if (spot != null) {
+                    checkWeatherAndNotify(wishlist.getUserId(), wishlist, spot);
+                    matchedCount++;
                 }
             }
         }
+        long endTime = System.currentTimeMillis();
+        log.info("\n==================================================" +
+                "\n⏱️ [{}] 스케줄러 실행 및 푸시 발송 완료 (총 소요시간: {} ms / {} 건 매칭)" +
+                "\n==================================================", timeCondition, (endTime - startTime), matchedCount);
     }
 
     // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머 (골든아워)
@@ -156,12 +172,8 @@ public class NotificationScheduler {
     }
 
     // 날씨 및 미세먼지 조건 확인 후 알림 발송
-    private void checkWeatherAndNotify(Long userId, Wishlist wishlist) {
+    private void checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot) {
         try {
-            Optional<Spot> spotOpt = spotRepository.findById(wishlist.getSpotId());
-            if (spotOpt.isEmpty()) return;
-            
-            Spot spot = spotOpt.get();
             Double lat = spot.getLatitude();
             Double lng = spot.getLongitude();
             
