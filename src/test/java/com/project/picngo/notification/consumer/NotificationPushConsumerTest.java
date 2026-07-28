@@ -1,11 +1,14 @@
 package com.project.picngo.notification.consumer;
 
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.NotificationErrorCode;
 import com.project.picngo.notification.domain.Notification;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.dto.NotificationPushDto;
 import com.project.picngo.notification.repository.NotificationRepository;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import com.project.picngo.notification.service.FcmService;
+import com.project.picngo.notification.service.NotificationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +38,8 @@ class NotificationPushConsumerTest {
     private NotificationSettingRepository notificationSettingRepository;
     @Mock
     private FcmService fcmService;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private NotificationPushConsumer consumer;
@@ -80,5 +86,18 @@ class NotificationPushConsumerTest {
 
         verify(notificationRepository).saveAndFlush(any(Notification.class));
         verify(fcmService, never()).sendMessage(anyString(), anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("무효 토큰(FCM_TOKEN_INVALID): 토큰 정리(handleInvalidToken)를 호출한다")
+    void invalidTokenTriggersCleanup() {
+        NotificationSetting setting = NotificationSetting.builder().userId(1L).fcmToken("dead-token").build();
+        when(notificationSettingRepository.findByUserId(1L)).thenReturn(Optional.of(setting));
+        doThrow(new CustomException(NotificationErrorCode.FCM_TOKEN_INVALID))
+                .when(fcmService).sendMessage(anyString(), anyString(), anyString(), anyString(), anyLong());
+
+        consumer.consumePushEvent(dto("WEATHER_MATCH:1:10:20260728:MORNING"));
+
+        verify(notificationService).handleInvalidToken(1L);
     }
 }
