@@ -1,7 +1,9 @@
 package com.project.picngo.notification.service;
 
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Notification;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.NotificationErrorCode;
@@ -45,6 +47,15 @@ public class FcmService {
         try {
             String response = firebaseMessaging.send(messageBuilder.build());
             log.info("FCM 알림 발송 성공: {}", response);
+        } catch (FirebaseMessagingException e) {
+            MessagingErrorCode code = e.getMessagingErrorCode();
+            // 토큰이 만료/재발급되었거나(UNREGISTERED) 형식이 잘못된(INVALID_ARGUMENT) 경우 → 정리 대상
+            if (code == MessagingErrorCode.UNREGISTERED || code == MessagingErrorCode.INVALID_ARGUMENT) {
+                log.warn("무효 FCM 토큰 감지 (code: {}) → 토큰 정리 대상", code);
+                throw new CustomException(NotificationErrorCode.FCM_TOKEN_INVALID);
+            }
+            log.error("FCM 알림 발송 실패 (code: {})", code, e);
+            throw new CustomException(NotificationErrorCode.FCM_SEND_FAILED);
         } catch (Exception e) {
             log.error("FCM 알림 발송 실패", e);
             throw new CustomException(NotificationErrorCode.FCM_SEND_FAILED);

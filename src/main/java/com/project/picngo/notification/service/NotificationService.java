@@ -54,6 +54,20 @@ public class NotificationService {
         notificationCacheService.updateCachedSetting(userId, setting);
     }
 
+    /**
+     * 무효(만료/재발급) FCM 토큰 정리.
+     * DB의 fcmToken을 비우고 캐시를 동기화하여, 활성 유저 Set에서도 제외되게 한다.
+     * (죽은 토큰으로 매 스케줄러마다 발송을 재시도하는 낭비 방지)
+     */
+    @Transactional
+    public void handleInvalidToken(Long userId) {
+        notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
+            setting.updateFcmToken(null);
+            notificationCacheService.updateCachedSetting(userId, setting);
+            log.info("♻️ 무효 FCM 토큰 제거 및 활성 대상에서 제외 완료 (userId: {})", userId);
+        });
+    }
+
     @Transactional
     public void markAsRead(Long id, Long userId) {
         Notification notification = notificationRepository.findById(id)

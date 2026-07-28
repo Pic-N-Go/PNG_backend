@@ -1,6 +1,7 @@
 package com.project.picngo.notification.consumer;
 
 import com.project.picngo.notification.service.FcmService;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.notification.config.RabbitMQConfig;
 import com.project.picngo.notification.domain.Notification;
 import com.project.picngo.notification.dto.NotificationPushDto;
@@ -12,6 +13,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.NotificationErrorCode;
 
 @Slf4j
@@ -20,6 +22,7 @@ import com.project.picngo.common.exception.code.NotificationErrorCode;
 public class NotificationPushConsumer {
 
     private final FcmService fcmService;
+    private final NotificationService notificationService;
     private final NotificationRepository notificationRepository;
     private final NotificationSettingRepository notificationSettingRepository;
 
@@ -52,8 +55,15 @@ public class NotificationPushConsumer {
                 if (setting.getFcmToken() != null && !setting.getFcmToken().trim().isEmpty()) {
                     try {
                         fcmService.sendMessage(setting.getFcmToken(), dto.title(), dto.content(), dto.deepLink(), dto.spotId());
+                    } catch (CustomException e) {
+                        if (e.getErrorCode() == NotificationErrorCode.FCM_TOKEN_INVALID) {
+                            // 만료/무효 토큰 → 정리하여 이후 스케줄러에서 재발송하지 않도록 함
+                            notificationService.handleInvalidToken(dto.userId());
+                        } else {
+                            log.warn("❌ [FCM 발송 실패 (ErrorCode: {})] userId: {}", NotificationErrorCode.FCM_SEND_FAILED.name(), dto.userId(), e);
+                        }
                     } catch (Exception e) {
-                        log.warn("❌ [FCM 발송 실패 (ErrorCode: {})] userId: {}", NotificationErrorCode.FCM_SEND_FAILED.name(), dto.userId(), e);
+                        log.warn("❌ [FCM 발송 실패] userId: {}", dto.userId(), e);
                     }
                 }
             });
