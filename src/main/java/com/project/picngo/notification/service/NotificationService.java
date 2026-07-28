@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.project.picngo.notification.dto.NotificationPushDto;
+import com.project.picngo.notification.producer.NotificationPushProducer;
 
 @Slf4j
 @Service
@@ -28,6 +30,7 @@ public class NotificationService {
     private final NotificationSettingRepository notificationSettingRepository;
     private final FcmService fcmService;
     private final NotificationCacheService notificationCacheService;
+    private final NotificationPushProducer notificationPushProducer;
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
@@ -101,27 +104,10 @@ public class NotificationService {
             boolean isPushEnabled = isPushEnabledForType(setting, type);
             boolean isDnd = setting.isDndActive();
             if (isPushEnabled && !isDnd) {
-                notificationSettingRepository.findByUserId(userId).ifPresent(entity -> {
-                    if (entity.getFcmToken() != null && !entity.getFcmToken().isEmpty()) {
-                        try {
-                            fcmService.sendMessage(entity.getFcmToken(), title, content, deepLink, spotId);
-                        } catch (Exception e) {
-                            log.warn("Failed to send FCM push to userId: {}", userId, e);
-                        }
-                    }
-                });
+                // RabbitMQ 비동기 메시지 큐 이벤트 발송 (소요 시간 0.001초 만에 큐로 발송 완료!)
+                notificationPushProducer.sendPushEvent(new NotificationPushDto(userId, type, title, content, deepLink, spotId));
             }
         }
-
-        Notification notification = Notification.builder()
-                .userId(userId)
-                .type(type)
-                .title(title)
-                .content(content)
-                .deepLink(deepLink)
-                .spotId(spotId)
-                .build();
-        notificationRepository.save(notification);
     }
 
     /**
