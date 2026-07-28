@@ -27,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -176,58 +175,125 @@ public class NotificationScheduler {
 
     // 매일 변하는 자연 현상(일출/일몰)의 타이밍을 실시간으로 계산하는 타이머 (골든아워)
     private void processGoldenHourNotification(TimeCondition timeCondition) {
+        long startTime = System.currentTimeMillis();
         List<Long> activeUserIds = getActiveGoldenHourUserIds();
+        if (activeUserIds.isEmpty()) return;
 
-        for (Long userId : activeUserIds) {
-            List<Wishlist> userWishlists = wishlistRepository.findAllByUserIdAndIsActiveTrue(userId);
+        // 1. N+1 해결: 위시리스트/스팟을 각각 1번의 배치 쿼리로 일괄 조회
+        List<Wishlist> allWishlists = wishlistRepository.findAllByUserIdInAndIsActiveTrue(activeUserIds);
+        List<Long> spotIds = allWishlists.stream().map(Wishlist::getSpotId).distinct().toList();
+        Map<Long, Spot> spotMap = spotRepository.findByIdIn(spotIds).stream()
+                .collect(Collectors.toMap(Spot::getId, s -> s));
 
-            for (Wishlist wishlist : userWishlists) {
-                if (wishlist.getTimeConditions().contains(timeCondition)) {
-                    try {
-                        Optional<Spot> spotOpt = spotRepository.findById(wishlist.getSpotId());
-                        if (spotOpt.isEmpty()) continue;
-                        
-                        Spot spot = spotOpt.get();
-                        Double lat = spot.getLatitude();
-                        Double lng = spot.getLongitude();
-                        
-                        int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
-                        String targetDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(dDay).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-                        
-                        GoldenHourResponse gh = weatherCacheService.getCachedGoldenHour(lat, lng, targetDate);
-                        
-                        String targetUtcTimeStr = timeCondition == TimeCondition.SUNRISE ? gh.sunriseTime() : gh.sunsetTime();
-                        if (targetUtcTimeStr != null && !targetUtcTimeStr.isEmpty()) {
-                            // ISO 8601 parsing e.g., 2015-05-21T05:05:35+00:00
-                            java.time.ZonedDateTime targetUtc = java.time.ZonedDateTime.parse(targetUtcTimeStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-                            java.time.ZonedDateTime targetKst = targetUtc.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
-                            
-                            java.time.ZonedDateTime now = java.time.ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
-                            
-                            // 스케줄러가 일치해야 할 '오늘의 알림 타겟 시간'을 D-Day의 대상 시간과 동일한 시간으로 간주
-                            java.time.ZonedDateTime alertTime = now.withHour(targetKst.getHour()).withMinute(targetKst.getMinute()).withSecond(0).withNano(0);
-                            
-                            // 현재 시간이 알림 발송 시간(alertTime)의 반경 10분 이내인지 확인 (스케줄러가 10분마다 도므로)
-                            long diffMinutes = java.time.Duration.between(now, alertTime).toMinutes();
-                            if (Math.abs(diffMinutes) <= 5) {
-                                log.info("유저 {} 의 스팟 {} 에 대해 {} 골든아워 임박 알림 발송 조건 충족! (D-{})", userId, spot.getId(), timeCondition, dDay);
-                                String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
-                                String title = "🌅 골든아워 알림";
-                                String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
-                                // 멱등키: 같은 날·같은 스팟·같은 일출/일몰 알림 중복 방지
-                                String ghDedupeKey = String.format("GOLDEN_HOUR:%d:%d:%s:%s", userId, spot.getId(), targetDate, timeCondition);
-                                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId(), ghDedupeKey);
-                                break; // 동일 유저 중복 골든아워 알림 폭탄 방지 (1건 발송 후 루프 탈출)
-                            }
-                        }
+        // 2. 병목 해결: 고유 (좌표, 타겟일) 단위로 골든아워 예보를 병렬 사전 워밍업
+        prewarmGoldenHourCache(allWishlists, spotMap, timeCondition);
 
-                    } catch (Exception e) {
-                        log.error("골든아워 확인 중 오류 발생 (유저: {}, 스팟: {})", userId, wishlist.getSpotId(), e);
-                    }
+        // 3. 유저별 최대 1건만 발송 (기존 break 시맨틱 유지) → 유저 단위로 그룹핑 후 첫 매칭에서 중단
+        Map<Long, List<Wishlist>> byUser = allWishlists.stream()
+                .collect(Collectors.groupingBy(Wishlist::getUserId));
+
+        int matchedCount = 0;
+        for (Map.Entry<Long, List<Wishlist>> entry : byUser.entrySet()) {
+            Long userId = entry.getKey();
+            for (Wishlist wishlist : entry.getValue()) {
+                if (!wishlist.getTimeConditions().contains(timeCondition)) continue;
+                Spot spot = spotMap.get(wishlist.getSpotId());
+                if (spot == null) continue;
+                if (checkGoldenHourAndNotify(userId, wishlist, spot, timeCondition)) {
+                    matchedCount++;
+                    break; // 동일 유저 중복 골든아워 알림 폭탄 방지 (1건 발송 후 다음 유저)
                 }
             }
         }
+        long endTime = System.currentTimeMillis();
+        log.info("\n==================================================" +
+                "\n⏱️ [{}] 골든아워 스케줄러 실행 완료 (총 소요시간: {} ms / {} 건 발송)" +
+                "\n==================================================", timeCondition, (endTime - startTime), matchedCount);
     }
+
+    /**
+     * 골든아워(일출/일몰) 예보를 고유 (반올림 좌표, 타겟일) 단위로 병렬 사전 조회하여 Redis 캐시를 채운다.
+     * 골든아워 캐시 키는 정수 반올림 좌표(%.0f) + 타겟일을 사용하므로 그 단위로 중복을 제거한다.
+     */
+    private void prewarmGoldenHourCache(List<Wishlist> allWishlists, Map<Long, Spot> spotMap, TimeCondition timeCondition) {
+        Map<String, GoldenHourWarmTarget> distinct = new LinkedHashMap<>();
+        for (Wishlist wishlist : allWishlists) {
+            if (!wishlist.getTimeConditions().contains(timeCondition)) continue;
+            Spot spot = spotMap.get(wishlist.getSpotId());
+            if (spot == null || spot.getLatitude() == null || spot.getLongitude() == null) continue;
+            int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+            String targetDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(dDay).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String cacheKey = String.format(Locale.US, "%.0f_%.0f_%s", spot.getLatitude(), spot.getLongitude(), targetDate);
+            distinct.putIfAbsent(cacheKey, new GoldenHourWarmTarget(spot.getLatitude(), spot.getLongitude(), targetDate, spot.getId()));
+        }
+
+        if (distinct.isEmpty()) return;
+
+        long warmStart = System.currentTimeMillis();
+        List<CompletableFuture<Void>> futures = distinct.values().stream()
+                .map(t -> CompletableFuture.runAsync(() -> {
+                    try {
+                        weatherCacheService.getCachedGoldenHour(t.lat(), t.lng(), t.date());
+                    } catch (Exception e) {
+                        log.warn("골든아워 사전 워밍업 실패 (spotId: {})", t.spotId(), e);
+                    }
+                }, weatherWarmupExecutor))
+                .toList();
+
+        try {
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.warn("골든아워 사전 워밍업 대기 중 타임아웃/오류 발생 (일부는 매칭 루프에서 개별 조회될 수 있음)", e);
+        }
+
+        log.info("🔥 골든아워 사전 병렬 워밍업 완료 (고유 좌표·타겟일 {}개, 소요: {} ms)",
+                distinct.size(), (System.currentTimeMillis() - warmStart));
+    }
+
+    // 단일 위시리스트의 골든아워 임박 여부 확인 후 발송. 발송했으면 true.
+    private boolean checkGoldenHourAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
+        try {
+            Double lat = spot.getLatitude();
+            Double lng = spot.getLongitude();
+
+            int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+            String targetDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(dDay).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+            GoldenHourResponse gh = weatherCacheService.getCachedGoldenHour(lat, lng, targetDate);
+
+            String targetUtcTimeStr = timeCondition == TimeCondition.SUNRISE ? gh.sunriseTime() : gh.sunsetTime();
+            if (targetUtcTimeStr == null || targetUtcTimeStr.isEmpty()) return false;
+
+            // ISO 8601 parsing e.g., 2015-05-21T05:05:35+00:00
+            java.time.ZonedDateTime targetUtc = java.time.ZonedDateTime.parse(targetUtcTimeStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            java.time.ZonedDateTime targetKst = targetUtc.withZoneSameInstant(ZoneId.of("Asia/Seoul"));
+
+            java.time.ZonedDateTime now = java.time.ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+
+            // 스케줄러가 일치해야 할 '오늘의 알림 타겟 시간'을 D-Day의 대상 시간과 동일한 시간으로 간주
+            java.time.ZonedDateTime alertTime = now.withHour(targetKst.getHour()).withMinute(targetKst.getMinute()).withSecond(0).withNano(0);
+
+            // 현재 시간이 알림 발송 시간(alertTime)의 반경 10분 이내인지 확인 (스케줄러가 10분마다 도므로)
+            long diffMinutes = java.time.Duration.between(now, alertTime).toMinutes();
+            if (Math.abs(diffMinutes) <= 5) {
+                log.info("유저 {} 의 스팟 {} 에 대해 {} 골든아워 임박 알림 발송 조건 충족! (D-{})", userId, spot.getId(), timeCondition, dDay);
+                String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
+                String title = "🌅 골든아워 알림";
+                String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
+                // 멱등키: 같은 날·같은 스팟·같은 일출/일몰 알림 중복 방지
+                String ghDedupeKey = String.format("GOLDEN_HOUR:%d:%d:%s:%s", userId, spot.getId(), targetDate, timeCondition);
+                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId(), ghDedupeKey);
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            log.error("골든아워 확인 중 오류 발생 (유저: {}, 스팟: {})", userId, wishlist.getSpotId(), e);
+            return false;
+        }
+    }
+
+    // 골든아워 워밍업 대상 (중복 제거된 고유 좌표·타겟일)
+    private record GoldenHourWarmTarget(Double lat, Double lng, String date, Long spotId) {}
 
     // 날씨 및 미세먼지 조건 확인 후 알림 발송
     private void checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
