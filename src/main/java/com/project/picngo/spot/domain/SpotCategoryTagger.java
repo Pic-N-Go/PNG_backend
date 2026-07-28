@@ -20,7 +20,8 @@ public final class SpotCategoryTagger {
     // cat3(TourAPI 소분류) → 장소형 테마. 관광공사 규격 기반, 정확.
     private static final Map<String, SpotCategory> CAT3 = Map.ofEntries(
             Map.entry("A02020700", SpotCategory.PARK),      // 공원
-            Map.entry("A02020600", SpotCategory.PARK),      // 테마공원
+            // A02020600(실내 테마파크/아쿠아리움)은 PARK에서 제외 — ChecklistMapper 실데이터 라벨 기준.
+            // 야외 공원 필터에 아쿠아리움이 섞여 나온다.
             Map.entry("A01011200", SpotCategory.BEACH),     // 해수욕장
             Map.entry("A01010400", SpotCategory.MOUNTAIN),  // 산
             Map.entry("A01020200", SpotCategory.MOUNTAIN),  // 기암괴석
