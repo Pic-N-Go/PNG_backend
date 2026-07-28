@@ -3,13 +3,19 @@ package com.project.picngo.spot.domain;
 import com.project.picngo.common.domain.BaseTimeEntity;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.common.domain.SpotCategory;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.Comment;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 @Entity
 @Getter
@@ -45,10 +51,21 @@ public class Spot extends BaseTimeEntity {
     @Column(nullable = false)
     private Double longitude;
 
-    @Comment("카테고리. TourAPI: cat1/cat2/cat3")
+    @Comment("사진테마 카테고리(다중). cat3 + overview 키워드로 태깅. 태그 없으면 ETC")
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "spot_categories",
+            joinColumns = @JoinColumn(name = "spot_id"),
+            // 없으면 data.sql의 ON DUPLICATE KEY가 안 먹어서 재기동마다 행이 쌓인다
+            uniqueConstraints = @UniqueConstraint(
+                    name = "uk_spot_categories", columnNames = {"spot_id", "category"}))
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 50)
-    private SpotCategory category;
+    // Hibernate 6.2+는 @Enumerated(STRING)을 MySQL 네이티브 ENUM 컬럼으로 만들고,
+    // enum 값이 바뀔 때마다 기동 시 `modify column ... enum(...)` DDL을 날린다.
+    // VARCHAR로 고정하면 그 DDL도, 스키마와 enum 목록의 결합도 사라진다.
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "category", length = 50)
+    private Set<SpotCategory> categories = new HashSet<>();
 
     @Comment("TourAPI cat3 소분류 코드. 체크리스트 매핑에 사용 (예: A0201=해수욕장)")
     @Column(length = 10)
@@ -136,6 +153,22 @@ public class Spot extends BaseTimeEntity {
     @Column(nullable = false)
     private boolean toilet = false;
 
+    public void updateCategories(Set<SpotCategory> categories) {
+        Set<SpotCategory> target = (categories != null) ? categories : Set.of();
+        // clear()만 해도 Hibernate가 컬렉션 전체를 DELETE 후 재INSERT 한다.
+        // 동기화 때 내용이 그대로인 스팟이 대부분이라 같으면 건너뛴다.
+        if (this.categories.equals(target)) {
+            return;
+        }
+        this.categories.clear();
+        this.categories.addAll(target);
+    }
+
+    // 응답용 카테고리 이름. Set 순서가 비결정적이라 정렬된 List로 고정 (응답 안정성)
+    public List<String> getCategoryNames() {
+        return categories.stream().map(Enum::name).sorted().toList();
+    }
+
     public void updateFromTourApi(String overview, String parking, String usetime,
                                    String restdate, String infocenter,
                                    String wheelchairAccess, String strollerAccess, String petFriendly) {
@@ -170,7 +203,7 @@ public class Spot extends BaseTimeEntity {
             String overview,
             Double latitude,
             Double longitude,
-            SpotCategory category,
+            Set<SpotCategory> categories,
             String cat3,
             SpotSource source,
             Boolean badge,
@@ -199,7 +232,7 @@ public class Spot extends BaseTimeEntity {
         this.overview = overview;
         this.latitude = latitude;
         this.longitude = longitude;
-        this.category = category;
+        this.categories = (categories != null) ? new HashSet<>(categories) : new HashSet<>();
         this.cat3 = cat3;
         this.source = source;
         this.badge = badge == null ? false : badge;

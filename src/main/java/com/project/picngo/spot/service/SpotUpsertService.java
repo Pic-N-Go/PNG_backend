@@ -3,8 +3,9 @@ package com.project.picngo.spot.service;
 import com.project.picngo.external.dto.TourApiImageResponse.ImageItem;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse.Item;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotCategory;
+import com.project.picngo.spot.domain.SpotCategoryTagger;
 import com.project.picngo.spot.domain.SpotPhoto;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -25,10 +27,13 @@ public class SpotUpsertService {
 
     @Transactional
     public void upsertSpot(Item item, Item detail, IntroItem intro, List<ImageItem> images) {
+        String overview = detail != null ? detail.overview() : null;
+        Set<SpotCategory> categories = SpotCategoryTagger.tag(item.cat3(), item.title(), overview);
+
         Spot spot = spotRepository.findByTourContentId(item.contentid()).map(
                 existing -> {
                     existing.updateFromTourApi(
-                            detail != null ? detail.overview() : null,
+                            overview,
                             intro != null ? intro.parking() : null,
                             intro != null ? intro.usetime() : null,
                             intro != null ? intro.restdate() : null,
@@ -37,16 +42,17 @@ public class SpotUpsertService {
                             intro != null ? intro.chkbabycarriage() : null,
                             intro != null ? intro.chkpet() : null
                     );
+                    existing.updateCategories(categories);
                     return existing;
                 }).orElseGet(
                 () -> spotRepository.save(Spot.builder()
                         .name(item.title())
                         .address(trim(item.addr1()) + (item.addr2() != null ? " " + item.addr2().trim() : ""))
                         .zipcode(item.zipcode())
-                        .overview(detail != null ? detail.overview() : null)
+                        .overview(overview)
                         .latitude(parseDouble(item.mapy()))
                         .longitude(parseDouble(item.mapx()))
-                        .category(SpotCategory.ETC)
+                        .categories(categories)
                         .cat3(item.cat3())
                         .source(SpotSource.TOUR_API)
                         .badge(true)

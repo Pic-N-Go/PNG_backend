@@ -7,6 +7,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -56,6 +58,8 @@ public class User extends BaseTimeEntity {
 			joinColumns = @JoinColumn(name = "user_id")
 	)
 	@Enumerated(EnumType.STRING)
+	// Spot.categories와 동일 — 네이티브 ENUM 컬럼 생성 방지. 자세한 근거는 Spot.categories 주석 참고.
+	@JdbcTypeCode(SqlTypes.VARCHAR)
 	@Column(name = "category", length = 50)
 	private Set<SpotCategory> spotCategories = new HashSet<>();
 
