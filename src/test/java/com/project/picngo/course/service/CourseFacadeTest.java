@@ -57,8 +57,8 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "스팟2");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, "명소", "url", 5, 1, 1, "스팟1", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "스팟2", 33.2, 126.2, "명소", "url", 5, 1, 2, "스팟2", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, List.of("명소"), "url", 5, 1, 1, "스팟1", null);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "스팟2", 33.2, 126.2, List.of("명소"), "url", 5, 1, 2, "스팟2", null);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
         

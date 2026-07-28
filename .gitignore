@@ -36,12 +36,17 @@ out/
 ### VS Code ###
 .vscode/
 
-.DS_Store
-
 # 환경변수 및 민감한 키 파일
 .env
 firebase-key.json
 
 .claude/
 CLAUDE.md
+
+# 팀 문서 (git 미추적)
+docs/spot-category-set-progress.md
+
+# OS / 로컬 덤프 / 스킬 산출물
+.DS_Store
+picngo_spots.sql
 docs/superpowers/
