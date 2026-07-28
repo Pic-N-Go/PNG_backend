@@ -14,7 +14,10 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
-@Table(indexes = @Index(name = "idx_notification_created_at", columnList = "createdAt"))
+@Table(indexes = {
+        @Index(name = "idx_notification_user_created_at", columnList = "userId, createdAt"),
+        @Index(name = "idx_notification_created_at", columnList = "createdAt")
+})
 public class Notification {
 
     @Id
@@ -38,17 +41,20 @@ public class Notification {
 
     private String deepLink;
 
+    private Long spotId;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Notification(Long userId, String type, String title, String content, String deepLink) {
+    public Notification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
         this.userId = userId;
         this.type = type;
         this.title = title;
         this.content = content;
         this.deepLink = deepLink;
+        this.spotId = spotId;
         this.isRead = false;
     }
 
