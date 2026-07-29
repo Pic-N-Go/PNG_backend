@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/posts/{postId}/comments")
 @RequiredArgsConstructor
-public class PostCommentController {
+public class PostCommentController implements PostCommentControllerApiSpec {
 
     private final PostCommentService commentService;
 
