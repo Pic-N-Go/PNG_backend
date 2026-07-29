@@ -128,6 +128,12 @@ public class ReviewService {
         );
     }
 
+    // 수정 화면 진입 시 폼을 채울 원본값. 스팟 상세의 myReviewId로 받은 id를 그대로 쓴다.
+    public ReviewResponse getMyReview(Long userId, Long reviewId) {
+        Review review = findMyReview(userId, reviewId);
+        return ReviewResponse.from(review, tagsOf(reviewId), photosOf(reviewId));
+    }
+
     @Transactional
     public ReviewResponse createReview(Long userId, Long spotId, ReviewRequest request, List<MultipartFile> photos) {
         Spot spot = spotRepository.findById(spotId)
@@ -178,7 +184,6 @@ public class ReviewService {
                 request.tags()
         );
         // 별점이 바뀌면 스팟 평균도 다시 계산해야 한다. 빠지면 스팟 상세에 옛 평점이 남는다.
-        // 아래 집계 쿼리의 AUTO-flush가 위 UPDATE를 먼저 내보낸다 (query space가 review로 겹침).
         updateSpotReviewStats(review.getSpot());
 
         // photos 없이 반환하면 프론트가 응답을 그대로 반영할 때 사진이 사라진 것처럼 보인다.
@@ -266,6 +271,20 @@ public class ReviewService {
         spot.updateReviewStats(avg, count);
     }
 
+    // 지연 로딩에 맡기면 리뷰 행마다 review_tag를 조회한다(페이지 20건이면 20회). 한 번에 가져와 묶는다.
+    private Map<Long, Set<ReviewTag>> tagsByReviewId(List<Long> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+        return reviewRepository.findTagsByReviewIds(reviewIds).stream()
+                .collect(Collectors.groupingBy(
+                        row -> (Long) row[0],
+                        // HashSet이면 응답 배열 순서가 요청마다 달라진다. 조회 순서를 유지한다.
+                        Collectors.mapping(row -> (ReviewTag) row[1],
+                                Collectors.toCollection(java.util.LinkedHashSet::new))
+                ));
+    }
+
     private Map<Long, List<ReviewPhotoResponse>> photosByReviewId(List<Long> reviewIds) {
         if (reviewIds.isEmpty()) {
             return Map.of();
@@ -279,20 +298,6 @@ public class ReviewService {
 
     private ReviewPhotoResponse toPhotoResponse(ReviewPhoto photo) {
         return new ReviewPhotoResponse(photo.getId(), imageStorageService.getPresignedUrl(photo.getPhotoUrl()));
-    }
-
-    // 지연 로딩에 맡기면 리뷰 행마다 review_tag를 조회한다(페이지 20건이면 20회). 한 번에 가져와 묶는다.
-    private Map<Long, Set<ReviewTag>> tagsByReviewId(List<Long> reviewIds) {
-        if (reviewIds.isEmpty()) {
-            return Map.of();
-        }
-        return reviewRepository.findTagsByReviewIds(reviewIds).stream()
-                .collect(Collectors.groupingBy(
-                        row -> (Long) row[0],
-                        // HashSet이면 응답 배열 순서가 요청마다 달라진다. 조회 순서를 유지한다.
-                        Collectors.mapping(row -> (ReviewTag) row[1],
-                                Collectors.toCollection(java.util.LinkedHashSet::new))
-                ));
     }
 
     private Set<ReviewTag> tagsOf(Long reviewId) {
