@@ -92,8 +92,11 @@ public class SpotController implements SpotControllerApiSpec {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SpotDetailResponse> getSpotDetail(@PathVariable Long id) {
-        return ResponseEntity.ok(spotService.getSpotDetail(id));
+    public ResponseEntity<SpotDetailResponse> getSpotDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(spotService.getSpotDetail(id, userDetails != null ? userDetails.getId() : null));
     }
 
     @GetMapping("/{id}/reviews")

@@ -71,6 +71,16 @@ class ReviewTagAggregationTest {
         assertThat(reviewRepository.findFrequentTagsBySpotId(spot.getId())).isEmpty();
     }
 
+    @Test
+    @DisplayName("과거 데이터에 같은 유저의 중복 리뷰가 있어도 내 리뷰 ID 조회가 깨지지 않는다")
+    void survivesPreExistingDuplicate() {
+        // 1인 1리뷰는 앱 레벨 검증뿐이라 제약이 없다. 검증 도입 전 데이터를 재현한다.
+        saveReview(1L, Set.of());
+        saveReview(1L, Set.of());
+
+        assertThat(reviewRepository.findIdsBySpotIdAndUserId(spot.getId(), 1L)).hasSize(2);
+    }
+
     private void saveReview(Long userId, Set<ReviewTag> tags) {
         reviewRepository.save(Review.builder()
                 .spot(spot)

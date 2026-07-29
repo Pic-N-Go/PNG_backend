@@ -20,7 +20,8 @@ public record SpotDetailResponse(
         ConvenienceInfo convenience,
         StatsInfo stats,
         List<String> checklist,
-        Boolean isBookmarked
+        Boolean isBookmarked,
+        Long myReviewId
 ) {
     public record ConvenienceInfo(
             String parking,
@@ -65,7 +66,8 @@ public record SpotDetailResponse(
             Double avgRating,
             Integer reviewCount,
             Long photoCount,
-            Boolean isBookmarked
+            Boolean isBookmarked,
+        Long myReviewId
     ) {
         return new SpotDetailResponse(
                 spot.getId(),
@@ -82,7 +84,8 @@ public record SpotDetailResponse(
                 ConvenienceInfo.from(spot),
                 new StatsInfo(avgRating, reviewCount, photoCount),
                 checklist,
-                isBookmarked
+                isBookmarked,
+                myReviewId
         );
     }
 }
