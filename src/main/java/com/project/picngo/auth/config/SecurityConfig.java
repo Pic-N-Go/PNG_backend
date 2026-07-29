@@ -50,6 +50,7 @@ public class SecurityConfig {
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
+				.requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
 				// 관심테마 기반 개인화 추천이라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 				.requestMatchers(HttpMethod.GET, "/spots/recommended").authenticated()
 				.requestMatchers(HttpMethod.POST, "/spots/*/reviews").authenticated()
