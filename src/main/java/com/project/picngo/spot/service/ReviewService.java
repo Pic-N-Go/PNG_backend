@@ -8,6 +8,7 @@ import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.ReviewPhoto;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.dto.MyReviewListResponse;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewPhotoResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
@@ -97,6 +98,26 @@ public class ReviewService {
                         reviewPage.getTotalPages(),
                         reviewPage.getNumber()
                 )
+        );
+    }
+
+    public MyReviewListResponse getMyReviews(Long userId, String sort, int page, int size) {
+        Pageable pageable = toPageable(sort, page, size);
+        Page<Review> reviewPage = reviewRepository.findByUserIdWithSpot(userId, pageable);
+
+        List<Review> reviews = reviewPage.getContent();
+        Map<Long, List<ReviewPhotoResponse>> photoMap = photosByReviewId(reviews.stream().map(Review::getId).toList());
+
+        return new MyReviewListResponse(
+                reviews.stream()
+                        .map(review -> MyReviewListResponse.MyReviewInfo.of(
+                                review,
+                                photoMap.getOrDefault(review.getId(), List.of())
+                        ))
+                        .toList(),
+                reviewPage.getTotalElements(),
+                reviewPage.getTotalPages(),
+                reviewPage.getNumber()
         );
     }
 

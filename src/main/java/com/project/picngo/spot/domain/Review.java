@@ -16,6 +16,8 @@ import org.hibernate.annotations.Comment;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+// user_id는 FK가 아니라 자동 인덱스가 없다. 내 리뷰 목록 조회가 풀스캔이 되므로 직접 걸어준다.
+@Table(indexes = @Index(name = "idx_review_user_id", columnList = "user_id"))
 public class Review extends BaseTimeEntity {
 
     @Id
