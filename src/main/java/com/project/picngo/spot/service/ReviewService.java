@@ -53,7 +53,7 @@ public class ReviewService {
             throw new CustomException(SpotErrorCode.SPOT_NOT_FOUND);
         }
 
-        Pageable pageable = PageRequest.of(page, Math.min(size, 100), toSort(sort));
+        Pageable pageable = toPageable(sort, page, size);
         Page<Review> reviewPage = reviewRepository.findBySpotId(spotId, pageable);
 
         List<Object[]> avgAndCountList = reviewRepository.findAvgAndCountBySpotId(spotId);
@@ -172,11 +172,18 @@ public class ReviewService {
         return review;
     }
 
-    private Sort toSort(String sort) {
+    // 범위 밖 page/size는 PageRequest.of가 IllegalArgumentException을 던져 500이 된다. 여기서 잘라낸다.
+    static Pageable toPageable(String sort, int page, int size) {
+        return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 100), toSort(sort));
+    }
+
+    // 동점 행 순서는 DB가 보장하지 않아 페이지 경계에서 중복·누락이 생긴다. id를 타이브레이커로 고정한다.
+    static Sort toSort(String sort) {
+        Sort tieBreaker = Sort.by(Sort.Direction.DESC, "id");
         return switch (sort) {
-            case "LATEST" -> Sort.by(Sort.Direction.DESC, "createdAt");
-            case "RATING_HIGH" -> Sort.by(Sort.Direction.DESC, "rating");
-            case "RATING_LOW" -> Sort.by(Sort.Direction.ASC, "rating");
+            case "LATEST" -> Sort.by(Sort.Direction.DESC, "createdAt").and(tieBreaker);
+            case "RATING_HIGH" -> Sort.by(Sort.Direction.DESC, "rating").and(tieBreaker);
+            case "RATING_LOW" -> Sort.by(Sort.Direction.ASC, "rating").and(tieBreaker);
             default -> throw new CustomException(ReviewErrorCode.REVIEW_INVALID_SORT);
         };
     }
