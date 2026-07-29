@@ -33,8 +33,12 @@ SELECT spot_id, user_id, COUNT(*) AS cnt FROM review
 ALTER TABLE review ADD CONSTRAINT uk_review_spot_user UNIQUE (spot_id, user_id);
 
 -- 적용 현황 (마이그레이션 도구가 없어 수동 관리. 적용하면 이 표를 갱신할 것)
---                            (2) DROP    (3) INDEX   (4) UNIQUE
---   로컬 (프론트 작성자)        [x] 07-28   [ ]         [ ]
---   로컬 (박예은)               [ ]         [ ]         [ ]
---   개발                        [ ]         [ ]         [ ]
---   운영                        [ ]         [ ]         [ ]
+--                            (2) DROP      (3) INDEX   (4) UNIQUE
+--   로컬 (프론트 작성자)        [x] 07-28     [ ]         [ ]
+--   로컬 (박예은)               [-] 해당없음  [x] 07-29   [x] 07-29
+--   개발                        [ ]           [ ]         [ ]
+--   운영                        [ ]           [ ]         [ ]
+--
+--   [-] 해당없음: 이 환경에는 time_slot 컬럼이 애초에 없었다(엔티티 변경 시점 이후 생성된 DB).
+--   (4) UNIQUE 적용 시 로컬 리뷰 데이터 31건이 중복(spot 1에 30건)이라 전량 삭제 후 적용했다.
+--   개발/운영은 실사용 데이터일 수 있으니 아래 조회로 중복을 확인하고 남길 행을 판단할 것.
