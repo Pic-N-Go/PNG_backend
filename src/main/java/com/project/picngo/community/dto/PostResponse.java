@@ -1,6 +1,6 @@
 package com.project.picngo.community.dto;
 
-import com.project.picngo.community.domain.CommunityWeather;
+import com.project.picngo.community.domain.PostWeather;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
@@ -11,7 +11,7 @@ public record PostResponse(
         Long spotId,
         String spotName,
         LocalTime shootingTime,
-        CommunityWeather weather,
+        PostWeather weather,
         String cameraModel,
         String lensModel,
         List<String> tags,

@@ -1,6 +1,6 @@
 package com.project.picngo.community.dto;
 
-import com.project.picngo.community.domain.CommunityWeather;
+import com.project.picngo.community.domain.PostWeather;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
@@ -22,7 +22,7 @@ public record PostUpdateRequest(
 
         LocalTime shootingTime,
 
-        CommunityWeather weather,
+        PostWeather weather,
 
         @Size(max = 100)
         String cameraModel,
