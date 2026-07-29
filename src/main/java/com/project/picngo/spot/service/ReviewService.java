@@ -133,6 +133,11 @@ public class ReviewService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
+        // 스팟당 1인 1리뷰. 프론트에서 막아도 API 직접 호출로 우회 가능하므로 서버에서 막는다.
+        if (reviewRepository.existsBySpotIdAndUserId(spotId, userId)) {
+            throw new CustomException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+        }
+
         validatePhotoCount(0, photos);
 
         Review review = Review.builder()

@@ -151,12 +151,12 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
     );
 
-    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 10장까지 함께 업로드할 수 있습니다.")
+    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 5장까지 함께 업로드할 수 있습니다. 이미 이 스팟에 리뷰를 작성했으면 409를 반환합니다.")
     ResponseEntity<ReviewResponse> createReview(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Valid @RequestPart("request") ReviewRequest request,
-            @Parameter(description = "리뷰 사진 목록, 최대 10장")
+            @Parameter(description = "리뷰 사진 목록, 최대 5장")
             @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     );
 }
