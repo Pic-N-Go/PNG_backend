@@ -145,7 +145,7 @@ public class UserService {
 		User follower = getById(followerId);
 		User following = getById(followingId);
 
-		Follow follow = followRepository.findbyFollowerAndFollowing(follower, following)
+		Follow follow = followRepository.findByFollowerAndFollowing(follower, following)
 				.orElseThrow(()-> new CustomException(UserErrorCode.FOLLOW_NOT_FOUND));
 
 		followRepository.delete(follow);

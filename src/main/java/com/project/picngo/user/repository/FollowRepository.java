@@ -3,6 +3,8 @@ package com.project.picngo.user.repository;
 import com.project.picngo.user.domain.Follow;
 import com.project.picngo.user.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,8 +18,11 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     Optional<Follow> findByFollowerAndFollowing(User follower, User following);
 
     // 특정 사용자를 팔로우하는 사람 목록 조회
-    List<Follow> findAllByFollowing(User following);
+    @Query("select f from Follow f join fetch f.follower where f.following = :following")
+    List<Follow> findAllByFollowing(@Param("following") User following);
 
     // 특정 사용자를 팔로우 중인 사람 목록 조히
-    List<Follow> findAllByFollower(User follower);
+    @Query("select f from Follow f join fetch f.following where f.follower = :follower")
+    List<Follow> findAllByFollower(@Param("follower") User follower);
+
 }
