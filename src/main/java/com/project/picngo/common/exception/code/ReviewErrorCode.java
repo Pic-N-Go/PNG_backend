@@ -6,7 +6,8 @@ import org.springframework.http.HttpStatus;
 public enum ReviewErrorCode implements BaseErrorCode {
     REVIEW_NOT_FOUND(HttpStatus.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
     REVIEW_FORBIDDEN(HttpStatus.FORBIDDEN, "본인의 리뷰만 수정/삭제할 수 있습니다."),
-    REVIEW_INVALID_SORT(HttpStatus.BAD_REQUEST, "sort 값은 LATEST, RATING_HIGH, RATING_LOW 중 하나여야 합니다.");
+    REVIEW_INVALID_SORT(HttpStatus.BAD_REQUEST, "sort 값은 LATEST, RATING_HIGH, RATING_LOW 중 하나여야 합니다."),
+    REVIEW_EQUIPMENT_INFO_TOO_LONG(HttpStatus.BAD_REQUEST, "장비 정보는 모두 합쳐 100자를 넘을 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

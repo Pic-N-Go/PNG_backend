@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 public class ReviewService {
 
     private static final int MAX_REVIEW_PHOTO_COUNT = 10;
+    private static final int MAX_EQUIPMENT_INFO_LENGTH = 100; // Review.equipmentInfo 컬럼 길이와 동일해야 한다
 
     private final ReviewRepository reviewRepository;
     private final ReviewPhotoRepository reviewPhotoRepository;
@@ -245,7 +246,9 @@ public class ReviewService {
         }
     }
 
-    private String joinEquipmentInfo(List<String> equipmentInfo) {
+    // ", "로 합쳐 한 컬럼에 저장하므로 요소별 길이 제한(@Size)으로는 컬럼 초과를 막을 수 없다.
+    // 검증 없이 넘기면 DataIntegrityViolationException → 500이 되므로 합친 길이로 400을 낸다.
+    static String joinEquipmentInfo(List<String> equipmentInfo) {
         if (equipmentInfo == null || equipmentInfo.isEmpty()) {
             return null;
         }
@@ -253,6 +256,9 @@ public class ReviewService {
         String joined = equipmentInfo.stream()
                 .filter(value -> value != null && !value.isBlank())
                 .collect(Collectors.joining(", "));
+        if (joined.length() > MAX_EQUIPMENT_INFO_LENGTH) {
+            throw new CustomException(ReviewErrorCode.REVIEW_EQUIPMENT_INFO_TOO_LONG);
+        }
         return joined.isBlank() ? null : joined;
     }
 }
