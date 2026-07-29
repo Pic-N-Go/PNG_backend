@@ -20,6 +20,7 @@ import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -139,7 +140,7 @@ public class ReviewService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
-        // 스팟당 1인 1리뷰. 프론트에서 막아도 API 직접 호출로 우회 가능하므로 서버에서 막는다.
+        // 스팟당 1인 1리뷰. 대부분의 케이스를 여기서 걸러내고, 동시 요청은 아래 DB 제약이 막는다.
         if (reviewRepository.existsBySpotIdAndUserId(spotId, userId)) {
             throw new CustomException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
         }
@@ -157,7 +158,15 @@ public class ReviewService {
                 .tags(request.tags())
                 .build();
 
-        Review savedReview = reviewRepository.save(review);
+        // 커밋까지 미루면 제약 위반이 아래 catch 밖에서 터져 업로드된 S3 객체가 고아로 남는다.
+        // 여기서 flush해 사진 업로드 전에 위반을 확정시킨다.
+        Review savedReview;
+        try {
+            savedReview = reviewRepository.saveAndFlush(review);
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+        }
+
         List<String> uploadedKeys = new ArrayList<>();
 
         try {

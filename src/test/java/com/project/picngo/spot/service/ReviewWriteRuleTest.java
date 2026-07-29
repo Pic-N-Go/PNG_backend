@@ -2,6 +2,7 @@ package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.image.service.ImageStorageService;
+import org.springframework.dao.DataIntegrityViolationException;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.TimePeriod;
@@ -23,6 +24,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -59,6 +61,21 @@ class ReviewWriteRuleTest {
                 .isInstanceOf(CustomException.class);
 
         verify(reviewRepository, never()).save(any(Review.class));
+    }
+
+    @Test
+    @DisplayName("앱 레벨 검사를 통과해도 DB 유니크 제약 위반이면 409로 변환된다 (동시 요청)")
+    void convertsUniqueViolationToConflict() {
+        given(spotRepository.findById(SPOT_ID)).willReturn(Optional.of(mock(Spot.class)));
+        given(reviewRepository.existsBySpotIdAndUserId(SPOT_ID, USER_ID)).willReturn(false);
+        given(reviewRepository.saveAndFlush(any(Review.class)))
+                .willThrow(new DataIntegrityViolationException("uk_review_spot_user"));
+
+        assertThatThrownBy(() -> reviewService.createReview(USER_ID, SPOT_ID, request(5), List.of()))
+                .isInstanceOf(CustomException.class);
+
+        // 위반이 사진 업로드 전에 확정되므로 S3에 올라간 것이 없다
+        verify(imageStorageService, never()).delete(anyString());
     }
 
     @Test

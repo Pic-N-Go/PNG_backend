@@ -78,7 +78,7 @@ class MyReviewQueryTest {
     @DisplayName("별점이 모두 같아도 id 타이브레이커로 페이지 간 중복·누락이 없다")
     void pagesDoNotOverlapWhenRatingsTie() {
         for (int i = 0; i < 6; i++) {
-            saveReview(MY_ID, 5);
+            saveReviewOnNewSpot(MY_ID, 5);
         }
 
         Sort sort = sortByRatingDescThenId();
@@ -93,8 +93,8 @@ class MyReviewQueryTest {
     @Test
     @DisplayName("LATEST 정렬도 fetch join 쿼리에서 동작한다 (createdAt은 BaseTimeEntity 상속 필드)")
     void latestSortWorksOnFetchJoinQuery() {
-        saveReview(MY_ID, 3);
-        saveReview(MY_ID, 4);
+        saveReviewOnNewSpot(MY_ID, 3);
+        saveReviewOnNewSpot(MY_ID, 4);
 
         Page<Review> page = reviewRepository.findByUserIdWithSpot(
                 MY_ID, PageRequest.of(0, 10, latestSort()));
@@ -114,6 +114,26 @@ class MyReviewQueryTest {
 
     private List<Long> idsOf(Page<Review> page) {
         return page.getContent().stream().map(Review::getId).toList();
+    }
+
+    // 스팟당 1인 1리뷰 제약이 있어, 한 사용자의 리뷰를 여러 건 만들 때는 스팟도 새로 만든다.
+    private void saveReviewOnNewSpot(Long userId, int rating) {
+        Spot another = spotRepository.save(Spot.builder()
+                .name("스팟" + userId + "-" + rating + "-" + System.nanoTime())
+                .address("부산")
+                .latitude(35.153)
+                .longitude(129.118)
+                .category(SpotCategory.BEACH)
+                .source(SpotSource.TOUR_API)
+                .status(SpotStatus.APPROVED)
+                .build());
+        reviewRepository.save(Review.builder()
+                .spot(another)
+                .userId(userId)
+                .rating(rating)
+                .content("좋아요")
+                .timePeriod(TimePeriod.SUNSET)
+                .build());
     }
 
     private void saveReview(Long userId, int rating) {

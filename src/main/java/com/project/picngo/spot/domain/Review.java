@@ -20,7 +20,11 @@ import org.hibernate.annotations.Comment;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 // user_id는 FK가 아니라 자동 인덱스가 없다. 내 리뷰 목록 조회가 풀스캔이 되므로 직접 걸어준다.
-@Table(indexes = @Index(name = "idx_review_user_id", columnList = "user_id"))
+// 스팟당 1인 1리뷰는 앱 레벨 검사만으로는 동시 요청을 막지 못해 DB 제약을 함께 둔다.
+@Table(
+        indexes = @Index(name = "idx_review_user_id", columnList = "user_id"),
+        uniqueConstraints = @UniqueConstraint(name = "uk_review_spot_user", columnNames = {"spot_id", "user_id"})
+)
 public class Review extends BaseTimeEntity {
 
     @Id

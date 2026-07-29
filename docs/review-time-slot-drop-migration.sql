@@ -22,9 +22,19 @@ ALTER TABLE review DROP COLUMN time_slot;
 --    이미 있으면 에러 1061 "Duplicate key name"이 나는데 그건 무시해도 된다.
 CREATE INDEX idx_review_user_id ON review (user_id);
 
+-- 4) 스팟당 1인 1리뷰 DB 제약
+--    앱 레벨 검사(existsBySpotIdAndUserId)는 조회와 삽입 사이가 원자적이지 않아
+--    동시 요청 두 건이 모두 통과할 수 있다. 엔티티에도 @UniqueConstraint를 걸었지만
+--    ddl-auto: update가 기존 테이블에 유니크 제약을 안정적으로 추가하지 않으므로 직접 적용한다.
+--    ⚠️ 중복 행이 이미 있으면 ALTER가 실패한다. 먼저 아래 조회로 확인하고 정리할 것.
+SELECT spot_id, user_id, COUNT(*) AS cnt FROM review
+ GROUP BY spot_id, user_id HAVING COUNT(*) > 1;
+
+ALTER TABLE review ADD CONSTRAINT uk_review_spot_user UNIQUE (spot_id, user_id);
+
 -- 적용 현황 (마이그레이션 도구가 없어 수동 관리. 적용하면 이 표를 갱신할 것)
---                            (2) DROP    (3) INDEX
---   로컬 (프론트 작성자)        [x] 07-28   [ ]
---   로컬 (박예은)               [ ]         [ ]
---   개발                        [ ]         [ ]
---   운영                        [ ]         [ ]
+--                            (2) DROP    (3) INDEX   (4) UNIQUE
+--   로컬 (프론트 작성자)        [x] 07-28   [ ]         [ ]
+--   로컬 (박예은)               [ ]         [ ]         [ ]
+--   개발                        [ ]         [ ]         [ ]
+--   운영                        [ ]         [ ]         [ ]

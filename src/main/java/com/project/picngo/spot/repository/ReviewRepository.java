@@ -19,7 +19,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     boolean existsBySpotIdAndUserId(Long spotId, Long userId);
 
     // 프론트가 작성/수정 분기를 한 번의 조회로 판단하게 한다.
-    // 1인 1리뷰는 앱 레벨 검증뿐이라 과거 데이터에 중복 행이 있을 수 있다.
+    // 유니크 제약을 걸었지만 수동 마이그레이션이라 적용 전 환경에는 중복 행이 남아 있을 수 있다.
     // Optional로 받으면 그 경우 IncorrectResultSizeDataAccessException → 스팟 상세가 500이 된다.
     @Query("SELECT r.id FROM Review r WHERE r.spot.id = :spotId AND r.userId = :userId ORDER BY r.id ASC")
     List<Long> findIdsBySpotIdAndUserId(@Param("spotId") Long spotId, @Param("userId") Long userId);
