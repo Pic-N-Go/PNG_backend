@@ -1,11 +1,13 @@
 package com.project.picngo.common.exception;
 
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+// Boot 4의 기본 JSON 매퍼는 Jackson 3(tools.jackson)이다. jackson 2 클래스로 잡으면 분기가 죽는다.
+import tools.jackson.databind.exc.InvalidFormatException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -79,6 +81,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, detail));
+    }
+
+    // 업로드 용량 초과도 클라이언트 오류다. 전역 Exception 핸들러에 걸리면 500이 된다.
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("MaxUploadSizeExceededException: {}", e.getMessage());
+        return ResponseEntity
+                .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, "업로드 용량이 허용 범위를 초과했습니다."));
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
