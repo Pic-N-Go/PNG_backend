@@ -6,6 +6,9 @@ spring:
   sql:
     init:
       mode: always
+      data-locations:
+        - classpath:data.sql
+        - classpath:spot_data.sql
 
   servlet:
     multipart:
