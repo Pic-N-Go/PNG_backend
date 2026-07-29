@@ -16,6 +16,7 @@ public record SpotDetailResponse(
         String category,
         String overview,
         List<String> tags,
+        List<String> reviewTags,
         ConvenienceInfo convenience,
         StatsInfo stats,
         List<String> checklist,
@@ -59,6 +60,7 @@ public record SpotDetailResponse(
     public static SpotDetailResponse of(
             Spot spot,
             List<SpotTag> tags,
+            List<String> reviewTags,
             List<String> checklist,
             Double avgRating,
             Integer reviewCount,
@@ -76,6 +78,7 @@ public record SpotDetailResponse(
                 spot.getCategory().name(),
                 spot.getOverview(),
                 tags.stream().map(SpotTag::getTag).toList(),
+                reviewTags,
                 ConvenienceInfo.from(spot),
                 new StatsInfo(avgRating, reviewCount, photoCount),
                 checklist,

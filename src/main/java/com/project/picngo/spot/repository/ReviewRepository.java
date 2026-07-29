@@ -21,6 +21,16 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             countQuery = "SELECT COUNT(r) FROM Review r WHERE r.userId = :userId")
     Page<Review> findByUserIdWithSpot(@Param("userId") Long userId, Pageable pageable);
 
+    // "자주 쓰인 태그" — 2회 이상 등장한 것만, 많이 쓰인 순. 상위 N개 절삭은 호출부에서 한다.
+    // 리뷰가 적은 스팟에서 1회짜리 태그가 대표 태그로 뜨는 것을 막기 위해 HAVING을 둔다.
+    @Query("SELECT t, COUNT(t) FROM Review r JOIN r.tags t WHERE r.spot.id = :spotId "
+            + "GROUP BY t HAVING COUNT(t) >= 2 ORDER BY COUNT(t) DESC, t ASC")
+    List<Object[]> findFrequentTagsBySpotId(@Param("spotId") Long spotId);
+
+    // 목록 조회용 태그 일괄 로딩. 지연 로딩에 맡기면 리뷰 행마다 review_tag를 한 번씩 조회한다.
+    @Query("SELECT r.id, t FROM Review r JOIN r.tags t WHERE r.id IN :reviewIds ORDER BY t ASC")
+    List<Object[]> findTagsByReviewIds(@Param("reviewIds") List<Long> reviewIds);
+
     @Query("SELECT r.rating, COUNT(r) FROM Review r WHERE r.spot.id = :spotId GROUP BY r.rating")
     List<Object[]> findRatingDistributionBySpotId(@Param("spotId") Long spotId);
 }

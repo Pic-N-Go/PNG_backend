@@ -6,6 +6,7 @@ import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.spot.domain.Review;
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.ReviewPhoto;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.dto.MyReviewListResponse;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -73,6 +75,7 @@ public class ReviewService {
         Map<Long, User> userMap = userRepository.findByIdIn(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
         Map<Long, List<ReviewPhotoResponse>> photoMap = photosByReviewId(reviewIds);
+        Map<Long, Set<ReviewTag>> tagMap = tagsByReviewId(reviewIds);
 
         List<ReviewListResponse.ReviewInfo> reviewInfos = reviews.stream()
                 .map(review -> {
@@ -81,6 +84,7 @@ public class ReviewService {
                             review,
                             user != null ? user.getNickname() : "알 수 없음",
                             user != null ? user.getProfileImageUrl() : null,
+                            tagMap.getOrDefault(review.getId(), Set.of()),
                             photoMap.getOrDefault(review.getId(), List.of())
                     );
                 })
@@ -106,12 +110,15 @@ public class ReviewService {
         Page<Review> reviewPage = reviewRepository.findByUserIdWithSpot(userId, pageable);
 
         List<Review> reviews = reviewPage.getContent();
-        Map<Long, List<ReviewPhotoResponse>> photoMap = photosByReviewId(reviews.stream().map(Review::getId).toList());
+        List<Long> reviewIds = reviews.stream().map(Review::getId).toList();
+        Map<Long, List<ReviewPhotoResponse>> photoMap = photosByReviewId(reviewIds);
+        Map<Long, Set<ReviewTag>> tagMap = tagsByReviewId(reviewIds);
 
         return new MyReviewListResponse(
                 reviews.stream()
                         .map(review -> MyReviewListResponse.MyReviewInfo.of(
                                 review,
+                                tagMap.getOrDefault(review.getId(), Set.of()),
                                 photoMap.getOrDefault(review.getId(), List.of())
                         ))
                         .toList(),
@@ -136,6 +143,7 @@ public class ReviewService {
                 .equipmentInfo(joinEquipmentInfo(request.equipmentInfo()))
                 .timePeriod(request.timePeriod())
                 .visitedAt(request.visitedAt())
+                .tags(request.tags())
                 .build();
 
         Review savedReview = reviewRepository.save(review);
@@ -146,7 +154,7 @@ public class ReviewService {
 
             updateSpotReviewStats(spot);
 
-            return ReviewResponse.from(savedReview, uploaded);
+            return ReviewResponse.from(savedReview, request.tags() == null ? Set.of() : request.tags(), uploaded);
         } catch (RuntimeException e) {
             deleteUploadedImages(uploadedKeys);
             throw e;
@@ -161,10 +169,11 @@ public class ReviewService {
                 request.content(),
                 joinEquipmentInfo(request.equipmentInfo()),
                 request.timePeriod(),
-                request.visitedAt()
+                request.visitedAt(),
+                request.tags()
         );
         // photos 없이 반환하면 프론트가 응답을 그대로 반영할 때 사진이 사라진 것처럼 보인다.
-        return ReviewResponse.from(review, photosOf(reviewId));
+        return ReviewResponse.from(review, tagsOf(reviewId), photosOf(reviewId));
     }
 
     // 사진 추가. PUT은 JSON이라 파일 파트를 받을 수 없어 별도 엔드포인트로 분리했다.
@@ -261,6 +270,24 @@ public class ReviewService {
 
     private ReviewPhotoResponse toPhotoResponse(ReviewPhoto photo) {
         return new ReviewPhotoResponse(photo.getId(), imageStorageService.getPresignedUrl(photo.getPhotoUrl()));
+    }
+
+    // 지연 로딩에 맡기면 리뷰 행마다 review_tag를 조회한다(페이지 20건이면 20회). 한 번에 가져와 묶는다.
+    private Map<Long, Set<ReviewTag>> tagsByReviewId(List<Long> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+        return reviewRepository.findTagsByReviewIds(reviewIds).stream()
+                .collect(Collectors.groupingBy(
+                        row -> (Long) row[0],
+                        // HashSet이면 응답 배열 순서가 요청마다 달라진다. 조회 순서를 유지한다.
+                        Collectors.mapping(row -> (ReviewTag) row[1],
+                                Collectors.toCollection(java.util.LinkedHashSet::new))
+                ));
+    }
+
+    private Set<ReviewTag> tagsOf(Long reviewId) {
+        return tagsByReviewId(List.of(reviewId)).getOrDefault(reviewId, Set.of());
     }
 
     private List<ReviewPhotoResponse> photosOf(Long reviewId) {

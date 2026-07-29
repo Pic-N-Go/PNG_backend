@@ -1,11 +1,14 @@
 package com.project.picngo.spot.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.enums.TimePeriod;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -53,12 +56,19 @@ public class Review extends BaseTimeEntity {
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ReviewPhoto> photos = new ArrayList<>();
 
+    @Comment("리뷰 태그. 고정 9종 중 최대 5개")
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "review_tag", joinColumns = @JoinColumn(name = "review_id"))
+    @Column(name = "tag", nullable = false, length = 30)
+    @Enumerated(EnumType.STRING)
+    private Set<ReviewTag> tags = new LinkedHashSet<>();
+
     @Comment("방문 날짜. 사용자 직접 입력, nullable")
     @Column
     private LocalDate visitedAt;
 
     @Builder
-    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt) {
+    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt, Set<ReviewTag> tags) {
         this.spot = spot;
         this.userId = userId;
         this.rating = rating;
@@ -66,13 +76,21 @@ public class Review extends BaseTimeEntity {
         this.equipmentInfo = equipmentInfo;
         this.timePeriod = timePeriod;
         this.visitedAt = visitedAt;
+        if (tags != null) {
+            this.tags.addAll(tags);
+        }
     }
 
-    public void update(Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt) {
+    public void update(Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt, Set<ReviewTag> tags) {
         this.rating = rating;
         this.content = content;
         this.equipmentInfo = equipmentInfo;
         this.timePeriod = timePeriod;
         this.visitedAt = visitedAt;
+        // 컬렉션은 새 인스턴스로 바꾸면 orphan 관리가 깨진다. 내용만 교체한다.
+        this.tags.clear();
+        if (tags != null) {
+            this.tags.addAll(tags);
+        }
     }
 }

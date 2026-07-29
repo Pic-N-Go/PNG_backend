@@ -2,11 +2,13 @@ package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.enums.TimePeriod;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 // 페이징 필드 이름은 GET /spots/{id}/reviews 의 PageInfo와 동일하게 맞춘다 (프론트 페이지네이션 로직 재사용)
 public record MyReviewListResponse(
@@ -24,11 +26,12 @@ public record MyReviewListResponse(
             String content,
             String equipmentInfo,
             TimePeriod timePeriod,
+            Set<ReviewTag> tags,
             List<ReviewPhotoResponse> photos,
             LocalDate visitedAt,
             LocalDateTime createdAt
     ) {
-        public static MyReviewInfo of(Review review, List<ReviewPhotoResponse> photos) {
+        public static MyReviewInfo of(Review review, Set<ReviewTag> tags, List<ReviewPhotoResponse> photos) {
             Spot spot = review.getSpot();
             return new MyReviewInfo(
                     review.getId(),
@@ -39,6 +42,7 @@ public record MyReviewListResponse(
                     review.getContent(),
                     review.getEquipmentInfo(),
                     review.getTimePeriod(),
+                    tags,
                     photos,
                     review.getVisitedAt(),
                     review.getCreatedAt()

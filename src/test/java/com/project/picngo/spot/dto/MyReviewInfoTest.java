@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,6 +57,6 @@ class MyReviewInfoTest {
                 .timePeriod(TimePeriod.SUNSET)
                 .build();
 
-        return MyReviewListResponse.MyReviewInfo.of(review, List.of()).spotImageUrl();
+        return MyReviewListResponse.MyReviewInfo.of(review, Set.of(), List.of()).spotImageUrl();
     }
 }

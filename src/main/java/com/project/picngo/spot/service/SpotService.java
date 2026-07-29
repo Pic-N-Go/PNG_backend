@@ -6,6 +6,7 @@ import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.dto.NearbySpotResponse;
@@ -46,6 +47,11 @@ public class SpotService {
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         List<SpotTag> tags = spotTagRepository.findBySpotId(spotId);
+        // 2회 이상 쓰인 태그 중 상위 3개만 노출 (스팟 상세 카드에 한 줄로 들어가는 분량)
+        List<String> reviewTags = reviewRepository.findFrequentTagsBySpotId(spotId).stream()
+                .limit(3)
+                .map(row -> ((ReviewTag) row[0]).name())
+                .toList();
         List<String> checklist = ChecklistMapper.getChecklist(spot.getCat3());
 
         List<Object[]> rows = reviewRepository.findAvgAndCountBySpotId(spotId);
@@ -56,7 +62,7 @@ public class SpotService {
         boolean isBookmarked = bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId);
 
         return SpotDetailResponse.of(
-                spot, tags, checklist,
+                spot, tags, reviewTags, checklist,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
                 reviewCount, photoCount, isBookmarked
         );
