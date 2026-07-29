@@ -45,6 +45,8 @@
 | 리뷰 작성 | POST | /spots/{id}/reviews | 리뷰 작성 | 박예은 | 완료 |
 | 리뷰 작성 | PUT | /reviews/{id} | 리뷰 수정 | 박예은 | 완료 |
 | 리뷰 작성 | DELETE | /reviews/{id} | 리뷰 삭제 | 박예은 | 완료 |
+| 리뷰 작성 | POST | /reviews/{id}/photos | 리뷰 사진 추가 | 박예은 | 완료 |
+| 리뷰 작성 | DELETE | /reviews/{id}/photos/{photoId} | 리뷰 사진 삭제 | 박예은 | 완료 |
 | 코스 계획 | GET | /courses | 내 여행 계획 목록 | 모정민 | 미시작 |
 | 코스 계획 | POST | /courses | 새 여행 계획 생성 | 모정민 | 미시작 |
 | 코스 계획 | GET | /courses/{id} | 여행 계획 상세 조회 | 모정민 | 미시작 |

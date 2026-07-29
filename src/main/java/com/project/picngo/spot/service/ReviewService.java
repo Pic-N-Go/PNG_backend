@@ -167,6 +167,37 @@ public class ReviewService {
         return ReviewResponse.from(review, photosOf(reviewId));
     }
 
+    // 사진 추가. PUT은 JSON이라 파일 파트를 받을 수 없어 별도 엔드포인트로 분리했다.
+    @Transactional
+    public List<ReviewPhotoResponse> addReviewPhotos(Long userId, Long reviewId, List<MultipartFile> photos) {
+        Review review = findMyReview(userId, reviewId);
+        validatePhotoCount(reviewPhotoRepository.countByReviewId(reviewId), photos);
+
+        List<String> uploadedKeys = new ArrayList<>();
+        try {
+            uploadReviewPhotos(review, photos, uploadedKeys);
+            return photosOf(reviewId);
+        } catch (RuntimeException e) {
+            deleteUploadedImages(uploadedKeys);
+            throw e;
+        }
+    }
+
+    @Transactional
+    public void deleteReviewPhoto(Long userId, Long reviewId, Long photoId) {
+        findMyReview(userId, reviewId);
+
+        // 다른 리뷰의 사진 id를 조용히 통과시키면 지운 줄 알았던 사진이 남는다. 404로 막는다.
+        ReviewPhoto photo = reviewPhotoRepository.findById(photoId)
+                .filter(saved -> saved.getReview().getId().equals(reviewId))
+                .orElseThrow(() -> new CustomException(ReviewErrorCode.REVIEW_PHOTO_NOT_FOUND));
+
+        reviewPhotoRepository.delete(photo);
+        reviewPhotoRepository.flush();
+
+        deleteUploadedImages(List.of(photo.getPhotoUrl()));
+    }
+
     @Transactional
     public void deleteReview(Long userId, Long reviewId) {
         Review review = findMyReview(userId, reviewId);
@@ -228,12 +259,12 @@ public class ReviewService {
                 ));
     }
 
-    private List<ReviewPhotoResponse> photosOf(Long reviewId) {
-        return photosByReviewId(List.of(reviewId)).getOrDefault(reviewId, List.of());
-    }
-
     private ReviewPhotoResponse toPhotoResponse(ReviewPhoto photo) {
         return new ReviewPhotoResponse(photo.getId(), imageStorageService.getPresignedUrl(photo.getPhotoUrl()));
+    }
+
+    private List<ReviewPhotoResponse> photosOf(Long reviewId) {
+        return photosByReviewId(List.of(reviewId)).getOrDefault(reviewId, List.of());
     }
 
     private Map<Integer, Long> buildDistribution(Long spotId) {
