@@ -172,6 +172,10 @@ public class ReviewService {
                 request.visitedAt(),
                 request.tags()
         );
+        // 별점이 바뀌면 스팟 평균도 다시 계산해야 한다. 빠지면 스팟 상세에 옛 평점이 남는다.
+        // 아래 집계 쿼리의 AUTO-flush가 위 UPDATE를 먼저 내보낸다 (query space가 review로 겹침).
+        updateSpotReviewStats(review.getSpot());
+
         // photos 없이 반환하면 프론트가 응답을 그대로 반영할 때 사진이 사라진 것처럼 보인다.
         return ReviewResponse.from(review, tagsOf(reviewId), photosOf(reviewId));
     }
