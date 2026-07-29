@@ -14,7 +14,7 @@ public record ReviewResponse(
         String content,
         String equipmentInfo,
         TimePeriod timePeriod,
-        List<String> photos,
+        List<ReviewPhotoResponse> photos,
         LocalDate visitedAt,
         LocalDateTime createdAt
 ) {
@@ -22,7 +22,7 @@ public record ReviewResponse(
         return from(review, List.of());
     }
 
-    public static ReviewResponse from(Review review, List<String> photos) {
+    public static ReviewResponse from(Review review, List<ReviewPhotoResponse> photos) {
         return new ReviewResponse(
                 review.getId(),
                 review.getUserId(),

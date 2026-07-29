@@ -34,11 +34,11 @@ public record ReviewListResponse(
             String content,
             String equipmentInfo,
             TimePeriod timePeriod,
-            List<String> photos,
+            List<ReviewPhotoResponse> photos,
             LocalDate visitedAt,
             LocalDateTime createdAt
     ) {
-        public static ReviewInfo of(Review review, String nickname, String profileImageUrl, List<String> photos) {
+        public static ReviewInfo of(Review review, String nickname, String profileImageUrl, List<ReviewPhotoResponse> photos) {
             return new ReviewInfo(
                     review.getId(),
                     review.getUserId(),

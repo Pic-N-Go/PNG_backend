@@ -1,7 +1,6 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
-import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.ReviewErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
@@ -10,6 +9,7 @@ import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.ReviewPhoto;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.dto.ReviewListResponse;
+import com.project.picngo.spot.dto.ReviewPhotoResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.repository.ReviewPhotoRepository;
@@ -40,7 +40,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ReviewService {
 
-    private static final int MAX_REVIEW_PHOTO_COUNT = 10;
+    private static final int MAX_REVIEW_PHOTO_COUNT = 5;
     private static final int MAX_EQUIPMENT_INFO_LENGTH = 100; // Review.equipmentInfo 컬럼 길이와 동일해야 한다
 
     private final ReviewRepository reviewRepository;
@@ -71,11 +71,7 @@ public class ReviewService {
         // profileImageUrl은 null이 정상 케이스라 Collectors.toMap의 값으로 쓰면 NPE가 난다. User째로 담는다.
         Map<Long, User> userMap = userRepository.findByIdIn(userIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
-        Map<Long, List<String>> photoMap = reviewPhotoRepository.findByReview_IdIn(reviewIds).stream()
-                .collect(Collectors.groupingBy(
-                        photo -> photo.getReview().getId(),
-                        Collectors.mapping(photo -> imageStorageService.getPresignedUrl(photo.getPhotoUrl()), Collectors.toList())
-                ));
+        Map<Long, List<ReviewPhotoResponse>> photoMap = photosByReviewId(reviewIds);
 
         List<ReviewListResponse.ReviewInfo> reviewInfos = reviews.stream()
                 .map(review -> {
@@ -109,6 +105,8 @@ public class ReviewService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
+        validatePhotoCount(0, photos);
+
         Review review = Review.builder()
                 .spot(spot)
                 .userId(userId)
@@ -123,11 +121,11 @@ public class ReviewService {
         List<String> uploadedKeys = new ArrayList<>();
 
         try {
-            List<String> photoUrls = uploadReviewPhotos(savedReview, photos, uploadedKeys);
+            List<ReviewPhotoResponse> uploaded = uploadReviewPhotos(savedReview, photos, uploadedKeys);
 
             updateSpotReviewStats(spot);
 
-            return ReviewResponse.from(savedReview, photoUrls);
+            return ReviewResponse.from(savedReview, uploaded);
         } catch (RuntimeException e) {
             deleteUploadedImages(uploadedKeys);
             throw e;
@@ -197,6 +195,21 @@ public class ReviewService {
         spot.updateReviewStats(avg, count);
     }
 
+    private Map<Long, List<ReviewPhotoResponse>> photosByReviewId(List<Long> reviewIds) {
+        if (reviewIds.isEmpty()) {
+            return Map.of();
+        }
+        return reviewPhotoRepository.findByReview_IdInOrderByIdAsc(reviewIds).stream()
+                .collect(Collectors.groupingBy(
+                        photo -> photo.getReview().getId(),
+                        Collectors.mapping(this::toPhotoResponse, Collectors.toList())
+                ));
+    }
+
+    private ReviewPhotoResponse toPhotoResponse(ReviewPhoto photo) {
+        return new ReviewPhotoResponse(photo.getId(), imageStorageService.getPresignedUrl(photo.getPhotoUrl()));
+    }
+
     private Map<Integer, Long> buildDistribution(Long spotId) {
         Map<Integer, Long> distribution = new HashMap<>();
         for (int i = 1; i <= 5; i++) distribution.put(i, 0L);
@@ -205,16 +218,12 @@ public class ReviewService {
         return distribution;
     }
 
-    private List<String> uploadReviewPhotos(Review review, List<MultipartFile> photos, List<String> uploadedKeys) {
-        if (photos == null || photos.isEmpty()) {
+    private List<ReviewPhotoResponse> uploadReviewPhotos(Review review, List<MultipartFile> photos, List<String> uploadedKeys) {
+        if (countUploadable(photos) == 0) {
             return List.of();
         }
 
-        if (photos.size() > MAX_REVIEW_PHOTO_COUNT) {
-            throw new CustomException(ImageErrorCode.IMAGE_FILE_TOO_MANY);
-        }
-
-        List<String> photoUrls = new ArrayList<>();
+        List<ReviewPhotoResponse> uploaded = new ArrayList<>();
 
         for (MultipartFile photo : photos) {
             if (photo == null || photo.isEmpty()) {
@@ -230,10 +239,25 @@ public class ReviewService {
                     .build();
 
             reviewPhotoRepository.save(reviewPhoto);
-            photoUrls.add(uploadResult.url());
+            uploaded.add(new ReviewPhotoResponse(reviewPhoto.getId(), uploadResult.url()));
         }
 
-        return photoUrls;
+        return uploaded;
+    }
+
+    // 빈 파트는 업로드에서 건너뛰므로 개수 검증도 같은 기준으로 센다.
+    static int countUploadable(List<MultipartFile> photos) {
+        if (photos == null) {
+            return 0;
+        }
+        return (int) photos.stream().filter(photo -> photo != null && !photo.isEmpty()).count();
+    }
+
+    // 기존 사진 + 신규 파일 합계로 상한을 검증한다. 작성은 기존 0장.
+    static void validatePhotoCount(int existingCount, List<MultipartFile> newPhotos) {
+        if (existingCount + countUploadable(newPhotos) > MAX_REVIEW_PHOTO_COUNT) {
+            throw new CustomException(ReviewErrorCode.REVIEW_PHOTO_TOO_MANY);
+        }
     }
 
     private void deleteUploadedImages(List<String> uploadedKeys) {
