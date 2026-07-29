@@ -18,10 +18,6 @@ public record ReviewResponse(
         LocalDate visitedAt,
         LocalDateTime createdAt
 ) {
-    public static ReviewResponse from(Review review) {
-        return from(review, List.of());
-    }
-
     public static ReviewResponse from(Review review, List<ReviewPhotoResponse> photos) {
         return new ReviewResponse(
                 review.getId(),

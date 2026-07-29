@@ -163,7 +163,8 @@ public class ReviewService {
                 request.timePeriod(),
                 request.visitedAt()
         );
-        return ReviewResponse.from(review);
+        // photos 없이 반환하면 프론트가 응답을 그대로 반영할 때 사진이 사라진 것처럼 보인다.
+        return ReviewResponse.from(review, photosOf(reviewId));
     }
 
     @Transactional
@@ -225,6 +226,10 @@ public class ReviewService {
                         photo -> photo.getReview().getId(),
                         Collectors.mapping(this::toPhotoResponse, Collectors.toList())
                 ));
+    }
+
+    private List<ReviewPhotoResponse> photosOf(Long reviewId) {
+        return photosByReviewId(List.of(reviewId)).getOrDefault(reviewId, List.of());
     }
 
     private ReviewPhotoResponse toPhotoResponse(ReviewPhoto photo) {
