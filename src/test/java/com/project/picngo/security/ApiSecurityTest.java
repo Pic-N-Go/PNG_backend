@@ -16,16 +16,22 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Collections;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
+@TestPropertySource(properties = "spring.sql.init.mode=never")
 public class ApiSecurityTest {
 
     @Autowired
@@ -109,5 +115,39 @@ public class ApiSecurityTest {
         mockMvc.perform(get("/courses")
                         .with(authentication(createMockAuthToken())))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("커뮤니티 게시글 목록은 인증 없이 조회할 수 있다")
+    void communityPostsCanBeReadWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/posts"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("커뮤니티 게시글 작성은 인증 없이 호출할 수 없다")
+    void communityPostCannotBeCreatedWithoutAuthentication() throws Exception {
+        MockMultipartFile request = new MockMultipartFile(
+                "request",
+                "",
+                APPLICATION_JSON.toString(),
+                """
+                        {
+                          "content": "test post",
+                          "shootingTime": "05:30:00",
+                          "weather": "CLEAR",
+                          "tags": []
+                        }
+                        """.getBytes()
+        );
+        MockMultipartFile image = new MockMultipartFile(
+                "images",
+                "photo.jpg",
+                "image/jpeg",
+                new byte[]{1}
+        );
+
+        mockMvc.perform(multipart("/posts").file(request).file(image))
+                .andExpect(status().isForbidden());
     }
 }
