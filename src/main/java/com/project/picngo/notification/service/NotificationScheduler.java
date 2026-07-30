@@ -117,15 +117,14 @@ public class NotificationScheduler {
         for (Wishlist wishlist : allWishlists) {
             if (wishlist.getTimeConditions().contains(timeCondition)) {
                 Spot spot = spotMap.get(wishlist.getSpotId());
-                if (spot != null) {
-                    checkWeatherAndNotify(wishlist.getUserId(), wishlist, spot, timeCondition);
+                if (spot != null && checkWeatherAndNotify(wishlist.getUserId(), wishlist, spot, timeCondition)) {
                     matchedCount++;
                 }
             }
         }
         long endTime = System.currentTimeMillis();
         log.info("\n==================================================" +
-                "\n⏱️ [{}] 스케줄러 실행 및 푸시 발송 완료 (총 소요시간: {} ms / {} 건 매칭)" +
+                "\n⏱️ [{}] 스케줄러 실행 및 푸시 발송 완료 (총 소요시간: {} ms / {} 건 발송)" +
                 "\n==================================================", timeCondition, (endTime - startTime), matchedCount);
     }
 
@@ -295,11 +294,15 @@ public class NotificationScheduler {
     // 골든아워 워밍업 대상 (중복 제거된 고유 좌표·타겟일)
     private record GoldenHourWarmTarget(Double lat, Double lng, String date, Long spotId) {}
 
-    // 날씨 및 미세먼지 조건 확인 후 알림 발송
-    private void checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
+    // 날씨 및 미세먼지 조건 확인 후 알림 발송. 실제로 발송했으면 true.
+    private boolean checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
         try {
             Double lat = spot.getLatitude();
             Double lng = spot.getLongitude();
+            // 좌표가 없으면 예보 조회 불가 → 프리워밍업과 동일하게 스킵
+            if (lat == null || lng == null) {
+                return false;
+            }
 
             int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
             // DAWN(새벽)은 밤 22시에 트리거되므로 대상 새벽은 '다음 날'이다. 그래서 하루를 더해 보정
@@ -312,7 +315,7 @@ public class NotificationScheduler {
 
             Set<WeatherCondition> userConditions = wishlist.getWeatherConditions();
             if (userConditions == null || userConditions.isEmpty()) {
-                return;
+                return false;
             }
 
             // 촬영 시간대(timeCondition)에 해당하는 예보 슬롯으로 날씨 조건 일치 여부 판정 (공용 매칭 로직)
@@ -353,11 +356,14 @@ public class NotificationScheduler {
                     // 멱등키: 같은 날·같은 스팟이라도 촬영 시간대별로 별개 알림 → timeCondition까지 포함
                     String dedupeKey = String.format("WEATHER_MATCH:%d:%d:%s:%s", userId, spot.getId(), targetDateStr, timeCondition);
                     notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId(), spot.getId(), dedupeKey);
+                    return true;
                 }
             }
+            return false;
 
         } catch (Exception e) {
             log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);
+            return false;
         }
     }
 
