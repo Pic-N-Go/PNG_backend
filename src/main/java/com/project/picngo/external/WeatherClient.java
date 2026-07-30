@@ -144,7 +144,7 @@ public class WeatherClient {
 
     public KmaMidWeatherApiResponse getMidTermForecast(String regId, String tmFc) {
         try {
-            String urlStr = "https://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
+            String urlStr = kmaBaseUrl + "/MidFcstInfoService/getMidLandFcst"
                     + "?serviceKey=" + serviceKey
                     + "&pageNo=1"
                     + "&numOfRows=10"
