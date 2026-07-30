@@ -1,8 +1,8 @@
-package com.project.picngo.wishlist.service;
+package com.project.picngo.spotalert.service;
 
 import com.project.picngo.external.dto.WeatherForecastResponse;
-import com.project.picngo.wishlist.domain.enums.TimeCondition;
-import com.project.picngo.wishlist.domain.enums.WeatherCondition;
+import com.project.picngo.spotalert.domain.enums.TimeCondition;
+import com.project.picngo.spotalert.domain.enums.WeatherCondition;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -10,10 +10,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 위시리스트의 '촬영 시간대(TimeCondition) + 원하는 날씨(WeatherCondition)'가
+ * 출사알림의 '촬영 시간대(TimeCondition) + 원하는 날씨(WeatherCondition)'가
  * 특정 날짜의 예보와 일치하는지 판정하는 공용 컴포넌트.
  * <p>
- * 스케줄러(알림 발송 판단)와 위시리스트 상세 프리뷰(화면 표시 판단)가 동일한 규칙을 쓰도록
+ * 스케줄러(알림 발송 판단)와 출사알림 상세 프리뷰(화면 표시 판단)가 동일한 규칙을 쓰도록
  * 매칭 로직을 이 한 곳으로 모은다.
  * <p>
  * <b>데이터 기반 정밀도 분기</b><br>
@@ -44,7 +44,7 @@ public class WeatherMatchService {
     }
 
     /**
-     * 시간대 지정이 없는 위시리스트용: 해당 날짜의 모든 슬롯 중 하나라도 조건에 맞으면 true.
+     * 시간대 지정이 없는 출사알림용: 해당 날짜의 모든 슬롯 중 하나라도 조건에 맞으면 true.
      * (프리뷰에서 timeConditions가 비어 있는 경우의 Fallback)
      */
     public boolean matchesAnyTime(List<WeatherForecastResponse> forecast, String targetDateStr,

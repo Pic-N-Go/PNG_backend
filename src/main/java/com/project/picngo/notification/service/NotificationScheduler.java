@@ -8,11 +8,11 @@ import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
-import com.project.picngo.wishlist.domain.Wishlist;
-import com.project.picngo.wishlist.domain.enums.TimeCondition;
-import com.project.picngo.wishlist.domain.enums.WeatherCondition;
-import com.project.picngo.wishlist.repository.WishlistRepository;
-import com.project.picngo.wishlist.service.WeatherMatchService;
+import com.project.picngo.spotalert.domain.SpotAlert;
+import com.project.picngo.spotalert.domain.enums.TimeCondition;
+import com.project.picngo.spotalert.domain.enums.WeatherCondition;
+import com.project.picngo.spotalert.repository.SpotAlertRepository;
+import com.project.picngo.spotalert.service.WeatherMatchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 public class NotificationScheduler {
 
     private final NotificationSettingRepository notificationSettingRepository;
-    private final WishlistRepository wishlistRepository;
+    private final SpotAlertRepository spotAlertRepository;
     private final SpotRepository spotRepository;
     private final WeatherCacheService weatherCacheService;
     private final NotificationService notificationService;
@@ -95,29 +95,29 @@ public class NotificationScheduler {
 
     // --- 공통 로직 ---
 
-    // 고정된 시간대 알림 처리 (위시리스트 날씨 매칭)
+    // 고정된 시간대 알림 처리 (출사알림 날씨 매칭)
     private void processFixedTimeNotification(TimeCondition timeCondition) {
         long startTime = System.currentTimeMillis();
-        List<Long> activeUserIds = getActiveWishlistUserIds();
+        List<Long> activeUserIds = getActiveSpotAlertUserIds();
         if (activeUserIds.isEmpty()) return;
 
-        // 1. N+1 문제 해결: activeUserIds 목록으로 위시리스트 및 조건들을 단 1번의 쿼리로 일괄 배치 조회
-        List<Wishlist> allWishlists = wishlistRepository.findAllByUserIdInAndIsActiveTrue(activeUserIds);
+        // 1. N+1 문제 해결: activeUserIds 목록으로 출사알림 및 조건들을 단 1번의 쿼리로 일괄 배치 조회
+        List<SpotAlert> allSpotAlerts = spotAlertRepository.findAllByUserIdInAndIsActiveTrue(activeUserIds);
 
         // 2. N+1 문제 해결: 스팟 ID 수집 후 단 1번의 IN 쿼리로 스팟 정보를 인메모리 맵에 일괄 로딩
-        List<Long> spotIds = allWishlists.stream().map(Wishlist::getSpotId).distinct().toList();
+        List<Long> spotIds = allSpotAlerts.stream().map(SpotAlert::getSpotId).distinct().toList();
         Map<Long, Spot> spotMap = spotRepository.findByIdIn(spotIds).stream()
                 .collect(Collectors.toMap(Spot::getId, s -> s));
 
         // 3. 병목 해결: 매칭 대상 스팟의 날씨 예보를 '고유 좌표 단위'로 병렬 사전 워밍업.
         //    이후 매칭 루프의 getCached7DayForecast()는 전부 캐시 히트가 되어 외부 API 직렬 호출이 사라진다.
-        prewarmForecastCache(allWishlists, spotMap, timeCondition);
+        prewarmForecastCache(allSpotAlerts, spotMap, timeCondition);
 
         int matchedCount = 0;
-        for (Wishlist wishlist : allWishlists) {
-            if (wishlist.getTimeConditions().contains(timeCondition)) {
-                Spot spot = spotMap.get(wishlist.getSpotId());
-                if (spot != null && checkWeatherAndNotify(wishlist.getUserId(), wishlist, spot, timeCondition)) {
+        for (SpotAlert spotAlert : allSpotAlerts) {
+            if (spotAlert.getTimeConditions().contains(timeCondition)) {
+                Spot spot = spotMap.get(spotAlert.getSpotId());
+                if (spot != null && checkWeatherAndNotify(spotAlert.getUserId(), spotAlert, spot, timeCondition)) {
                     matchedCount++;
                 }
             }
@@ -135,14 +135,14 @@ public class NotificationScheduler {
      * 그 키 기준으로 중복을 먼저 제거하여 '고유 좌표당 정확히 1번'만 외부 API를 호출한다.
      * (중복 제거 후 병렬 호출이므로 동일 좌표를 동시에 여러 번 조회하는 캐시 스탬피드도 방지된다.)
      */
-    private void prewarmForecastCache(List<Wishlist> allWishlists, Map<Long, Spot> spotMap, TimeCondition timeCondition) {
+    private void prewarmForecastCache(List<SpotAlert> allSpotAlerts, Map<Long, Spot> spotMap, TimeCondition timeCondition) {
         String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
         // 시간 조건이 일치하는 스팟만, 캐시 키(반올림 좌표) 기준으로 중복 제거
         Map<String, Spot> distinctByCacheKey = new LinkedHashMap<>();
-        for (Wishlist wishlist : allWishlists) {
-            if (!wishlist.getTimeConditions().contains(timeCondition)) continue;
-            Spot spot = spotMap.get(wishlist.getSpotId());
+        for (SpotAlert spotAlert : allSpotAlerts) {
+            if (!spotAlert.getTimeConditions().contains(timeCondition)) continue;
+            Spot spot = spotMap.get(spotAlert.getSpotId());
             if (spot == null || spot.getLatitude() == null || spot.getLongitude() == null) continue;
             String cacheKey = String.format(Locale.US, "%.1f_%.1f", spot.getLatitude(), spot.getLongitude());
             distinctByCacheKey.putIfAbsent(cacheKey, spot);
@@ -178,27 +178,27 @@ public class NotificationScheduler {
         List<Long> activeUserIds = getActiveGoldenHourUserIds();
         if (activeUserIds.isEmpty()) return;
 
-        // 1. N+1 해결: 위시리스트/스팟을 각각 1번의 배치 쿼리로 일괄 조회
-        List<Wishlist> allWishlists = wishlistRepository.findAllByUserIdInAndIsActiveTrue(activeUserIds);
-        List<Long> spotIds = allWishlists.stream().map(Wishlist::getSpotId).distinct().toList();
+        // 1. N+1 해결: 출사알림/스팟을 각각 1번의 배치 쿼리로 일괄 조회
+        List<SpotAlert> allSpotAlerts = spotAlertRepository.findAllByUserIdInAndIsActiveTrue(activeUserIds);
+        List<Long> spotIds = allSpotAlerts.stream().map(SpotAlert::getSpotId).distinct().toList();
         Map<Long, Spot> spotMap = spotRepository.findByIdIn(spotIds).stream()
                 .collect(Collectors.toMap(Spot::getId, s -> s));
 
         // 2. 병목 해결: 고유 (좌표, 타겟일) 단위로 골든아워 예보를 병렬 사전 워밍업
-        prewarmGoldenHourCache(allWishlists, spotMap, timeCondition);
+        prewarmGoldenHourCache(allSpotAlerts, spotMap, timeCondition);
 
         // 3. 유저별 최대 1건만 발송 (기존 break 시맨틱 유지) → 유저 단위로 그룹핑 후 첫 매칭에서 중단
-        Map<Long, List<Wishlist>> byUser = allWishlists.stream()
-                .collect(Collectors.groupingBy(Wishlist::getUserId));
+        Map<Long, List<SpotAlert>> byUser = allSpotAlerts.stream()
+                .collect(Collectors.groupingBy(SpotAlert::getUserId));
 
         int matchedCount = 0;
-        for (Map.Entry<Long, List<Wishlist>> entry : byUser.entrySet()) {
+        for (Map.Entry<Long, List<SpotAlert>> entry : byUser.entrySet()) {
             Long userId = entry.getKey();
-            for (Wishlist wishlist : entry.getValue()) {
-                if (!wishlist.getTimeConditions().contains(timeCondition)) continue;
-                Spot spot = spotMap.get(wishlist.getSpotId());
+            for (SpotAlert spotAlert : entry.getValue()) {
+                if (!spotAlert.getTimeConditions().contains(timeCondition)) continue;
+                Spot spot = spotMap.get(spotAlert.getSpotId());
                 if (spot == null) continue;
-                if (checkGoldenHourAndNotify(userId, wishlist, spot, timeCondition)) {
+                if (checkGoldenHourAndNotify(userId, spotAlert, spot, timeCondition)) {
                     matchedCount++;
                     break; // 동일 유저 중복 골든아워 알림 폭탄 방지 (1건 발송 후 다음 유저)
                 }
@@ -214,13 +214,13 @@ public class NotificationScheduler {
      * 골든아워(일출/일몰) 예보를 고유 (반올림 좌표, 타겟일) 단위로 병렬 사전 조회하여 Redis 캐시를 채운다.
      * 골든아워 캐시 키는 정수 반올림 좌표(%.0f) + 타겟일을 사용하므로 그 단위로 중복을 제거한다.
      */
-    private void prewarmGoldenHourCache(List<Wishlist> allWishlists, Map<Long, Spot> spotMap, TimeCondition timeCondition) {
+    private void prewarmGoldenHourCache(List<SpotAlert> allSpotAlerts, Map<Long, Spot> spotMap, TimeCondition timeCondition) {
         Map<String, GoldenHourWarmTarget> distinct = new LinkedHashMap<>();
-        for (Wishlist wishlist : allWishlists) {
-            if (!wishlist.getTimeConditions().contains(timeCondition)) continue;
-            Spot spot = spotMap.get(wishlist.getSpotId());
+        for (SpotAlert spotAlert : allSpotAlerts) {
+            if (!spotAlert.getTimeConditions().contains(timeCondition)) continue;
+            Spot spot = spotMap.get(spotAlert.getSpotId());
             if (spot == null || spot.getLatitude() == null || spot.getLongitude() == null) continue;
-            int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+            int dDay = spotAlert.getAlertTimingDays() != null ? spotAlert.getAlertTimingDays() : 0;
             String targetDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(dDay).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             String cacheKey = String.format(Locale.US, "%.0f_%.0f_%s", spot.getLatitude(), spot.getLongitude(), targetDate);
             distinct.putIfAbsent(cacheKey, new GoldenHourWarmTarget(spot.getLatitude(), spot.getLongitude(), targetDate, spot.getId()));
@@ -249,13 +249,13 @@ public class NotificationScheduler {
                 distinct.size(), (System.currentTimeMillis() - warmStart));
     }
 
-    // 단일 위시리스트의 골든아워 임박 여부 확인 후 발송. 발송했으면 true.
-    private boolean checkGoldenHourAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
+    // 단일 출사알림의 골든아워 임박 여부 확인 후 발송. 발송했으면 true.
+    private boolean checkGoldenHourAndNotify(Long userId, SpotAlert spotAlert, Spot spot, TimeCondition timeCondition) {
         try {
             Double lat = spot.getLatitude();
             Double lng = spot.getLongitude();
 
-            int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+            int dDay = spotAlert.getAlertTimingDays() != null ? spotAlert.getAlertTimingDays() : 0;
             String targetDate = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(dDay).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 
             GoldenHourResponse gh = weatherCacheService.getCachedGoldenHour(lat, lng, targetDate);
@@ -281,12 +281,12 @@ public class NotificationScheduler {
                 String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
                 // 멱등키: 같은 날·같은 스팟·같은 일출/일몰 알림 중복 방지
                 String ghDedupeKey = String.format("GOLDEN_HOUR:%d:%d:%s:%s", userId, spot.getId(), targetDate, timeCondition);
-                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/wishlist/" + spot.getId(), spot.getId(), ghDedupeKey);
+                notificationService.sendPushNotification(userId, "GOLDEN_HOUR", title, content, "/spot-alerts/" + spot.getId(), spot.getId(), ghDedupeKey);
                 return true;
             }
             return false;
         } catch (Exception e) {
-            log.error("골든아워 확인 중 오류 발생 (유저: {}, 스팟: {})", userId, wishlist.getSpotId(), e);
+            log.error("골든아워 확인 중 오류 발생 (유저: {}, 스팟: {})", userId, spotAlert.getSpotId(), e);
             return false;
         }
     }
@@ -295,7 +295,7 @@ public class NotificationScheduler {
     private record GoldenHourWarmTarget(Double lat, Double lng, String date, Long spotId) {}
 
     // 날씨 및 미세먼지 조건 확인 후 알림 발송. 실제로 발송했으면 true.
-    private boolean checkWeatherAndNotify(Long userId, Wishlist wishlist, Spot spot, TimeCondition timeCondition) {
+    private boolean checkWeatherAndNotify(Long userId, SpotAlert spotAlert, Spot spot, TimeCondition timeCondition) {
         try {
             Double lat = spot.getLatitude();
             Double lng = spot.getLongitude();
@@ -304,7 +304,7 @@ public class NotificationScheduler {
                 return false;
             }
 
-            int dDay = wishlist.getAlertTimingDays() != null ? wishlist.getAlertTimingDays() : 0;
+            int dDay = spotAlert.getAlertTimingDays() != null ? spotAlert.getAlertTimingDays() : 0;
             // DAWN(새벽)은 밤 22시에 트리거되므로 대상 새벽은 '다음 날'이다. 그래서 하루를 더해 보정
             int targetOffset = timeCondition == TimeCondition.DAWN ? dDay + 1 : dDay;
             String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -313,7 +313,7 @@ public class NotificationScheduler {
             // 캐싱된 7일 예보 조회
             List<WeatherForecastResponse> combinedForecast = weatherCacheService.getCached7DayForecast(lat, lng, todayStr);
 
-            Set<WeatherCondition> userConditions = wishlist.getWeatherConditions();
+            Set<WeatherCondition> userConditions = spotAlert.getWeatherConditions();
             if (userConditions == null || userConditions.isEmpty()) {
                 return false;
             }
@@ -324,9 +324,9 @@ public class NotificationScheduler {
             if (isMatched) {
                 // 미세먼지 조건 필터링
                 boolean isAirQualityMatched = true; 
-                com.project.picngo.wishlist.domain.enums.AirQualityCondition aqCondition = wishlist.getAirQualityCondition();
+                com.project.picngo.spotalert.domain.enums.AirQualityCondition aqCondition = spotAlert.getAirQualityCondition();
                 
-                if (aqCondition != null && aqCondition != com.project.picngo.wishlist.domain.enums.AirQualityCondition.NONE) {
+                if (aqCondition != null && aqCondition != com.project.picngo.spotalert.domain.enums.AirQualityCondition.NONE) {
                     try {
                         String sidoName = com.project.picngo.external.SidoNameMapper.normalize(spot.getAddress());
                         if (sidoName == null) sidoName = "서울"; // 주소 없음/짧음 → 기존 기본값 유지
@@ -335,9 +335,9 @@ public class NotificationScheduler {
                         
                         if (aqItem != null && aqItem.pm10Grade() != null) {
                             int pm10Grade = Integer.parseInt(aqItem.pm10Grade());
-                            if (aqCondition == com.project.picngo.wishlist.domain.enums.AirQualityCondition.GOOD && pm10Grade > 1) {
+                            if (aqCondition == com.project.picngo.spotalert.domain.enums.AirQualityCondition.GOOD && pm10Grade > 1) {
                                 isAirQualityMatched = false;
-                            } else if (aqCondition == com.project.picngo.wishlist.domain.enums.AirQualityCondition.NORMAL_OR_BETTER && pm10Grade > 2) {
+                            } else if (aqCondition == com.project.picngo.spotalert.domain.enums.AirQualityCondition.NORMAL_OR_BETTER && pm10Grade > 2) {
                                 isAirQualityMatched = false;
                             }
                         }
@@ -355,14 +355,14 @@ public class NotificationScheduler {
                     String content = String.format("%s %s %s의 날씨가 설정하신 조건과 일치할 예정입니다!", whenStr, timeLabel, spot.getName());
                     // 멱등키: 같은 날·같은 스팟이라도 촬영 시간대별로 별개 알림 → timeCondition까지 포함
                     String dedupeKey = String.format("WEATHER_MATCH:%d:%d:%s:%s", userId, spot.getId(), targetDateStr, timeCondition);
-                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/wishlist/" + spot.getId(), spot.getId(), dedupeKey);
+                    notificationService.sendPushNotification(userId, "WEATHER_MATCH", title, content, "/spot-alerts/" + spot.getId(), spot.getId(), dedupeKey);
                     return true;
                 }
             }
             return false;
 
         } catch (Exception e) {
-            log.error("유저 {} 의 위시리스트 체크 중 오류 발생", userId, e);
+            log.error("유저 {} 의 출사알림 체크 중 오류 발생", userId, e);
             return false;
         }
     }
@@ -380,8 +380,8 @@ public class NotificationScheduler {
         };
     }
 
-    private List<Long> getActiveWishlistUserIds() {
-        Set<Long> userIds = notificationCacheService.getActiveUserIds("wishlist");
+    private List<Long> getActiveSpotAlertUserIds() {
+        Set<Long> userIds = notificationCacheService.getActiveUserIds("spotalert");
         return userIds.stream()
                 .filter(userId -> {
                     com.project.picngo.notification.dto.NotificationSettingResponse setting = notificationCacheService.getCachedSetting(userId);

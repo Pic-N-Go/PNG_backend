@@ -8,8 +8,8 @@ import java.time.LocalTime;
 
 @Schema(description = "알림 수신 설정 응답 DTO")
 public record NotificationSettingResponse(
-        @Schema(description = "위시리스트 알림 수신 여부", example = "true")
-        Boolean isWishlistPushEnabled,
+        @Schema(description = "출사알림 알림 수신 여부", example = "true")
+        Boolean isSpotAlertPushEnabled,
 
         @Schema(description = "골든아워 알림 수신 여부", example = "true")
         Boolean isGoldenHourPushEnabled,
@@ -33,7 +33,7 @@ public record NotificationSettingResponse(
             return new NotificationSettingResponse(true, true, true, false, null, null);
         }
         return new NotificationSettingResponse(
-                setting.getIsWishlistPushEnabled(),
+                setting.getIsSpotAlertPushEnabled(),
                 setting.getIsGoldenHourPushEnabled(),
                 setting.getIsCommunityPushEnabled(),
                 setting.getIsDndEnabled(),

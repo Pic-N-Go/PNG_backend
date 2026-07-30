@@ -107,38 +107,41 @@ ON DUPLICATE KEY UPDATE id=id;
 -- ============================================================
 -- 알림 수신 설정 (1~100번 유저 전원 동의 설정)
 -- ============================================================
-INSERT INTO notification_setting (user_id, fcm_token, is_wishlist_push_enabled, is_golden_hour_push_enabled, is_community_push_enabled, is_dnd_enabled, dnd_start_time, dnd_end_time, created_at, updated_at)
+INSERT INTO notification_setting (user_id, fcm_token, is_spot_alert_push_enabled, is_golden_hour_push_enabled, is_community_push_enabled, is_dnd_enabled, dnd_start_time, dnd_end_time, created_at, updated_at)
 SELECT id, CONCAT('dummy_fcm_token_', id), true, true, true, false, '23:00:00', '07:00:00', NOW(), NOW()
 FROM users
+WHERE id BETWEEN 1 AND 100
 ON DUPLICATE KEY UPDATE fcm_token = VALUES(fcm_token);
 
 -- ============================================================
--- 위시리스트 (1~101번 유저 전원 스팟 1번 성산일출봉 & 2번 함덕 등록)
+-- 출사알림 (1~100번 더미 유저 스팟 1번 성산일출봉 & 2번 함덕 등록)
 -- ============================================================
-INSERT INTO wishlist (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
+INSERT INTO spot_alert (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
 SELECT id, id, 1, '성산일출봉 출사 및 골든아워 촬영', 'NONE', 0, true, NOW(), NOW()
 FROM users
+WHERE id BETWEEN 1 AND 100
 ON DUPLICATE KEY UPDATE spot_id=1;
 
-INSERT INTO wishlist (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
+INSERT INTO spot_alert (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
 SELECT id + 1000, id, 2, '함덕 에메랄드 바다 풍경', 'NONE', 0, true, NOW(), NOW()
 FROM users
+WHERE id BETWEEN 1 AND 100
 ON DUPLICATE KEY UPDATE spot_id=2;
 
--- 위시리스트 시간 조건 (성산일출봉: MORNING, SUNRISE, SUNSET / 함덕: MORNING, AFTERNOON, SUNSET)
-INSERT INTO wishlist_time_conditions (wishlist_id, time_condition)
-SELECT id, 'MORNING' FROM wishlist
+-- 출사알림 시간 조건 (성산일출봉: MORNING, SUNRISE, SUNSET / 함덕: MORNING, AFTERNOON, SUNSET)
+INSERT INTO spot_alert_time_conditions (spot_alert_id, time_condition)
+SELECT id, 'MORNING' FROM spot_alert WHERE (id BETWEEN 1 AND 100) OR (id BETWEEN 1001 AND 1100)
 UNION ALL
-SELECT id, 'SUNRISE' FROM wishlist WHERE spot_id = 1
+SELECT id, 'SUNRISE' FROM spot_alert WHERE spot_id = 1 AND ((id BETWEEN 1 AND 100) OR (id BETWEEN 1001 AND 1100))
 UNION ALL
-SELECT id, 'SUNSET' FROM wishlist
+SELECT id, 'SUNSET' FROM spot_alert WHERE (id BETWEEN 1 AND 100) OR (id BETWEEN 1001 AND 1100)
 ON DUPLICATE KEY UPDATE time_condition=VALUES(time_condition);
 
--- 위시리스트 날씨 조건 (CLEAR, CLOUDY)
-INSERT INTO wishlist_weather_conditions (wishlist_id, weather_condition)
-SELECT id, 'CLEAR' FROM wishlist
+-- 출사알림 날씨 조건 (CLEAR, CLOUDY)
+INSERT INTO spot_alert_weather_conditions (spot_alert_id, weather_condition)
+SELECT id, 'CLEAR' FROM spot_alert WHERE (id BETWEEN 1 AND 100) OR (id BETWEEN 1001 AND 1100)
 UNION ALL
-SELECT id, 'CLOUDY' FROM wishlist
+SELECT id, 'CLOUDY' FROM spot_alert WHERE (id BETWEEN 1 AND 100) OR (id BETWEEN 1001 AND 1100)
 ON DUPLICATE KEY UPDATE weather_condition=VALUES(weather_condition);
 
 -- ============================================================

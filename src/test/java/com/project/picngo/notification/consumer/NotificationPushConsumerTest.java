@@ -46,7 +46,7 @@ class NotificationPushConsumerTest {
 
     private NotificationPushDto dto(String dedupeKey) {
         return new NotificationPushDto(1L, "WEATHER_MATCH", "☁️ 오전 날씨 조건 알림",
-                "오늘 오전 경복궁의 날씨가 설정하신 조건과 일치할 예정입니다!", "/wishlist/10", 10L, dedupeKey);
+                "오늘 오전 경복궁의 날씨가 설정하신 조건과 일치할 예정입니다!", "/spot-alerts/10", 10L, dedupeKey);
     }
 
     @Test

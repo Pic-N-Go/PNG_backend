@@ -103,7 +103,7 @@ public class NotificationService {
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
         
         setting.updateSettings(
-                request.isWishlistPushEnabled(),
+                request.isSpotAlertPushEnabled(),
                 request.isGoldenHourPushEnabled(),
                 request.isCommunityPushEnabled(),
                 request.isDndEnabled(),
@@ -136,19 +136,19 @@ public class NotificationService {
     }
 
     /**
-     * 알림 발송 직전, 알림 종류(type)에 따라 유저의 해당 토글 수신 동의 여부(isWishlistPushEnabled 등)를 검사하는 이중 안전장치 메서드
+     * 알림 발송 직전, 알림 종류(type)에 따라 유저의 해당 토글 수신 동의 여부(isSpotAlertPushEnabled 등)를 검사하는 이중 안전장치 메서드
      */
     private boolean isPushEnabledForType(NotificationSettingResponse setting, String type) {
         if (setting == null) return false;
         if ("GOLDEN_HOUR".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.isGoldenHourPushEnabled());
-        } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "WISHLIST".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.isWishlistPushEnabled());
+            return !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
+        } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "SPOT_ALERT".equalsIgnoreCase(type)) {
+            return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled());
         } else if ("COMMUNITY".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.isCommunityPushEnabled());
+            return !Boolean.FALSE.equals(setting.isCommunityPushEnabled());
         } else if ("TEST".equalsIgnoreCase(type)) {
-            // 테스트 알림 발송 시: 위시리스트 + 골든아워 알림이 둘 다 켜져있는지 검사
-            return Boolean.TRUE.equals(setting.isWishlistPushEnabled()) && Boolean.TRUE.equals(setting.isGoldenHourPushEnabled());
+            // 테스트 알림 발송 시: 출사알림 + 골든아워 알림 검사 (null은 기본 true 처리)
+            return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled()) && !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
         }
         return true;
     }
@@ -160,7 +160,7 @@ public class NotificationService {
         String content = (request != null && request.content() != null && !request.content().isBlank())
                 ? request.content() : "프론트엔드 푸시 알림 수신 성공 테스트 메시지입니다!";
         String deepLink = (request != null && request.deepLink() != null && !request.deepLink().isBlank())
-                ? request.deepLink() : "/wishlist/1";
+                ? request.deepLink() : "/spot-alerts/1";
 
         sendPushNotification(userId, "TEST", title, content, deepLink);
     }

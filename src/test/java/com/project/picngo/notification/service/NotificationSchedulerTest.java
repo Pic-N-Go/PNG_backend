@@ -6,10 +6,10 @@ import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
-import com.project.picngo.wishlist.domain.Wishlist;
-import com.project.picngo.wishlist.domain.enums.TimeCondition;
-import com.project.picngo.wishlist.domain.enums.WeatherCondition;
-import com.project.picngo.wishlist.repository.WishlistRepository;
+import com.project.picngo.spotalert.domain.SpotAlert;
+import com.project.picngo.spotalert.domain.enums.TimeCondition;
+import com.project.picngo.spotalert.domain.enums.WeatherCondition;
+import com.project.picngo.spotalert.repository.SpotAlertRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,7 +54,7 @@ class NotificationSchedulerTest {
     private SpotRepository spotRepository;
 
     @Autowired
-    private WishlistRepository wishlistRepository;
+    private SpotAlertRepository spotAlertRepository;
 
     @Autowired
     private NotificationSettingRepository notificationSettingRepository;
@@ -82,27 +82,27 @@ class NotificationSchedulerTest {
                 .build();
         savedSpot = spotRepository.save(spot);
 
-        // 스케줄러의 활성 위시리스트 유저 조회가 테스트 유저를 반환하도록 스텁
-        when(notificationCacheService.getActiveUserIds("wishlist")).thenReturn(Set.of(userId));
+        // 스케줄러의 활성 출사알림 유저 조회가 테스트 유저를 반환하도록 스텁
+        when(notificationCacheService.getActiveUserIds("spotalert")).thenReturn(Set.of(userId));
     }
 
     @Test
     @DisplayName("[통합 시나리오] 유저가 '맑음'을 조건으로 걸었을 때, 기상청(Mock)이 '맑음'을 반환하면 알림 발송됨")
     void testWeatherMatchSuccess() {
         // Given: 유저가 1일 뒤 '맑음'을 알림 조건으로 설정함
-        Wishlist wishlist = Wishlist.builder()
+        SpotAlert spotAlert = SpotAlert.builder()
                 .userId(userId)
                 .spotId(savedSpot.getId())
                 .build();
-        wishlist.updateSettings(
+        spotAlert.updateSettings(
                 "테스트 메모",
                 Set.of(WeatherCondition.CLEAR),
                 Set.of(TimeCondition.AFTERNOON),
-                com.project.picngo.wishlist.domain.enums.AirQualityCondition.NONE,
+                com.project.picngo.spotalert.domain.enums.AirQualityCondition.NONE,
                 1, // 1일 뒤 (내일)
                 true
         );
-        wishlistRepository.save(wishlist);
+        spotAlertRepository.save(spotAlert);
 
         // 오늘 날짜 및 타겟 날짜 계산
         String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -125,7 +125,7 @@ class NotificationSchedulerTest {
                 eq("WEATHER_MATCH"),
                 eq("☁️ 오후 날씨 조건 알림"),
                 contains("경복궁 야간개장"),
-                anyString(),               // deepLink
+                eq("/spot-alerts/" + savedSpot.getId()), // deepLink
                 eq(savedSpot.getId()),     // spotId
                 anyString()                // dedupeKey
         );
@@ -135,19 +135,19 @@ class NotificationSchedulerTest {
     @DisplayName("[통합 시나리오] 유저가 '맑음'을 조건으로 걸었는데, 기상청(Mock)이 '비'를 반환하면 알림 발송안됨")
     void testWeatherMatchFail() {
         // Given
-        Wishlist wishlist = Wishlist.builder()
+        SpotAlert spotAlert = SpotAlert.builder()
                 .userId(userId)
                 .spotId(savedSpot.getId())
                 .build();
-        wishlist.updateSettings(
+        spotAlert.updateSettings(
                 "테스트 메모",
                 Set.of(WeatherCondition.CLEAR),
                 Set.of(TimeCondition.AFTERNOON),
-                com.project.picngo.wishlist.domain.enums.AirQualityCondition.NONE,
+                com.project.picngo.spotalert.domain.enums.AirQualityCondition.NONE,
                 1,
                 true
         );
-        wishlistRepository.save(wishlist);
+        spotAlertRepository.save(spotAlert);
 
         String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String targetDateStr = LocalDate.now(ZoneId.of("Asia/Seoul")).plusDays(1).format(DateTimeFormatter.ofPattern("yyyyMMdd"));

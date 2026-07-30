@@ -7,7 +7,7 @@ import com.project.picngo.course.service.CourseService;
 import com.project.picngo.notification.service.FcmService;
 import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
-import com.project.picngo.wishlist.service.WishlistService;
+import com.project.picngo.spotalert.service.SpotAlertService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -52,7 +52,7 @@ public class ApiSecurityTest {
     private NotificationService notificationService;
 
     @MockitoBean
-    private WishlistService wishlistService;
+    private SpotAlertService spotAlertService;
 
     @MockitoBean
     private CourseService courseService;
@@ -67,9 +67,9 @@ public class ApiSecurityTest {
     }
 
     @Test
-    @DisplayName("위시리스트 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
-    void 위시리스트_API_토큰_없이_호출시_차단() throws Exception {
-        mockMvc.perform(get("/wishlist")) // 오타가 났다면 404가 떠서 이 테스트는 실패함
+    @DisplayName("출사알림 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    void 출사알림_API_토큰_없이_호출시_차단() throws Exception {
+        mockMvc.perform(get("/spot-alerts")) // 오타가 났다면 404가 떠서 이 테스트는 실패함
                 .andExpect(status().isForbidden());
     }
 
@@ -102,9 +102,9 @@ public class ApiSecurityTest {
     }
 
     @Test
-    @DisplayName("위시리스트 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
-    void 위시리스트_API_유효한_인증으로_호출시_정상_응답() throws Exception {
-        mockMvc.perform(get("/wishlist")
+    @DisplayName("출사알림 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
+    void 출사알림_API_유효한_인증으로_호출시_정상_응답() throws Exception {
+        mockMvc.perform(get("/spot-alerts")
                         .with(authentication(createMockAuthToken())))
                 .andExpect(status().isOk());
     }
