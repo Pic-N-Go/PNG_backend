@@ -57,8 +57,9 @@ public class NotificationPushConsumer {
                         fcmService.sendMessage(setting.getFcmToken(), dto.title(), dto.content(), dto.deepLink(), dto.spotId());
                     } catch (CustomException e) {
                         if (e.getErrorCode() == NotificationErrorCode.FCM_TOKEN_INVALID) {
-                            // 만료/무효 토큰 → 정리하여 이후 스케줄러에서 재발송하지 않도록 함
-                            notificationService.handleInvalidToken(dto.userId());
+                            // 만료/무효 토큰 → 정리하여 이후 스케줄러에서 재발송하지 않도록 함.
+                            // 발송에 사용한 토큰을 함께 넘겨, 그 사이 토큰이 갱신됐으면 정리를 건너뛰게 한다.
+                            notificationService.handleInvalidToken(dto.userId(), setting.getFcmToken());
                         } else {
                             log.warn("❌ [FCM 발송 실패 (ErrorCode: {})] userId: {}", NotificationErrorCode.FCM_SEND_FAILED.name(), dto.userId(), e);
                         }

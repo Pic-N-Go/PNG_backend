@@ -36,7 +36,9 @@ spring:
   jpa:
     defer-datasource-initialization: true
     hibernate:
-      ddl-auto: create
+      # create로 두면 기동마다 전체 테이블을 DROP+재생성해 users/review 등 데이터가 소실된다.
+      # 스키마를 갈아엎어야 하면 임시로 바꾸되 커밋하지 말 것. (2026-06 5c3502a에 이어 두 번째 회귀)
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:

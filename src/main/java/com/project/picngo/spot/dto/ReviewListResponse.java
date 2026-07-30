@@ -29,6 +29,7 @@ public record ReviewListResponse(
             Long id,
             Long userId,
             String nickname,
+            String profileImageUrl,
             Integer rating,
             String content,
             String equipmentInfo,
@@ -37,11 +38,12 @@ public record ReviewListResponse(
             LocalDate visitedAt,
             LocalDateTime createdAt
     ) {
-        public static ReviewInfo of(Review review, String nickname, List<String> photos) {
+        public static ReviewInfo of(Review review, String nickname, String profileImageUrl, List<String> photos) {
             return new ReviewInfo(
                     review.getId(),
                     review.getUserId(),
                     nickname,
+                    profileImageUrl,
                     review.getRating(),
                     review.getContent(),
                     review.getEquipmentInfo(),

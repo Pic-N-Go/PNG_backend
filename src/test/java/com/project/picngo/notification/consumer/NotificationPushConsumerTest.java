@@ -98,6 +98,7 @@ class NotificationPushConsumerTest {
 
         consumer.consumePushEvent(dto("WEATHER_MATCH:1:10:20260728:MORNING"));
 
-        verify(notificationService).handleInvalidToken(1L);
+        // 실패에 사용한 토큰을 함께 전달해야 한다 (그 사이 갱신됐으면 정리 스킵하도록)
+        verify(notificationService).handleInvalidToken(1L, "dead-token");
     }
 }

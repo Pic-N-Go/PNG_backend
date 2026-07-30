@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -66,8 +67,9 @@ public class ReviewService {
         List<Long> reviewIds = reviews.stream().map(Review::getId).toList();
         List<Long> userIds = reviews.stream().map(Review::getUserId).toList();
 
-        Map<Long, String> nicknameMap = userRepository.findByIdIn(userIds).stream()
-                .collect(Collectors.toMap(User::getId, User::getNickname));
+        // profileImageUrl은 null이 정상 케이스라 Collectors.toMap의 값으로 쓰면 NPE가 난다. User째로 담는다.
+        Map<Long, User> userMap = userRepository.findByIdIn(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
         Map<Long, List<String>> photoMap = reviewPhotoRepository.findByReview_IdIn(reviewIds).stream()
                 .collect(Collectors.groupingBy(
                         photo -> photo.getReview().getId(),
@@ -75,11 +77,15 @@ public class ReviewService {
                 ));
 
         List<ReviewListResponse.ReviewInfo> reviewInfos = reviews.stream()
-                .map(review -> ReviewListResponse.ReviewInfo.of(
-                        review,
-                        nicknameMap.getOrDefault(review.getUserId(), "알 수 없음"),
-                        photoMap.getOrDefault(review.getId(), List.of())
-                ))
+                .map(review -> {
+                    User user = userMap.get(review.getUserId());
+                    return ReviewListResponse.ReviewInfo.of(
+                            review,
+                            user != null ? user.getNickname() : "알 수 없음",
+                            user != null ? user.getProfileImageUrl() : null,
+                            photoMap.getOrDefault(review.getId(), List.of())
+                    );
+                })
                 .toList();
 
         return new ReviewListResponse(

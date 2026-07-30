@@ -47,9 +47,19 @@ public class KakaoAuthClient {
 
 		String email = valueOrDefault(kakaoAccount.get("email"), providerId + "@kakao.local");
 		String nickname = valueOrDefault(profile.get("nickname"), "kakao_" + providerId);
-		String profileImageUrl = valueOrDefault(profile.get("profile_image_url"), null);
+		String profileImageUrl = toHttps(valueOrDefault(profile.get("profile_image_url"), null));
 
 		return new KakaoProfile(providerId, email, nickname, profileImageUrl);
+	}
+
+	// 카카오가 프로필 이미지를 http로 내려주는 경우가 있다.
+	// iOS ATS / Android cleartext 정책상 http는 앱에서 로드되지 않으므로 저장 전에 https로 승격한다.
+	private String toHttps(String url) {
+		if (url == null) {
+			return null;
+		}
+
+		return url.replaceFirst("^http://", "https://");
 	}
 
 	private String valueOrDefault(Object value, String defaultValue) {

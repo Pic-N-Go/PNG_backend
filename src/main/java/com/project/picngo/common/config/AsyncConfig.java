@@ -4,6 +4,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.util.concurrent.ThreadPoolExecutor;
+
 @Configuration
 public class AsyncConfig {
 
@@ -21,6 +23,9 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("weather-warmup-");
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
+        // 큐(200)까지 가득 차면 예외로 스케줄러를 중단시키는 대신, 제출한 스레드(스케줄러)가 직접 실행한다.
+        // → 작업 유실 없이 자연스러운 백프레셔로 감속. (워밍업은 실패해도 매칭 루프에서 개별 조회로 폴백)
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
     }
