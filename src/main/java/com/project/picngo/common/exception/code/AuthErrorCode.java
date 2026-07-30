@@ -12,6 +12,7 @@ public enum AuthErrorCode implements BaseErrorCode {
     EMAIL_VERIFICATION_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "인증 코드가 일치하지 않습니다."),
     KAKAO_PROFILE_FETCH_FAILED(HttpStatus.BAD_GATEWAY, "카카오 사용자 정보를 조회하지 못했습니다."),
     SOCIAL_EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 다른 로그인 방식으로 가입된 이메일입니다."),
+    LOGIN_REQUIRED(HttpStatus.UNAUTHORIZED, "로그인이 필요한 기능입니다."),
     FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
 
     private final HttpStatus status;
