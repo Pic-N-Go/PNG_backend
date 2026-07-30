@@ -170,6 +170,9 @@ public class PostImage extends BaseTimeEntity {
         if (this.post != null) {
             throw new IllegalStateException("이미 게시글에 연결된 이미지입니다.");
         }
+        if (postOrder < 0){
+            throw new IllegalArgumentException("이미지 순서는 0 이상이어야 합니다.");
+        }
         this.post = post;
         this.postOrder = postOrder;
     }
