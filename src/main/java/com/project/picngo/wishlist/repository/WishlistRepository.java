@@ -16,5 +16,8 @@ public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
     @EntityGraph(attributePaths = {"weatherConditions", "timeConditions"})
     List<Wishlist> findAllByUserIdAndIsActiveTrue(Long userId);
     
+    @EntityGraph(attributePaths = {"weatherConditions", "timeConditions"})
+    List<Wishlist> findAllByUserIdInAndIsActiveTrue(List<Long> userIds);
+    
     List<Wishlist> findAllByIsActiveTrue();
 }

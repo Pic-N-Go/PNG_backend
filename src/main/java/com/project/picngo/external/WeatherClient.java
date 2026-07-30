@@ -26,6 +26,7 @@ import java.util.Map;
 public class WeatherClient {
 
     private final String serviceKey;
+    private final String kmaBaseUrl;
     private final WebClient kmaWebClient;
     private final WebClient sunriseWebClient;
 
@@ -34,7 +35,8 @@ public class WeatherClient {
                          @Value("${weather.api.sunrise-url:https://api.sunrise-sunset.org}") String sunriseUrl,
                          @Value("${weather.api.key}") String serviceKey) {
         this.serviceKey = serviceKey;
-        
+        this.kmaBaseUrl = kmaUrl;
+
         ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
                 .build();
@@ -68,7 +70,7 @@ public class WeatherClient {
             String baseDate = baseDateTime[0];
             String baseTime = baseDateTime[1];
 
-            String urlStr = "http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst"
+            String urlStr = kmaBaseUrl + "/VilageFcstInfoService_2.0/getVilageFcst"
                     + "?serviceKey=" + serviceKey
                     + "&pageNo=1"
                     + "&numOfRows=1000"
@@ -142,7 +144,7 @@ public class WeatherClient {
 
     public KmaMidWeatherApiResponse getMidTermForecast(String regId, String tmFc) {
         try {
-            String urlStr = "https://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst"
+            String urlStr = kmaBaseUrl + "/MidFcstInfoService/getMidLandFcst"
                     + "?serviceKey=" + serviceKey
                     + "&pageNo=1"
                     + "&numOfRows=10"

@@ -117,8 +117,9 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "최대 결과 수") @RequestParam(defaultValue = "20") int limit
     );
 
-    @Operation(summary = "스팟 상세 조회", description = "스팟 ID로 상세 정보를 조회합니다. 태그, 편의정보, 체크리스트, 통계, 북마크 여부를 포함합니다.")
+    @Operation(summary = "스팟 상세 조회", description = "스팟 ID로 상세 정보를 조회합니다. 태그, 편의정보, 체크리스트, 통계, 북마크 여부, 내가 쓴 리뷰 ID를 포함합니다.")
     ResponseEntity<SpotDetailResponse> getSpotDetail(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
@@ -171,12 +172,12 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
     );
 
-    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 10장까지 함께 업로드할 수 있습니다.")
+    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 5장까지 함께 업로드할 수 있습니다. 이미 이 스팟에 리뷰를 작성했으면 409를 반환합니다.")
     ResponseEntity<ReviewResponse> createReview(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Valid @RequestPart("request") ReviewRequest request,
-            @Parameter(description = "리뷰 사진 목록, 최대 10장")
+            @Parameter(description = "리뷰 사진 목록, 최대 5장")
             @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     );
 }

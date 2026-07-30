@@ -43,18 +43,8 @@ public record NotificationSettingResponse(
     }
 
     public boolean isDndActive() {
-        if (!Boolean.TRUE.equals(this.isDndEnabled)) {
-            return false;
-        }
-        if (this.dndStartTime == null || this.dndEndTime == null) {
-            return false;
-        }
-
-        LocalTime now = LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
-        if (this.dndStartTime.isBefore(this.dndEndTime)) {
-            return !now.isBefore(this.dndStartTime) && now.isBefore(this.dndEndTime);
-        } else {
-            return !now.isBefore(this.dndStartTime) || now.isBefore(this.dndEndTime);
-        }
+        return com.project.picngo.notification.domain.DndPolicy.isActive(
+                this.isDndEnabled, this.dndStartTime, this.dndEndTime,
+                LocalTime.now(java.time.ZoneId.of("Asia/Seoul")));
     }
 }

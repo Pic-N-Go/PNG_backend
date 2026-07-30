@@ -24,6 +24,9 @@ dependencies {
 	// Redis
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
+	// RabbitMQ (비동기 메시지 큐)
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
 	// Spring Security
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 

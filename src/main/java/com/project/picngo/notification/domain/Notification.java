@@ -43,18 +43,24 @@ public class Notification {
 
     private Long spotId;
 
+    // 멱등키: 같은 논리적 알림(재전달·중복 발행)의 중복 저장/발송을 막기 위한 유니크 키.
+    // 형식 예) WEATHER_MATCH:{userId}:{spotId}:{targetDate}:{timeCondition}. null이면 중복 검사 대상이 아님(TEST 등).
+    @Column(unique = true)
+    private String dedupeKey;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Notification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
+    public Notification(Long userId, String type, String title, String content, String deepLink, Long spotId, String dedupeKey) {
         this.userId = userId;
         this.type = type;
         this.title = title;
         this.content = content;
         this.deepLink = deepLink;
         this.spotId = spotId;
+        this.dedupeKey = dedupeKey;
         this.isRead = false;
     }
 
