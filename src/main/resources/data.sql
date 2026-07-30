@@ -78,29 +78,7 @@ UPDATE season_event SET eligible_cat3 = 'A01010100,A01010200,A01010300,A01010400
 -- 개명 전 잔존 row 정리 (예: '벚꽃 시즌' -> '벚꽃') — NOT EXISTS 가드는 새 이름 기준이라 옛 이름 row가 안 지워지고 남아있었음
 DELETE FROM season_event WHERE name IN ('벚꽃 시즌', '단풍 시즌', '설경 시즌');
 
--- ============================================================
--- 스팟 초기 데이터 (제주 주요 스팟 6건)
--- ============================================================
-INSERT INTO spot (id, name, address, latitude, longitude, source, badge, status, bookmark_count, review_count, photogenic_score, is_active, review_average, toilet, created_at, updated_at)
-VALUES
-(1, '성산일출봉', '제주특별자치도 서귀포시 성산읍 일출로 284-12', 33.4580, 126.9425, 'TOUR_API', true, 'APPROVED', 150, 42, 95, true, 4.5, true, NOW(), NOW()),
-(2, '함덕해수욕장', '제주특별자치도 제주시 조천읍 조함해안로 525', 33.5433, 126.6692, 'TOUR_API', true, 'APPROVED', 120, 38, 90, true, 4.8, true, NOW(), NOW()),
-(3, '오설록 티 뮤지엄', '제주특별자치도 서귀포시 안덕면 신화역사로 15', 33.3060, 126.2895, 'TOUR_API', true, 'APPROVED', 98, 25, 85, true, 4.2, true, NOW(), NOW()),
-(4, '카멜리아힐', '제주특별자치도 서귀포시 안덕면 병악로 166', 33.2840, 126.3533, 'TOUR_API', true, 'APPROVED', 110, 30, 88, true, 4.6, true, NOW(), NOW()),
-(5, '협재해수욕장', '제주특별자치도 제주시 한림읍 한림로 329', 33.3940, 126.2397, 'TOUR_API', true, 'APPROVED', 140, 50, 92, true, 4.7, true, NOW(), NOW()),
-(6, '우도봉', '제주특별자치도 제주시 우도면 연평리', 33.4947, 126.9608, 'TOUR_API', true, 'APPROVED', 85, 20, 89, true, 4.4, true, NOW(), NOW())
-ON DUPLICATE KEY UPDATE id=id;
-
--- 스팟 카테고리 (다중 태그). spot_categories 로 이전
-INSERT INTO spot_categories (spot_id, category)
-VALUES
-(1, 'MOUNTAIN'),
-(2, 'BEACH'),
-(3, 'ETC'),
-(4, 'PARK'),
-(5, 'BEACH'),
-(6, 'MOUNTAIN')
-ON DUPLICATE KEY UPDATE spot_id=spot_id;
+-- 스팟 초기 데이터 135건(서울 100 + 6대 광역시·세종 35)은 spot_data.sql 파일로 분리 관리됩니다.
 
 -- ============================================================
 -- 유저 초기 데이터 (1~100번 더미 유저 + 101번 팀원 테스트 계정)
