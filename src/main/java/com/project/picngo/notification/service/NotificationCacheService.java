@@ -85,7 +85,7 @@ public class NotificationCacheService {
         String userIdStr = String.valueOf(userId);
         boolean hasToken = setting.getFcmToken() != null && !setting.getFcmToken().trim().isEmpty();
 
-        updateActiveSet("wishlist", userIdStr, Boolean.TRUE.equals(setting.getIsWishlistPushEnabled()) && hasToken);
+        updateActiveSet("spotalert", userIdStr, Boolean.TRUE.equals(setting.getIsSpotAlertPushEnabled()) && hasToken);
         updateActiveSet("goldenhour", userIdStr, Boolean.TRUE.equals(setting.getIsGoldenHourPushEnabled()) && hasToken);
         updateActiveSet("community", userIdStr, Boolean.TRUE.equals(setting.getIsCommunityPushEnabled()) && hasToken);
     }
@@ -115,7 +115,7 @@ public class NotificationCacheService {
 
         log.info("🔴 [Redis Active Set MISS] 유형별 활성 유저 Set 캐시 미스 -> DB 조회 및 레디스 워밍업 (type: {})", type);
         List<NotificationSetting> dbSettings = switch (type.toLowerCase()) {
-            case "wishlist" -> notificationSettingRepository.findActiveWishlistSettingsWithToken();
+            case "spotalert" -> notificationSettingRepository.findActiveSpotAlertSettingsWithToken();
             case "goldenhour" -> notificationSettingRepository.findActiveGoldenHourSettingsWithToken();
             case "community" -> notificationSettingRepository.findActiveCommunitySettingsWithToken();
             default -> List.of();
@@ -138,7 +138,7 @@ public class NotificationCacheService {
         if (userId == null) return;
         redisTemplate.delete(SETTING_KEY_PREFIX + userId);
         String userIdStr = String.valueOf(userId);
-        redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY_PREFIX + "wishlist", userIdStr);
+        redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY_PREFIX + "spotalert", userIdStr);
         redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY_PREFIX + "goldenhour", userIdStr);
         redisTemplate.opsForSet().remove(ACTIVE_USERS_KEY_PREFIX + "community", userIdStr);
     }

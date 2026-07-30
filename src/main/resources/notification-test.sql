@@ -10,7 +10,7 @@ BEGIN
             INSERT INTO notification_setting (
                 user_id,
                 fcm_token,
-                is_wishlist_push_enabled,
+                is_spot_alert_push_enabled,
                 is_golden_hour_push_enabled,
                 is_community_push_enabled,
                 is_dnd_enabled,
@@ -22,7 +22,7 @@ BEGIN
             VALUES (
                        i,
                        CONCAT('dummy_fcm_token_', i),
-                       TRUE,  -- 위시리스트 수신 동의
+                       TRUE,  -- 출사알림 수신 동의
                        TRUE,  -- 골든아워 수신 동의
                        TRUE,  -- 커뮤니티 수신 동의
                        FALSE, -- DND 꺼짐

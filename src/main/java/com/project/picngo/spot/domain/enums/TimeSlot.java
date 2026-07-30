@@ -3,7 +3,7 @@ package com.project.picngo.spot.domain.enums;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-// 리뷰 작성 시 사용자가 선택하는 촬영 시간대. 위시리스트 알림 조건인 TimeCondition과 무관.
+// 리뷰 작성 시 사용자가 선택하는 촬영 시간대. 출사알림 알림 조건인 TimeCondition과 무관.
 @Getter
 @RequiredArgsConstructor
 public enum TimeSlot {

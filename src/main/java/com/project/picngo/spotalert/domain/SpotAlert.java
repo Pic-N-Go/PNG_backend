@@ -1,4 +1,4 @@
-package com.project.picngo.wishlist.domain;
+package com.project.picngo.spotalert.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
 import jakarta.persistence.*;
@@ -7,16 +7,16 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import com.project.picngo.wishlist.domain.enums.TimeCondition;
-import com.project.picngo.wishlist.domain.enums.WeatherCondition;
-import com.project.picngo.wishlist.domain.enums.AirQualityCondition;
+import com.project.picngo.spotalert.domain.enums.TimeCondition;
+import com.project.picngo.spotalert.domain.enums.WeatherCondition;
+import com.project.picngo.spotalert.domain.enums.AirQualityCondition;
 import java.util.HashSet;
 import java.util.Set;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Wishlist extends BaseTimeEntity {
+public class SpotAlert extends BaseTimeEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,13 +32,13 @@ public class Wishlist extends BaseTimeEntity {
     private String memo;
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "wishlist_weather_conditions", joinColumns = @JoinColumn(name = "wishlist_id"))
+    @CollectionTable(name = "spot_alert_weather_conditions", joinColumns = @JoinColumn(name = "spot_alert_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "weather_condition", length = 50)
     private Set<WeatherCondition> weatherConditions = new HashSet<>();
 
     @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "wishlist_time_conditions", joinColumns = @JoinColumn(name = "wishlist_id"))
+    @CollectionTable(name = "spot_alert_time_conditions", joinColumns = @JoinColumn(name = "spot_alert_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "time_condition", length = 50)
     private Set<TimeCondition> timeConditions = new HashSet<>();
@@ -54,7 +54,7 @@ public class Wishlist extends BaseTimeEntity {
     private Boolean isActive = true;
 
     @Builder
-    public Wishlist(Long userId, Long spotId, String memo, Set<WeatherCondition> weatherConditions, Set<TimeCondition> timeConditions, AirQualityCondition airQualityCondition, Integer alertTimingDays, Boolean isActive) {
+    public SpotAlert(Long userId, Long spotId, String memo, Set<WeatherCondition> weatherConditions, Set<TimeCondition> timeConditions, AirQualityCondition airQualityCondition, Integer alertTimingDays, Boolean isActive) {
         this.userId = userId;
         this.spotId = spotId;
         this.memo = memo;

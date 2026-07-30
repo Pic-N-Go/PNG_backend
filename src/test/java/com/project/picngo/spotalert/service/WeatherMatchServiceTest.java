@@ -1,8 +1,8 @@
-package com.project.picngo.wishlist.service;
+package com.project.picngo.spotalert.service;
 
 import com.project.picngo.external.dto.WeatherForecastResponse;
-import com.project.picngo.wishlist.domain.enums.TimeCondition;
-import com.project.picngo.wishlist.domain.enums.WeatherCondition;
+import com.project.picngo.spotalert.domain.enums.TimeCondition;
+import com.project.picngo.spotalert.domain.enums.WeatherCondition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -185,7 +185,7 @@ class WeatherMatchServiceTest {
     }
 
     @Nested
-    @DisplayName("matchesAnyTime - 시간대 없는 위시리스트(프리뷰 폴백)")
+    @DisplayName("matchesAnyTime - 시간대 없는 출사알림(프리뷰 폴백)")
     class MatchesAnyTime {
 
         @Test

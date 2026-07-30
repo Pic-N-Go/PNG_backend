@@ -25,7 +25,7 @@ public class NotificationSetting extends BaseTimeEntity {
     private String fcmToken;
 
     @Column(nullable = false)
-    private Boolean isWishlistPushEnabled = true;
+    private Boolean isSpotAlertPushEnabled = true;
 
     @Column(nullable = false)
     private Boolean isGoldenHourPushEnabled = true;
@@ -41,10 +41,10 @@ public class NotificationSetting extends BaseTimeEntity {
     private LocalTime dndEndTime;
 
     @Builder
-    public NotificationSetting(Long userId, String fcmToken, Boolean isWishlistPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, Boolean isDndEnabled) {
+    public NotificationSetting(Long userId, String fcmToken, Boolean isSpotAlertPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, Boolean isDndEnabled) {
         this.userId = userId;
         this.fcmToken = fcmToken;
-        this.isWishlistPushEnabled = isWishlistPushEnabled != null ? isWishlistPushEnabled : true;
+        this.isSpotAlertPushEnabled = isSpotAlertPushEnabled != null ? isSpotAlertPushEnabled : true;
         this.isGoldenHourPushEnabled = isGoldenHourPushEnabled != null ? isGoldenHourPushEnabled : true;
         this.isCommunityPushEnabled = isCommunityPushEnabled != null ? isCommunityPushEnabled : true;
         this.isDndEnabled = isDndEnabled != null ? isDndEnabled : false;
@@ -54,9 +54,9 @@ public class NotificationSetting extends BaseTimeEntity {
         this.fcmToken = fcmToken;
     }
 
-    public void updateSettings(Boolean isWishlistPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, Boolean isDndEnabled, LocalTime dndStartTime, LocalTime dndEndTime) {
-        if (isWishlistPushEnabled != null) {
-            this.isWishlistPushEnabled = isWishlistPushEnabled;
+    public void updateSettings(Boolean isSpotAlertPushEnabled, Boolean isGoldenHourPushEnabled, Boolean isCommunityPushEnabled, Boolean isDndEnabled, LocalTime dndStartTime, LocalTime dndEndTime) {
+        if (isSpotAlertPushEnabled != null) {
+            this.isSpotAlertPushEnabled = isSpotAlertPushEnabled;
         }
         if (isGoldenHourPushEnabled != null) {
             this.isGoldenHourPushEnabled = isGoldenHourPushEnabled;

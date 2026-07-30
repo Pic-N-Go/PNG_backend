@@ -1,4 +1,4 @@
-package com.project.picngo.wishlist.service;
+package com.project.picngo.spotalert.service;
 
 import com.project.picngo.external.service.WeatherCacheService;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
@@ -6,13 +6,13 @@ import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.spot.repository.SpotTagRepository;
-import com.project.picngo.wishlist.domain.Wishlist;
-import com.project.picngo.wishlist.domain.enums.TimeCondition;
-import com.project.picngo.wishlist.domain.enums.WeatherCondition;
-import com.project.picngo.wishlist.dto.*;
-import com.project.picngo.wishlist.repository.WishlistRepository;
+import com.project.picngo.spotalert.domain.SpotAlert;
+import com.project.picngo.spotalert.domain.enums.TimeCondition;
+import com.project.picngo.spotalert.domain.enums.WeatherCondition;
+import com.project.picngo.spotalert.dto.*;
+import com.project.picngo.spotalert.repository.SpotAlertRepository;
 import com.project.picngo.common.exception.CustomException;
-import com.project.picngo.common.exception.code.WishlistErrorCode;
+import com.project.picngo.common.exception.code.SpotAlertErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,9 +36,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class WishlistService {
+public class SpotAlertService {
 
-    private final WishlistRepository wishlistRepository;
+    private final SpotAlertRepository spotAlertRepository;
     private final WeatherCacheService weatherCacheService;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
@@ -46,32 +46,32 @@ public class WishlistService {
     private final NotificationSettingRepository notificationSettingRepository;
     private final WeatherMatchService weatherMatchService;
 
-    public List<WishlistSettingResponse> getWishlists(Long userId) {
+    public List<SpotAlertSettingResponse> getSpotAlerts(Long userId) {
         validateUserExists(userId);
-        return wishlistRepository.findAllByUserId(userId).stream()
+        return spotAlertRepository.findAllByUserId(userId).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
-    public WishlistSettingResponse getWishlistDetail(Long userId, Long spotId) {
+    public SpotAlertSettingResponse getSpotAlertDetail(Long userId, Long spotId) {
         validateUserExists(userId);
-        Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
-        return convertToResponse(wishlist);
+        SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
+                .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+        return convertToResponse(spotAlert);
     }
 
     @Transactional
-    public WishlistSettingResponse updateWishlistSettings(Long userId, Long spotId, WishlistSettingUpdateRequest request) {
+    public SpotAlertSettingResponse updateSpotAlertSettings(Long userId, Long spotId, SpotAlertSettingUpdateRequest request) {
         validateUserExists(userId);
         validateAlertTimingDays(request.alertTimingDays());
 
-        Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
-                .orElseGet(() -> Wishlist.builder()
+        SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
+                .orElseGet(() -> SpotAlert.builder()
                         .userId(userId)
                         .spotId(spotId)
                         .build());
         
-        wishlist.updateSettings(
+        spotAlert.updateSettings(
                 request.memo(),
                 request.weatherConditions(),
                 request.timeConditions(),
@@ -80,16 +80,16 @@ public class WishlistService {
                 request.isAlertEnabled()
         );
 
-        Wishlist saved = wishlistRepository.save(wishlist);
+        SpotAlert saved = spotAlertRepository.save(spotAlert);
         return convertToResponse(saved);
     }
 
     @Transactional
-    public void deleteWishlist(Long userId, Long spotId) {
+    public void deleteSpotAlert(Long userId, Long spotId) {
         validateUserExists(userId);
-        Wishlist wishlist = wishlistRepository.findByUserIdAndSpotId(userId, spotId)
-                .orElseThrow(() -> new CustomException(WishlistErrorCode.WISHLIST_NOT_FOUND_OR_UNAUTHORIZED));
-        wishlistRepository.delete(wishlist);
+        SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
+                .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+        spotAlertRepository.delete(spotAlert);
     }
 
     private void validateUserExists(Long userId) {
@@ -103,30 +103,30 @@ public class WishlistService {
 
     private void validateAlertTimingDays(Integer alertTimingDays) {
         if (alertTimingDays != null && !ALLOWED_ALERT_TIMING_DAYS.contains(alertTimingDays)) {
-            throw new CustomException(WishlistErrorCode.INVALID_ALERT_TIMING);
+            throw new CustomException(SpotAlertErrorCode.INVALID_ALERT_TIMING);
         }
     }
 
-    private WishlistSettingResponse convertToResponse(Wishlist wishlist) {
-        Spot spot = spotRepository.findById(wishlist.getSpotId()).orElse(null);
+    private SpotAlertSettingResponse convertToResponse(SpotAlert spotAlert) {
+        Spot spot = spotRepository.findById(spotAlert.getSpotId()).orElse(null);
         String spotName = spot != null ? spot.getName() : "알 수 없는 스팟";
         String address = spot != null ? spot.getAddress() : "주소 미상";
         Integer photogenicScore = spot != null ? spot.getPhotogenicScore() : 0;
         
-        List<String> tags = spotTagRepository.findBySpotId(wishlist.getSpotId())
+        List<String> tags = spotTagRepository.findBySpotId(spotAlert.getSpotId())
                 .stream()
                 .map(SpotTag::getTag)
                 .collect(Collectors.toList());
                 
         LocalTime dndStartTime = null;
         LocalTime dndEndTime = null;
-        var notiSetting = notificationSettingRepository.findByUserId(wishlist.getUserId()).orElse(null);
+        var notiSetting = notificationSettingRepository.findByUserId(spotAlert.getUserId()).orElse(null);
         if (notiSetting != null) {
             dndStartTime = notiSetting.getDndStartTime();
             dndEndTime = notiSetting.getDndEndTime();
         }
 
-        List<WishlistSettingResponse.ExpectedMatchDayDto> expectedMatchDays = new ArrayList<>();
+        List<SpotAlertSettingResponse.ExpectedMatchDayDto> expectedMatchDays = new ArrayList<>();
         if (spot != null) {
             String todayStr = LocalDate.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
             List<com.project.picngo.external.dto.WeatherForecastResponse> forecasts = weatherCacheService.getCached7DayForecast(spot.getLatitude(), spot.getLongitude(), todayStr);
@@ -163,8 +163,8 @@ public class WishlistService {
                     repWeather = daytime.get(daytime.size() / 2).weatherStatus();
 
                     // 매치 판정: 알림 스케줄러와 동일한 공용 매칭 로직(시간대 반영)을 사용
-                    Set<TimeCondition> timeConditions = wishlist.getTimeConditions();
-                    Set<WeatherCondition> weatherConditions = wishlist.getWeatherConditions();
+                    Set<TimeCondition> timeConditions = spotAlert.getTimeConditions();
+                    Set<WeatherCondition> weatherConditions = spotAlert.getWeatherConditions();
                     if (timeConditions == null || timeConditions.isEmpty()) {
                         isMatched = weatherMatchService.matchesAnyTime(forecasts, targetDateStr, weatherConditions);
                     } else {
@@ -173,7 +173,7 @@ public class WishlistService {
                     }
                 }
                 
-                expectedMatchDays.add(new WishlistSettingResponse.ExpectedMatchDayDto(
+                expectedMatchDays.add(new SpotAlertSettingResponse.ExpectedMatchDayDto(
                     dayLabel,
                     target.format(DateTimeFormatter.ofPattern("MM/dd")),
                     repWeather,
@@ -182,18 +182,18 @@ public class WishlistService {
             }
         }
         
-        return new WishlistSettingResponse(
-                wishlist.getSpotId(),
+        return new SpotAlertSettingResponse(
+                spotAlert.getSpotId(),
                 spotName, 
                 address,
                 photogenicScore,
                 tags,
-                wishlist.getMemo(),
-                wishlist.getWeatherConditions(),
-                wishlist.getTimeConditions(),
-                wishlist.getAirQualityCondition(),
-                wishlist.getIsActive(),
-                wishlist.getAlertTimingDays(),
+                spotAlert.getMemo(),
+                spotAlert.getWeatherConditions(),
+                spotAlert.getTimeConditions(),
+                spotAlert.getAirQualityCondition(),
+                spotAlert.getIsActive(),
+                spotAlert.getAlertTimingDays(),
                 dndStartTime,
                 dndEndTime,
                 expectedMatchDays

@@ -28,7 +28,7 @@ public class Notification {
     private Long userId;
 
     @Column(nullable = false, length = 50)
-    private String type; // e.g. GOLDEN_HOUR, WISHLIST
+    private String type; // e.g. GOLDEN_HOUR, SPOT_ALERT
 
     @Column(nullable = false, length = 100)
     private String title;

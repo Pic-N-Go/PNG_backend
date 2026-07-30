@@ -3,7 +3,7 @@ package com.project.picngo.notification.dto;
 import java.time.LocalTime;
 
 public record NotificationSettingUpdateRequest(
-        Boolean isWishlistPushEnabled,
+        Boolean isSpotAlertPushEnabled,
         Boolean isGoldenHourPushEnabled,
         Boolean isCommunityPushEnabled,
         Boolean isDndEnabled,
