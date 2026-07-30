@@ -16,10 +16,12 @@ public record SpotDetailResponse(
         List<String> categories,
         String overview,
         List<String> tags,
+        List<String> reviewTags,
         ConvenienceInfo convenience,
         StatsInfo stats,
         List<String> checklist,
-        Boolean isBookmarked
+        Boolean isBookmarked,
+        Long myReviewId
 ) {
     public record ConvenienceInfo(
             String parking,
@@ -59,11 +61,13 @@ public record SpotDetailResponse(
     public static SpotDetailResponse of(
             Spot spot,
             List<SpotTag> tags,
+            List<String> reviewTags,
             List<String> checklist,
             Double avgRating,
             Integer reviewCount,
             Long photoCount,
-            Boolean isBookmarked
+            Boolean isBookmarked,
+        Long myReviewId
     ) {
         return new SpotDetailResponse(
                 spot.getId(),
@@ -76,10 +80,12 @@ public record SpotDetailResponse(
                 spot.getCategoryNames(),
                 spot.getOverview(),
                 tags.stream().map(SpotTag::getTag).toList(),
+                reviewTags,
                 ConvenienceInfo.from(spot),
                 new StatsInfo(avgRating, reviewCount, photoCount),
                 checklist,
-                isBookmarked
+                isBookmarked,
+                myReviewId
         );
     }
 }

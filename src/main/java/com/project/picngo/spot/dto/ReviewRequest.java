@@ -1,10 +1,12 @@
 package com.project.picngo.spot.dto;
 
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.enums.TimePeriod;
 import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 public record ReviewRequest(
         @NotNull @Min(1) @Max(5)
@@ -18,7 +20,7 @@ public record ReviewRequest(
         TimePeriod timePeriod,
 
         @Size(max = 5)
-        List<String> tags,
+        Set<ReviewTag> tags,
 
         @Size(max = 5)
         List<String> equipmentInfo,

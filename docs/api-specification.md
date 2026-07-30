@@ -45,6 +45,8 @@
 | 리뷰 작성 | POST | /spots/{id}/reviews | 리뷰 작성 | 박예은 | 완료 |
 | 리뷰 작성 | PUT | /reviews/{id} | 리뷰 수정 | 박예은 | 완료 |
 | 리뷰 작성 | DELETE | /reviews/{id} | 리뷰 삭제 | 박예은 | 완료 |
+| 리뷰 작성 | POST | /reviews/{id}/photos | 리뷰 사진 추가 | 박예은 | 완료 |
+| 리뷰 작성 | DELETE | /reviews/{id}/photos/{photoId} | 리뷰 사진 삭제 | 박예은 | 완료 |
 | 코스 계획 | GET | /courses | 내 여행 계획 목록 | 모정민 | 미시작 |
 | 코스 계획 | POST | /courses | 새 여행 계획 생성 | 모정민 | 미시작 |
 | 코스 계획 | GET | /courses/{id} | 여행 계획 상세 조회 | 모정민 | 미시작 |
@@ -85,6 +87,7 @@
 | 마이페이지 | GET | /users/me | 내 프로필 정보 조회 | 이예인 | 미시작 |
 | 마이페이지 | PUT | /users/me | 프로필 수정 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/stats | 활동 통계 | 이예인 | 미시작 |
+| 마이페이지 | GET | /users/me/reviews | 내가 쓴 리뷰 목록 | 박예은 | 완료 |
 | 마이페이지 | GET | /users/me/visited-spots | 방문한 스팟 목록 (지도용) | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/albums | 지난 촬영 앨범 목록 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/photogenic-report | 월간 포토제닉 리포트 | 이예인 | 미시작 |

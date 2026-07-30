@@ -1,4 +1,9 @@
 spring:
+  # data.sql은 ON DUPLICATE KEY UPDATE 등 MySQL 전용 구문이라 H2에서 깨진다. 테스트는 각자 데이터를 넣는다.
+  sql:
+    init:
+      mode: never
+
   datasource:
     url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
