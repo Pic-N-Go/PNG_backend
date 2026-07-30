@@ -13,10 +13,13 @@ import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@Slf4j
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -166,6 +169,10 @@ public class Spot extends BaseTimeEntity {
 
     // 응답용 카테고리 이름. Set 순서가 비결정적이라 정렬된 List로 고정 (응답 안정성)
     public List<String> getCategoryNames() {
+        if (categories == null || categories.isEmpty()) {
+            log.debug("스팟 카테고리가 비어 있어 ETC 기본값으로 처리합니다. (spotId: {})", id);
+            return List.of("ETC");
+        }
         return categories.stream().map(Enum::name).sorted().toList();
     }
 

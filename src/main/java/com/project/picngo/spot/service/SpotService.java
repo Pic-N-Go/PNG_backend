@@ -17,6 +17,7 @@ import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
 import com.project.picngo.spot.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -191,18 +193,23 @@ public class SpotService {
 
         List<SpotCategory> parsed = categories.stream()
                 .filter(c -> c != null && !c.isBlank())
-                .map(this::parseCategory)
+                .flatMap(c -> java.util.Arrays.stream(c.split(",")))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(this::parseCategoryOrNull)
+                .filter(java.util.Objects::nonNull)
                 .distinct()
                 .toList();
 
         return parsed.isEmpty() ? null : parsed;
     }
 
-    private SpotCategory parseCategory(String category) {
+    private SpotCategory parseCategoryOrNull(String category) {
         try {
             return SpotCategory.valueOf(category.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new CustomException(SpotErrorCode.INVALID_SPOT_CATEGORY);
+            log.debug("미지원/유효하지 않은 스팟 카테고리 요청 파라미터 스킵: {}", category);
+            return null;
         }
     }
 
