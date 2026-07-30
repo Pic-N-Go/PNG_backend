@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.project.picngo.notification.dto.NotificationPushDto;
+import com.project.picngo.notification.producer.NotificationPushProducer;
 
 @Slf4j
 @Service
@@ -28,6 +30,7 @@ public class NotificationService {
     private final NotificationSettingRepository notificationSettingRepository;
     private final FcmService fcmService;
     private final NotificationCacheService notificationCacheService;
+    private final NotificationPushProducer notificationPushProducer;
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(Long userId) {
@@ -49,6 +52,27 @@ public class NotificationService {
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
         setting.updateFcmToken(token);
         notificationCacheService.updateCachedSetting(userId, setting);
+    }
+
+    /**
+     * 무효(만료/재발급) FCM 토큰 정리.
+     * DB의 fcmToken을 비우고 캐시를 동기화하여, 활성 유저 Set에서도 제외되게 한다.
+     * (죽은 토큰으로 매 스케줄러마다 발송을 재시도하는 낭비 방지)
+     *
+     * <p>비동기 발송 지연 사이에 유저가 새 토큰을 재등록했을 수 있으므로,
+     * 저장된 토큰이 <b>실제로 실패한 토큰과 일치할 때만</b> 정리한다(정상 토큰 삭제 방지).
+     */
+    @Transactional
+    public void handleInvalidToken(Long userId, String failedToken) {
+        notificationSettingRepository.findByUserId(userId).ifPresent(setting -> {
+            if (failedToken != null && failedToken.equals(setting.getFcmToken())) {
+                setting.updateFcmToken(null);
+                notificationCacheService.updateCachedSetting(userId, setting);
+                log.info("♻️ 무효 FCM 토큰 제거 및 활성 대상에서 제외 완료 (userId: {})", userId);
+            } else {
+                log.info("무효 토큰 정리 스킵 - 저장된 토큰이 실패한 토큰과 달라 이미 갱신된 것으로 간주 (userId: {})", userId);
+            }
+        });
     }
 
     @Transactional
@@ -92,36 +116,23 @@ public class NotificationService {
 
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink) {
-        sendPushNotification(userId, type, title, content, deepLink, null);
+        sendPushNotification(userId, type, title, content, deepLink, null, null);
     }
 
     public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId) {
+        sendPushNotification(userId, type, title, content, deepLink, spotId, null);
+    }
+
+    public void sendPushNotification(Long userId, String type, String title, String content, String deepLink, Long spotId, String dedupeKey) {
         NotificationSettingResponse setting = notificationCacheService.getCachedSetting(userId);
         if (setting != null) {
             boolean isPushEnabled = isPushEnabledForType(setting, type);
             boolean isDnd = setting.isDndActive();
             if (isPushEnabled && !isDnd) {
-                notificationSettingRepository.findByUserId(userId).ifPresent(entity -> {
-                    if (entity.getFcmToken() != null && !entity.getFcmToken().isEmpty()) {
-                        try {
-                            fcmService.sendMessage(entity.getFcmToken(), title, content, deepLink, spotId);
-                        } catch (Exception e) {
-                            log.warn("Failed to send FCM push to userId: {}", userId, e);
-                        }
-                    }
-                });
+                // RabbitMQ 비동기 메시지 큐 이벤트 발송 (소요 시간 0.001초 만에 큐로 발송 완료!)
+                notificationPushProducer.sendPushEvent(new NotificationPushDto(userId, type, title, content, deepLink, spotId, dedupeKey));
             }
         }
-
-        Notification notification = Notification.builder()
-                .userId(userId)
-                .type(type)
-                .title(title)
-                .content(content)
-                .deepLink(deepLink)
-                .spotId(spotId)
-                .build();
-        notificationRepository.save(notification);
     }
 
     /**

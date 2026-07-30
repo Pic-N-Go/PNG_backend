@@ -166,6 +166,7 @@ ON DUPLICATE KEY UPDATE weather_condition=VALUES(weather_condition);
 -- ============================================================
 -- 코스 및 코스 스팟 데이터 (1번 테스터 & 101번 팀원 계정 코스)
 -- ============================================================
+-- 코스 데이터 (제주도 2박 3일 출사 코스)
 INSERT INTO course (id, user_id, title, start_date, end_date, created_at, updated_at)
 VALUES (1, 1, '제주도 2박 3일 풍경 출사', '2026-08-01', '2026-08-03', NOW(), NOW())
 ON DUPLICATE KEY UPDATE id=1;
