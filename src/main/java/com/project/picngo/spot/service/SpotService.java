@@ -6,6 +6,7 @@ import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.dto.NearbySpotResponse;
@@ -33,8 +34,6 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class SpotService {
 
-    // ponytail: Spring Security 연동 전까지 하드코딩
-    private static final Long TEMP_USER_ID = 1L;
     private static final int MAX_PAGE_SIZE = 50;
 
     private final SpotRepository spotRepository;
@@ -43,11 +42,16 @@ public class SpotService {
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
 
-    public SpotDetailResponse getSpotDetail(Long spotId) {
+    public SpotDetailResponse getSpotDetail(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         List<SpotTag> tags = spotTagRepository.findBySpotId(spotId);
+        // 2회 이상 쓰인 태그 중 상위 3개만 노출 (스팟 상세 카드에 한 줄로 들어가는 분량)
+        List<String> reviewTags = reviewRepository.findFrequentTagsBySpotId(spotId).stream()
+                .limit(3)
+                .map(row -> ((ReviewTag) row[0]).name())
+                .toList();
         List<String> checklist = ChecklistMapper.getChecklist(spot.getCat3());
 
         List<Object[]> rows = reviewRepository.findAvgAndCountBySpotId(spotId);
@@ -55,12 +59,17 @@ public class SpotService {
         int reviewCount = rows.isEmpty() || rows.get(0)[1] == null ? 0 : ((Long) rows.get(0)[1]).intValue();
         long photoCount = spotPhotoRepository.countBySpotId(spotId);
         // 북마크 = 1개 이상 컬렉션에 소속
-        boolean isBookmarked = bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId);
+        // 북마크 쓰기(BookmarkCollectionService)가 아직 TEMP_USER_ID 기반이라 읽기도 맞춰 둔다.
+        // 실제 userId로 읽으면 별이 켜지지 않는다(쓰기는 1번 사용자에게 저장되므로).
+        // 북마크 인증 연동 시 아래 1L을 userId로 교체 (BookmarkCollectionService·ChecklistService와 함께).
+        boolean isBookmarked = bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(1L, spotId);
+        Long myReviewId = userId == null ? null
+                : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
 
         return SpotDetailResponse.of(
-                spot, tags, checklist,
+                spot, tags, reviewTags, checklist,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
-                reviewCount, photoCount, isBookmarked
+                reviewCount, photoCount, isBookmarked, myReviewId
         );
     }
 

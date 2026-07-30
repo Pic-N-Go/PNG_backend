@@ -1,11 +1,13 @@
 package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Review;
+import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.enums.TimePeriod;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 public record ReviewResponse(
         Long id,
@@ -14,15 +16,12 @@ public record ReviewResponse(
         String content,
         String equipmentInfo,
         TimePeriod timePeriod,
-        List<String> photos,
+        Set<ReviewTag> tags,
+        List<ReviewPhotoResponse> photos,
         LocalDate visitedAt,
         LocalDateTime createdAt
 ) {
-    public static ReviewResponse from(Review review) {
-        return from(review, List.of());
-    }
-
-    public static ReviewResponse from(Review review, List<String> photos) {
+    public static ReviewResponse from(Review review, Set<ReviewTag> tags, List<ReviewPhotoResponse> photos) {
         return new ReviewResponse(
                 review.getId(),
                 review.getUserId(),
@@ -30,6 +29,7 @@ public record ReviewResponse(
                 review.getContent(),
                 review.getEquipmentInfo(),
                 review.getTimePeriod(),
+                tags,
                 photos,
                 review.getVisitedAt(),
                 review.getCreatedAt()
