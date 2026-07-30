@@ -170,7 +170,7 @@ public class UserService {
     public UserStatsResponse getMyStats(Long userId){
         User user = getById(userId);
 
-        long follwerCount = followRepository.countByFollowing(user);
+        long followerCount = followRepository.countByFollowing(user);
         long followingCount = followRepository.countByFollower(user);
 
         // TODO: 리뷰/방문 장소 기준은 아직 확정되지 않아 임시로 0을 반환한다
@@ -178,7 +178,7 @@ public class UserService {
         long visitedSpotCount = 0;
 
         return new UserStatsResponse(
-                follwerCount,
+                followerCount,
                 followingCount,
                 reviewCount,
                 visitedSpotCount
