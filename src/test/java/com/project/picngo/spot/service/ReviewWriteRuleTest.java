@@ -60,7 +60,7 @@ class ReviewWriteRuleTest {
         assertThatThrownBy(() -> reviewService.createReview(USER_ID, SPOT_ID, request(5), List.of()))
                 .isInstanceOf(CustomException.class);
 
-        verify(reviewRepository, never()).save(any(Review.class));
+        verify(reviewRepository, never()).saveAndFlush(any(Review.class));
     }
 
     @Test

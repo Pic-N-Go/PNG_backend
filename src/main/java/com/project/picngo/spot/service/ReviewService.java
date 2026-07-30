@@ -164,7 +164,11 @@ public class ReviewService {
         try {
             savedReview = reviewRepository.saveAndFlush(review);
         } catch (DataIntegrityViolationException e) {
-            throw new CustomException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+            // 스팟+사용자 유니크 위반만 409. 다른 제약 위반은 그대로 올려 500으로 드러낸다.
+            if (String.valueOf(e.getMostSpecificCause().getMessage()).contains("uk_review_spot_user")) {
+                throw new CustomException(ReviewErrorCode.REVIEW_ALREADY_EXISTS);
+            }
+            throw e;
         }
 
         List<String> uploadedKeys = new ArrayList<>();
