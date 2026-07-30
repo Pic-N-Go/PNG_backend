@@ -25,4 +25,9 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     @Query("select f from Follow f join fetch f.following where f.follower = :follower")
     List<Follow> findAllByFollower(@Param("follower") User follower);
 
+    // 팔로워 수 조회 -> user를 팔로우하는 사람 수(팔로워 수)
+    long countByFollowing(User following);
+
+    // 팔로잉 수 조회 -> user가 팔로우하는 사람 수(팔로잉 수)
+    long countByFollower(User follower);
 }
