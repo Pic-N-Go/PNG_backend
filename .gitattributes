@@ -1,3 +1,9 @@
-/gradlew text eol=lf
+# 텍스트 파일 줄바꿈 정규화 (크로스플랫폼 CRLF/LF 문제 방지)
+* text=auto
+
+# 플랫폼 고유 줄바꿈 유지
+gradlew text eol=lf
 *.bat text eol=crlf
+
+# 바이너리 (기존 유지)
 *.jar binary

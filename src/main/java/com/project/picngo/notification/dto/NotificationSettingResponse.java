@@ -1,5 +1,6 @@
 package com.project.picngo.notification.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.project.picngo.notification.domain.NotificationSetting;
 import io.swagger.v3.oas.annotations.media.Schema;
 
@@ -20,9 +21,11 @@ public record NotificationSettingResponse(
         Boolean isDndEnabled,
 
         @Schema(description = "방해금지 시작 시간 (HH:mm)", example = "23:00")
+        @JsonFormat(pattern = "HH:mm:ss")
         LocalTime dndStartTime,
 
         @Schema(description = "방해금지 종료 시간 (HH:mm)", example = "07:00")
+        @JsonFormat(pattern = "HH:mm:ss")
         LocalTime dndEndTime
 ) {
     public static NotificationSettingResponse from(NotificationSetting setting) {
@@ -37,5 +40,11 @@ public record NotificationSettingResponse(
                 setting.getDndStartTime(),
                 setting.getDndEndTime()
         );
+    }
+
+    public boolean isDndActive() {
+        return com.project.picngo.notification.domain.DndPolicy.isActive(
+                this.isDndEnabled, this.dndStartTime, this.dndEndTime,
+                LocalTime.now(java.time.ZoneId.of("Asia/Seoul")));
     }
 }

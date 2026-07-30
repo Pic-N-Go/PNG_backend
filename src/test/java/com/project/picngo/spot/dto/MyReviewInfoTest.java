@@ -2,7 +2,6 @@ package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.domain.enums.TimePeriod;
@@ -42,7 +41,6 @@ class MyReviewInfoTest {
                 .address("부산")
                 .latitude(35.153)
                 .longitude(129.118)
-                .category(SpotCategory.BEACH)
                 .source(SpotSource.TOUR_API)
                 .status(SpotStatus.APPROVED)
                 .thumbnailUrl(thumbnailUrl)

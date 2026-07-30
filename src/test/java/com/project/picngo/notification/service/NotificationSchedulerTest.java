@@ -46,6 +46,10 @@ class NotificationSchedulerTest {
     @MockitoBean
     private com.google.firebase.messaging.FirebaseMessaging firebaseMessaging;
 
+    // 활성 유저 조회(Redis 의존)를 목으로 대체하여 테스트를 결정적으로 만든다
+    @MockitoBean
+    private NotificationCacheService notificationCacheService;
+
     @Autowired
     private SpotRepository spotRepository;
 
@@ -56,7 +60,8 @@ class NotificationSchedulerTest {
     private NotificationSettingRepository notificationSettingRepository;
 
     private Spot savedSpot;
-    private Long userId = 1L;
+    // data.sql 시드(1~101번)와 겹치지 않는 userId 사용 (notification_setting UNIQUE 충돌 방지)
+    private Long userId = 999_999L;
 
     @BeforeEach
     void setUp() {
@@ -72,10 +77,13 @@ class NotificationSchedulerTest {
                 .address("서울특별시 종로구 사직로 161")
                 .latitude(37.5796)
                 .longitude(126.9770)
-                .category(com.project.picngo.spot.domain.SpotCategory.NIGHT_VIEW)
+                .categories(java.util.Set.of(com.project.picngo.common.domain.SpotCategory.NIGHT_VIEW))
                 .source(com.project.picngo.spot.domain.enums.SpotSource.USER)
                 .build();
         savedSpot = spotRepository.save(spot);
+
+        // 스케줄러의 활성 위시리스트 유저 조회가 테스트 유저를 반환하도록 스텁
+        when(notificationCacheService.getActiveUserIds("wishlist")).thenReturn(Set.of(userId));
     }
 
     @Test
@@ -111,12 +119,15 @@ class NotificationSchedulerTest {
         notificationScheduler.scheduleAfternoonNotification();
 
         // Then: NotificationService의 sendPushNotification이 정확히 1번 호출되었는지 검증
+        //  (시간대별 메시지 구분 + dedupeKey 도입으로 제목/시그니처가 변경됨)
         verify(notificationService, times(1)).sendPushNotification(
                 eq(userId),
                 eq("WEATHER_MATCH"),
-                eq("☁️ 날씨 조건 매칭 알림"),
+                eq("☁️ 오후 날씨 조건 알림"),
                 contains("경복궁 야간개장"),
-                anyString()
+                anyString(),               // deepLink
+                eq(savedSpot.getId()),     // spotId
+                anyString()                // dedupeKey
         );
     }
 
@@ -151,7 +162,8 @@ class NotificationSchedulerTest {
         // When
         notificationScheduler.scheduleAfternoonNotification();
 
-        // Then: 날씨가 맞지 않으므로 sendPushNotification이 한 번도 호출되지 않아야 함
-        verify(notificationService, never()).sendPushNotification(any(), any(), any(), any(), any());
+        // Then: 날씨가 맞지 않으므로 sendPushNotification이 한 번도 호출되지 않아야 함 (7-arg 시그니처 기준)
+        verify(notificationService, never()).sendPushNotification(
+                any(), any(), any(), any(), any(), any(), any());
     }
 }

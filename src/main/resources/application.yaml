@@ -6,6 +6,9 @@ spring:
   sql:
     init:
       mode: always
+      data-locations:
+        - classpath:data.sql
+        - classpath:spot_data.sql
 
   servlet:
     multipart:
@@ -40,11 +43,23 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # spot.categories 등 @ElementCollection/연관 지연로딩 N+1 방지 (목록 조회 시 IN 절로 일괄 로딩)
+        default_batch_fetch_size: 100
   data:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 2
 
 weather:
   api:

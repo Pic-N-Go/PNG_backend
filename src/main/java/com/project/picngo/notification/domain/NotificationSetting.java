@@ -72,19 +72,8 @@ public class NotificationSetting extends BaseTimeEntity {
     }
 
     public boolean isDndActive() {
-        if (!Boolean.TRUE.equals(this.isDndEnabled)) {
-            return false;
-        }
-        if (this.dndStartTime == null || this.dndEndTime == null) {
-            return false;
-        }
-
-        LocalTime now = LocalTime.now(ZoneId.of("Asia/Seoul"));
-        if (this.dndStartTime.isBefore(this.dndEndTime)) {
-            return !now.isBefore(this.dndStartTime) && now.isBefore(this.dndEndTime);
-        } else {
-            return !now.isBefore(this.dndStartTime) || now.isBefore(this.dndEndTime);
-        }
+        return DndPolicy.isActive(this.isDndEnabled, this.dndStartTime, this.dndEndTime,
+                LocalTime.now(ZoneId.of("Asia/Seoul")));
     }
 }
 

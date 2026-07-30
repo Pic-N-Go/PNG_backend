@@ -2,7 +2,6 @@ package com.project.picngo.spot.repository;
 
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
@@ -38,7 +37,6 @@ class ReviewTagAggregationTest {
                 .address("부산")
                 .latitude(35.153)
                 .longitude(129.118)
-                .category(SpotCategory.BEACH)
                 .source(SpotSource.TOUR_API)
                 .status(SpotStatus.APPROVED)
                 .build());
