@@ -106,6 +106,22 @@ public class AlbumService {
         return AlbumDetailResponse.from(album, photos);
     }
 
+    // 앨범 사진 삭제
+    @Transactional
+    public void deleteAlbumPhoto(Long userId, Long albumId, Long photoId) {
+        Album album = getAlbum(albumId);
+        validateOwner(userId, album);
+
+        AlbumPhoto albumPhoto = albumPhotoRepository.findById(photoId)
+                .orElseThrow(() -> new CustomException(AlbumErrorCode.ALBUM_PHOTO_NOT_FOUND));
+
+        if (!albumPhoto.getAlbum().getId().equals(album.getId())) {
+            throw new CustomException(AlbumErrorCode.ALBUM_ACCESS_DENIED);
+        }
+
+        albumPhotoRepository.delete(albumPhoto);
+    }
+
     private Album getAlbum(Long albumId) {
         return albumRepository.findById(albumId)
                 .orElseThrow(() -> new CustomException(AlbumErrorCode.ALBUM_NOT_FOUND));
