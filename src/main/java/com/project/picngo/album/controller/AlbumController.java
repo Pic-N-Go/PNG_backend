@@ -17,8 +17,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/users/me/albums")
-public class AlbumController {
-
+public class AlbumController implements AlbumControllerApiSpec {
     private final AlbumService albumService;
 
     // 내 앨범 목록 조회 API
