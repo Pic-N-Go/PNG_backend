@@ -141,14 +141,14 @@ public class NotificationService {
     private boolean isPushEnabledForType(NotificationSettingResponse setting, String type) {
         if (setting == null) return false;
         if ("GOLDEN_HOUR".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.isGoldenHourPushEnabled());
+            return !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
         } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "SPOT_ALERT".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.isSpotAlertPushEnabled());
+            return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled());
         } else if ("COMMUNITY".equalsIgnoreCase(type)) {
-            return Boolean.TRUE.equals(setting.isCommunityPushEnabled());
+            return !Boolean.FALSE.equals(setting.isCommunityPushEnabled());
         } else if ("TEST".equalsIgnoreCase(type)) {
-            // 테스트 알림 발송 시: 출사알림 + 골든아워 알림이 둘 다 켜져있는지 검사
-            return Boolean.TRUE.equals(setting.isSpotAlertPushEnabled()) && Boolean.TRUE.equals(setting.isGoldenHourPushEnabled());
+            // 테스트 알림 발송 시: 출사알림 + 골든아워 알림 검사 (null은 기본 true 처리)
+            return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled()) && !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
         }
         return true;
     }

@@ -12,19 +12,24 @@
 -- 운영 DB라면 아래 "데이터 이관" 블록으로 기존 데이터를 먼저 옮길 것.
 -- =====================================================================
 
--- (선택) 운영 데이터 이관 — 개발 DB는 data.sql 이 매 기동마다 재시딩하므로 불필요.
--- INSERT INTO spot_alert (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
---     SELECT id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at FROM wishlist;
--- INSERT INTO spot_alert_time_conditions (spot_alert_id, time_condition)
---     SELECT wishlist_id, time_condition FROM wishlist_time_conditions;
--- INSERT INTO spot_alert_weather_conditions (spot_alert_id, weather_condition)
---     SELECT wishlist_id, weather_condition FROM wishlist_weather_conditions;
+-- 1. 기존 데이터 이관 (wishlist → spot_alert)
+INSERT INTO spot_alert (id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at)
+    SELECT id, user_id, spot_id, memo, air_quality_condition, alert_timing_days, is_active, created_at, updated_at FROM wishlist
+    ON DUPLICATE KEY UPDATE id=id;
 
--- notification_setting: 옛 알림 토글 컬럼 값 이관 후 제거
+INSERT INTO spot_alert_time_conditions (spot_alert_id, time_condition)
+    SELECT wishlist_id, time_condition FROM wishlist_time_conditions
+    ON DUPLICATE KEY UPDATE time_condition=VALUES(time_condition);
+
+INSERT INTO spot_alert_weather_conditions (spot_alert_id, weather_condition)
+    SELECT wishlist_id, weather_condition FROM wishlist_weather_conditions
+    ON DUPLICATE KEY UPDATE weather_condition=VALUES(weather_condition);
+
+-- 2. notification_setting: 옛 알림 토글 컬럼 값 이관 후 제거
 UPDATE notification_setting SET is_spot_alert_push_enabled = is_wishlist_push_enabled;
 ALTER TABLE notification_setting DROP COLUMN is_wishlist_push_enabled;
 
--- orphan 테이블 제거 (자식 컬렉션 테이블 먼저)
+-- 3. orphan 테이블 제거 (자식 컬렉션 테이블 먼저)
 DROP TABLE IF EXISTS wishlist_time_conditions;
 DROP TABLE IF EXISTS wishlist_weather_conditions;
 DROP TABLE IF EXISTS wishlist;

@@ -125,7 +125,7 @@ class NotificationSchedulerTest {
                 eq("WEATHER_MATCH"),
                 eq("☁️ 오후 날씨 조건 알림"),
                 contains("경복궁 야간개장"),
-                anyString(),               // deepLink
+                eq("/spot-alerts/" + savedSpot.getId()), // deepLink
                 eq(savedSpot.getId()),     // spotId
                 anyString()                // dedupeKey
         );

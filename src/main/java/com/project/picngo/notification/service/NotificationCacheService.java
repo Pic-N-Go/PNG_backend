@@ -48,10 +48,16 @@ public class NotificationCacheService {
         if (cachedJson != null) {
             try {
                 NotificationSettingResponse response = objectMapper.readValue(cachedJson, NotificationSettingResponse.class);
-                log.info("🟢 [Redis Setting Cache HIT] 유저 알림 설정 캐시 히트 (userId: {}, DND 활성: {})", userId, response.isDndActive());
-                return response;
+                if (response.isSpotAlertPushEnabled() == null || response.isGoldenHourPushEnabled() == null || response.isCommunityPushEnabled() == null) {
+                    log.warn("🔴 [Legacy Redis Cache Key Detected] 구버전 필드가 누락된 캐시 무효화 및 DB 재조회 (userId: {})", userId);
+                    evictUserSetting(userId);
+                } else {
+                    log.info("🟢 [Redis Setting Cache HIT] 유저 알림 설정 캐시 히트 (userId: {}, DND 활성: {})", userId, response.isDndActive());
+                    return response;
+                }
             } catch (JsonProcessingException e) {
                 log.warn("Redis 알림 설정 파싱 실패 (userId: {})", userId, e);
+                evictUserSetting(userId);
             }
         }
 
