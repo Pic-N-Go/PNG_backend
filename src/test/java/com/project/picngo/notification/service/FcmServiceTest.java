@@ -34,6 +34,13 @@ class FcmServiceTest {
         return ex;
     }
 
+    private FirebaseMessagingException exceptionWith(MessagingErrorCode code, String message) {
+        FirebaseMessagingException ex = mock(FirebaseMessagingException.class);
+        when(ex.getMessagingErrorCode()).thenReturn(code);
+        when(ex.getMessage()).thenReturn(message);
+        return ex;
+    }
+
     @Test
     @DisplayName("UNREGISTERED(만료/재발급) 토큰은 FCM_TOKEN_INVALID로 구분해 던진다")
     void unregisteredMapsToTokenInvalid() throws Exception {
@@ -46,14 +53,28 @@ class FcmServiceTest {
     }
 
     @Test
-    @DisplayName("INVALID_ARGUMENT(형식 오류) 토큰도 FCM_TOKEN_INVALID로 구분해 던진다")
-    void invalidArgumentMapsToTokenInvalid() throws Exception {
-        FirebaseMessagingException ex = exceptionWith(MessagingErrorCode.INVALID_ARGUMENT);
+    @DisplayName("INVALID_ARGUMENT + '등록 토큰' 오류 메시지는 토큰 무효로 보고 FCM_TOKEN_INVALID로 던진다")
+    void invalidArgumentTokenErrorMapsToTokenInvalid() throws Exception {
+        FirebaseMessagingException ex = exceptionWith(MessagingErrorCode.INVALID_ARGUMENT,
+                "The registration token is not a valid FCM registration token");
         when(firebaseMessaging.send(any(Message.class))).thenThrow(ex);
 
         assertThatThrownBy(() -> fcmService.sendMessage("bad-token", "t", "b", "/dl", 1L))
                 .isInstanceOfSatisfying(CustomException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(NotificationErrorCode.FCM_TOKEN_INVALID));
+    }
+
+    @Test
+    @DisplayName("INVALID_ARGUMENT + 페이로드 오류 메시지는 정상 토큰을 보존하고 FCM_SEND_FAILED로 던진다")
+    void invalidArgumentPayloadErrorMapsToSendFailed() throws Exception {
+        // 토큰이 아니라 메시지 페이로드가 잘못된 경우 → 토큰을 삭제하면 안 됨
+        FirebaseMessagingException ex = exceptionWith(MessagingErrorCode.INVALID_ARGUMENT,
+                "Invalid value at 'message.notification.title'");
+        when(firebaseMessaging.send(any(Message.class))).thenThrow(ex);
+
+        assertThatThrownBy(() -> fcmService.sendMessage("valid-token", "t", "b", "/dl", 1L))
+                .isInstanceOfSatisfying(CustomException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(NotificationErrorCode.FCM_SEND_FAILED));
     }
 
     @Test
