@@ -155,6 +155,9 @@ VALUES
 ON DUPLICATE KEY UPDATE id=id;
 
 -- 스팟 카테고리 (다중 태그)
+-- 시드 스팟(1~135)의 기존 카테고리 연관을 먼저 삭제 후 재구축한다.
+-- (ddl-auto=update 환경에서 삭제된 enum 값 등 obsolete 카테고리가 남아 Spot.categories 매핑이 깨지는 것 방지)
+DELETE FROM spot_categories WHERE spot_id BETWEEN 1 AND 135;
 INSERT INTO spot_categories (spot_id, category)
 VALUES
 (1, 'HERITAGE'), (1, 'MOUNTAIN'),
