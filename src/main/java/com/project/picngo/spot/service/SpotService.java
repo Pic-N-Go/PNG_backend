@@ -58,11 +58,9 @@ public class SpotService {
         Double avgRating = rows.isEmpty() || rows.get(0)[0] == null ? null : (Double) rows.get(0)[0];
         int reviewCount = rows.isEmpty() || rows.get(0)[1] == null ? 0 : ((Long) rows.get(0)[1]).intValue();
         long photoCount = spotPhotoRepository.countBySpotId(spotId);
-        // 북마크 = 1개 이상 컬렉션에 소속
-        // 북마크 쓰기(BookmarkCollectionService)가 아직 TEMP_USER_ID 기반이라 읽기도 맞춰 둔다.
-        // 실제 userId로 읽으면 별이 켜지지 않는다(쓰기는 1번 사용자에게 저장되므로).
-        // 북마크 인증 연동 시 아래 1L을 userId로 교체 (BookmarkCollectionService·ChecklistService와 함께).
-        boolean isBookmarked = bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(1L, spotId);
+        // 북마크 = 1개 이상 컬렉션에 소속. userId가 null(익명 조회)이면 항상 false.
+        boolean isBookmarked = userId != null
+                && bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(userId, spotId);
         Long myReviewId = userId == null ? null
                 : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
 
