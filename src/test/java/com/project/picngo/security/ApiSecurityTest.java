@@ -23,6 +23,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Collections;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -149,5 +150,37 @@ public class ApiSecurityTest {
 
         mockMvc.perform(multipart("/posts").file(request).file(image))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("북마크 컬렉션 목록 조회 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    void 북마크_컬렉션_목록_조회_API_토큰_없이_호출시_차단() throws Exception {
+        mockMvc.perform(get("/bookmark-collections"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("스팟 북마크 컬렉션 동기화 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    void 스팟_북마크_컬렉션_동기화_API_토큰_없이_호출시_차단() throws Exception {
+        mockMvc.perform(put("/spots/1/bookmark-collections")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"collectionIds\":[]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("스팟 체크리스트 조회 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    void 스팟_체크리스트_조회_API_토큰_없이_호출시_차단() throws Exception {
+        // /spots/*/checklist/** 는 뒤에 추가 세그먼트가 없는 /spots/1/checklist 도 매치해야 한다.
+        // 매처를 잘못 좁히면(예: /spots/*/checklist/*) 이 요청은 인증 필터를 통과해 404가 떠서 이 테스트는 실패함
+        mockMvc.perform(get("/spots/1/checklist"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("스팟 상세 조회 API - 토큰 없이 호출해도 403으로 차단되지 않는다 (공개 API)")
+    void 스팟_상세_조회_API_토큰_없이_호출시_차단되지_않음() throws Exception {
+        mockMvc.perform(get("/spots/1"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
     }
 }

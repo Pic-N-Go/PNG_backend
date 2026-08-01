@@ -38,17 +38,16 @@ class BookmarkCollectionServiceTest {
     private ArgumentCaptor<Long> userIdCaptor;
 
     @Test
-    @DisplayName("getCollections는 요청한 userId로만 컬렉션을 조회한다 (다른 유저 데이터가 섞이지 않는다)")
-    void getCollections_usesRequestedUserId_notAnotherUsers() {
+    @DisplayName("getCollections는 요청한 userId를 그대로 리포지토리에 전달한다")
+    void getCollections_passesRequestedUserIdToRepository() {
         Long userA = 7L;
-        Long userB = 1L;
         given(collectionRepository.countByUserId(userA)).willReturn(1L);
         given(collectionRepository.findByUserIdOrderByCreatedAtAsc(any())).willReturn(List.of());
 
         bookmarkCollectionService.getCollections(userA, null);
 
         verify(collectionRepository).findByUserIdOrderByCreatedAtAsc(userIdCaptor.capture());
-        assertThat(userIdCaptor.getValue()).isEqualTo(userA).isNotEqualTo(userB);
+        assertThat(userIdCaptor.getValue()).isEqualTo(userA);
     }
 
     @Test
