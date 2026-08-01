@@ -118,7 +118,12 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "최대 결과 수") @RequestParam(defaultValue = "20") int limit
     );
 
-    @Operation(summary = "스팟 상세 조회", description = "스팟 ID로 상세 정보를 조회합니다. 태그, 편의정보, 체크리스트, 통계, 북마크 여부, 내가 쓴 리뷰 ID를 포함합니다.")
+    @Operation(
+            summary = "스팟 상세 조회",
+            description = "스팟 ID로 상세 정보를 조회합니다. 태그, 편의정보, 체크리스트, 통계, 북마크 여부, 내가 쓴 리뷰 ID를 포함합니다. "
+                    + "로그인 없이도 호출 가능하며, 이 경우 isBookmarked는 항상 false, myReviewId는 항상 null로 반환됩니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
     ResponseEntity<SpotDetailResponse> getSpotDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id

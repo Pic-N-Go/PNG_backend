@@ -8,6 +8,10 @@ import com.project.picngo.notification.service.FcmService;
 import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.spotalert.service.SpotAlertService;
+import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.enums.SpotSource;
+import com.project.picngo.spot.domain.enums.SpotStatus;
+import com.project.picngo.spot.repository.SpotRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -22,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Collections;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -57,6 +62,9 @@ public class ApiSecurityTest {
 
     @MockitoBean
     private CourseService courseService;
+
+    @Autowired
+    private SpotRepository spotRepository;
 
     // ========== 1. 인증 없이 API 호출 시 엄격하게 차단되는지 검증 ==========
 
@@ -175,6 +183,35 @@ public class ApiSecurityTest {
         // 매처를 잘못 좁히면(예: /spots/*/checklist/*) 이 요청은 인증 필터를 통과해 404가 떠서 이 테스트는 실패함
         mockMvc.perform(get("/spots/1/checklist"))
                 .andExpect(status().isForbidden());
+    }
+
+    // 위의 403(토큰 없음) 테스트들의 짝꿍: 유효한 인증 정보로 호출하면 실제로 통과되는지 검증
+    // (라우트 매처를 너무 넓게 잡아 항상 403만 나던 회귀나, 주소 오타로 인한 404 은폐를 막는다)
+
+    @Test
+    @DisplayName("북마크 컬렉션 목록 조회 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
+    void 북마크_컬렉션_목록_조회_API_유효한_인증으로_호출시_정상_응답() throws Exception {
+        mockMvc.perform(get("/bookmark-collections")
+                        .with(authentication(createMockAuthToken())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("스팟 체크리스트 조회 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
+    void 스팟_체크리스트_조회_API_유효한_인증으로_호출시_정상_응답() throws Exception {
+        Spot spot = spotRepository.save(Spot.builder()
+                .name("테스트 스팟")
+                .address("서울특별시 종로구")
+                .latitude(37.5)
+                .longitude(127.0)
+                .categories(Set.of())
+                .source(SpotSource.USER)
+                .status(SpotStatus.APPROVED)
+                .build());
+
+        mockMvc.perform(get("/spots/" + spot.getId() + "/checklist")
+                        .with(authentication(createMockAuthToken())))
+                .andExpect(status().isOk());
     }
 
     @Test
