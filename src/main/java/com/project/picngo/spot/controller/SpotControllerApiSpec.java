@@ -143,31 +143,36 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
-    @Operation(summary = "촬영 체크리스트 조회", description = "시스템 기본 항목(cat3 기반) + 사용자 추가 항목을 반환합니다.")
+    @Operation(summary = "촬영 체크리스트 조회", description = "시스템 기본 항목(cat3 기반) + 사용자 추가 항목을 반환합니다. 로그인 필요.")
     ResponseEntity<ChecklistResponse> getChecklist(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
-    @Operation(summary = "체크리스트 항목 추가", description = "사용자가 체크리스트 항목을 추가합니다. 최대 10개, 내용 20자 이하.")
+    @Operation(summary = "체크리스트 항목 추가", description = "사용자가 체크리스트 항목을 추가합니다. 최대 10개, 내용 20자 이하. 로그인 필요.")
     ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Valid @RequestBody ChecklistRequest request
     );
 
-    @Operation(summary = "체크리스트 항목 삭제", description = "사용자가 직접 추가한 항목만 삭제 가능합니다.")
+    @Operation(summary = "체크리스트 항목 삭제", description = "사용자가 직접 추가한 항목만 삭제 가능합니다. 로그인 필요.")
     ResponseEntity<Void> deleteChecklistItem(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Parameter(description = "항목 ID") @PathVariable Long itemId
     );
 
-    @Operation(summary = "기본 체크리스트 항목 숨김", description = "시스템 기본 항목을 사용자별로 숨깁니다. 이미 숨긴 항목이어도 204를 반환합니다(멱등).")
+    @Operation(summary = "기본 체크리스트 항목 숨김", description = "시스템 기본 항목을 사용자별로 숨깁니다. 이미 숨긴 항목이어도 204를 반환합니다(멱등). 로그인 필요.")
     ResponseEntity<Void> hideDefaultChecklistItem(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
     );
 
-    @Operation(summary = "기본 체크리스트 항목 복원", description = "숨긴 기본 항목을 다시 표시합니다. 숨겨져 있지 않았어도 204를 반환합니다(멱등).")
+    @Operation(summary = "기본 체크리스트 항목 복원", description = "숨긴 기본 항목을 다시 표시합니다. 숨겨져 있지 않았어도 204를 반환합니다(멱등). 로그인 필요.")
     ResponseEntity<Void> restoreDefaultChecklistItem(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Parameter(description = "기본 항목 ID (조회 응답의 defaultItemId)") @PathVariable Integer defaultItemId
     );

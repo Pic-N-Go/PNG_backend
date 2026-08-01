@@ -124,33 +124,50 @@ public class SpotController implements SpotControllerApiSpec {
     }
 
     @GetMapping("/{id}/checklist")
-    public ResponseEntity<ChecklistResponse> getChecklist(@PathVariable Long id) {
-        return ResponseEntity.ok(checklistService.getChecklist(id));
+    public ResponseEntity<ChecklistResponse> getChecklist(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(checklistService.getChecklist(id, userDetails.getId()));
     }
 
     @PostMapping("/{id}/checklist")
     public ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
             @Valid @RequestBody ChecklistRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(checklistService.addItem(id, request));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(checklistService.addItem(id, request, userDetails.getId()));
     }
 
     @DeleteMapping("/{id}/checklist/{itemId}")
-    public ResponseEntity<Void> deleteChecklistItem(@PathVariable Long id, @PathVariable Long itemId) {
-        checklistService.deleteItem(id, itemId);
+    public ResponseEntity<Void> deleteChecklistItem(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id,
+            @PathVariable Long itemId
+    ) {
+        checklistService.deleteItem(id, itemId, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}/checklist/default/{defaultItemId}")
-    public ResponseEntity<Void> hideDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
-        checklistService.hideDefaultItem(id, defaultItemId);
+    public ResponseEntity<Void> hideDefaultChecklistItem(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id,
+            @PathVariable Integer defaultItemId
+    ) {
+        checklistService.hideDefaultItem(id, defaultItemId, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/checklist/default/{defaultItemId}/restore")
-    public ResponseEntity<Void> restoreDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
-        checklistService.restoreDefaultItem(id, defaultItemId);
+    public ResponseEntity<Void> restoreDefaultChecklistItem(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long id,
+            @PathVariable Integer defaultItemId
+    ) {
+        checklistService.restoreDefaultItem(id, defaultItemId, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
 
