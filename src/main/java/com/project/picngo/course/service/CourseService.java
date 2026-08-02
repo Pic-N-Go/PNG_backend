@@ -44,6 +44,7 @@ public class CourseService {
     @Transactional
     public CourseResponse createCourse(Long userId, CourseCreateRequest request) {
         validateUserExists(userId);
+        validateCourseDates(request.startDate(), request.endDate());
         
         Course course = Course.builder()
                 .userId(userId)
@@ -87,6 +88,7 @@ public class CourseService {
     public CourseResponse updateCourse(Long userId, Long courseId, CourseCreateRequest request) {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
+        validateCourseDates(request.startDate(), request.endDate());
         
         course.update(request.title(), request.startDate(), request.endDate());
         return toCourseResponse(course);
@@ -101,14 +103,13 @@ public class CourseService {
 
     // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
 
-    // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
-
     @Transactional
     public void syncCourseSpots(Long userId, Long courseId, CourseSpotSyncRequest request) {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        List<CourseSpotSyncItem> requestSpots = request.spots();
+        List<CourseSpotSyncItem> requestSpots = request.spots() != null ? request.spots() : List.of();
+        validateDaySpotLimits(requestSpots);
 
         // 1. 기존 전체 스팟 조회
         List<CourseSpot> existingSpots = course.getCourseSpots();
@@ -255,6 +256,32 @@ public class CourseService {
     private void validateCourseOwner(Course course, Long userId) {
         if (!userId.equals(course.getUserId())) {
             throw new CustomException(AuthErrorCode.FORBIDDEN_ACCESS);
+        }
+    }
+
+    private void validateCourseDates(java.time.LocalDate startDate, java.time.LocalDate endDate) {
+        if (startDate != null && endDate != null) {
+            if (startDate.isAfter(endDate)) {
+                throw new CustomException(CourseErrorCode.INVALID_COURSE_DATE_RANGE);
+            }
+            long days = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
+            if (days > 15) {
+                throw new CustomException(CourseErrorCode.EXCEEDED_MAX_COURSE_DAYS);
+            }
+        }
+    }
+
+    private void validateDaySpotLimits(List<CourseSpotSyncItem> requestSpots) {
+        if (requestSpots == null || requestSpots.isEmpty()) return;
+
+        Map<Integer, Long> countByDay = requestSpots.stream()
+                .filter(item -> item.dayNumber() != null)
+                .collect(Collectors.groupingBy(CourseSpotSyncItem::dayNumber, Collectors.counting()));
+
+        for (Map.Entry<Integer, Long> entry : countByDay.entrySet()) {
+            if (entry.getValue() > 10) {
+                throw new CustomException(CourseErrorCode.EXCEEDED_MAX_DAY_SPOTS);
+            }
         }
     }
 
