@@ -79,10 +79,14 @@ public class CourseFacade {
                         s2.getName(), s2.getAccessType(), c2.latitude(), c2.longitude(),
                         travelTime, resultCode);
 
+                // 실제로 안내에 쓰는 좌표. 보정 결과를 최종 Fallback까지 이어서 쓰려고 블록 밖에 선언한다.
+                // 보정에 성공했는데 재계산이 실패했을 때 추정 계산이 원본 좌표로 돌아가면,
+                // 마지막 구간이 차량 시간과 별도로 붙는 도보 시간에 이중으로 계산된다.
+                Coordinate updatedC1 = c1;
+                Coordinate updatedC2 = c2;
+
                 // 온디맨드 보정: 길찾기 실패 시 출발지(s1: 102) 또는 목적지(s2: 103)에 대해 주차장 보정 및 재계산
                 if (travelTime == null && resultCode != null) {
-                    Coordinate updatedC1 = c1;
-                    Coordinate updatedC2 = c2;
                     boolean s1Corrected = false;
                     boolean s2Corrected = false;
 
@@ -122,10 +126,13 @@ public class CourseFacade {
                 // 만약 끝까지 실패했다면, 최종적으로 자체 Fallback 계산 적용
                 if (travelTime == null) {
                     travelTime = routeCacheService.calculateFallbackTime(
-                            c1.latitude(), c1.longitude(),
-                            c2.latitude(), c2.longitude()
+                            updatedC1.latitude(), updatedC1.longitude(),
+                            updatedC2.latitude(), updatedC2.longitude()
                     );
-                    log.info("ℹ️ [최종 Fallback 적용] ({}) -> ({}) => 추정시간: {}분", s1.getName(), s2.getName(), travelTime);
+                    log.info("ℹ️ [최종 Fallback 적용] ({}) ({},{}) -> ({}) ({},{}) => 추정시간: {}분",
+                            s1.getName(), updatedC1.latitude(), updatedC1.longitude(),
+                            s2.getName(), updatedC2.latitude(), updatedC2.longitude(),
+                            travelTime);
                 }
 
                 travelTimeUpdates.put(currentSpot.id(), travelTime != null ? travelTime : 30);

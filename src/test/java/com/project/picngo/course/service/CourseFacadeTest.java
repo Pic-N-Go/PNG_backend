@@ -136,4 +136,56 @@ class CourseFacadeTest {
 
         assert capturedUpdates.get(11L) == 42;
     }
+
+    @Test
+    @DisplayName("보정 후 재계산까지 실패하면 원본이 아닌 보정 좌표로 Fallback 추정")
+    void syncCourseSpots_fallbackUsesCorrectedCoordinate() {
+        // given
+        Long userId = 1L;
+        Long courseId = 1L;
+        Integer dayNumber = 1;
+
+        CourseSpotSyncItem item1 = new CourseSpotSyncItem(null, 100L, 1, 1, "함덕해수욕장");
+        CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "성산일출봉");
+        CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
+
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "함덕해수욕장", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 1, "함덕해수욕장", null);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "성산일출봉", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 2, "성산일출봉", null);
+
+        when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
+
+        Spot spot1 = createSpot(100L, 33.543, 126.669);
+        Spot spot2 = createSpot(200L, 33.458, 126.942);
+        when(spotRepository.findByIdIn(List.of(100L, 200L))).thenReturn(List.of(spot1, spot2));
+
+        // 1차 길찾기: 103(도착지 비도로) 실패
+        when(routeCacheService.getTravelInfoWithCache(33.543, 126.669, 33.458, 126.942))
+                .thenReturn(new com.project.picngo.external.dto.DirectionsResponse(null, null, 103));
+
+        // 도착지 보정 성공: 주차장 좌표 확보
+        com.project.picngo.spot.dto.Coordinate parkingCoord =
+                new com.project.picngo.spot.dto.Coordinate(33.462, 126.936, "성산일출봉 주차장");
+        when(spotNavigationService.correctSpotNavigation(spot2)).thenReturn(parkingCoord);
+
+        // 재계산도 실패 (카카오 장애 등) -> 최종 Fallback으로 넘어간다
+        when(routeCacheService.getTravelInfoWithCache(33.543, 126.669, 33.462, 126.936))
+                .thenReturn(null);
+        when(routeCacheService.calculateFallbackTime(33.543, 126.669, 33.462, 126.936))
+                .thenReturn(38);
+
+        // when
+        courseFacade.syncCourseSpots(userId, courseId, request);
+
+        // then: 원본(33.458, 126.942)이 아닌 보정 좌표(33.462, 126.936)로 추정해야 한다
+        verify(routeCacheService).calculateFallbackTime(33.543, 126.669, 33.462, 126.936);
+        verify(routeCacheService, never()).calculateFallbackTime(33.543, 126.669, 33.458, 126.942);
+
+        @SuppressWarnings("unchecked")
+        Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
+                .getInvocations().stream()
+                .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
+                .findFirst().get().getArgument(1);
+
+        assert capturedUpdates.get(11L) == 38;
+    }
 }
