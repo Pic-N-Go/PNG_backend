@@ -41,18 +41,23 @@ public class KakaoDirectionsClient implements DirectionsClient {
             throw new CustomException(ExternalApiErrorCode.KAKAO_API_ERROR);
         }
 
+        log.info("🚗 [카카오 길찾기 API 요청] 출발지: ({},{}), 목적지: ({},{})", startLat, startLng, goalLat, goalLng);
+
         if (apiResponse != null && apiResponse.routes() != null && !apiResponse.routes().isEmpty()) {
             KakaoDirectionsApiResponse.Route route = apiResponse.routes().get(0);
+            log.info("🚗 [카카오 길찾기 API 응답] result_code: {}, result_msg: {}, summary: {}",
+                    route.result_code(), route.result_msg(), route.summary());
+
             if (route.result_code() == 0) {
                 KakaoDirectionsApiResponse.Summary summary = route.summary();
                 int minutes = summary.duration() / 60; // 카카오는 초 단위 반환
-                return new DirectionsResponse(minutes, summary.distance());
+                return new DirectionsResponse(minutes, summary.distance(), 0);
             } else {
-                log.warn("카카오 길찾기 경로 탐색 실패 (API 응답코드: {})", route.result_code());
-                return null;
+                log.warn("⚠️ 카카오 길찾기 경로 탐색 실패 (API 응답코드: {}, 메세지: {})", route.result_code(), route.result_msg());
+                return new DirectionsResponse(null, null, route.result_code());
             }
         }
-        log.warn("카카오 길찾기 API 응답값 없음");
+        log.warn("❌ 카카오 길찾기 API 응답값 없음");
         return null;
     }
 
