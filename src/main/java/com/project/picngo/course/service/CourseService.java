@@ -59,6 +59,14 @@ public class CourseService {
 
     public List<CourseResponse> getCourses(Long userId) {
         return courseRepository.findAllByUserId(userId).stream()
+                .sorted(java.util.Comparator
+                        // 1순위: 완료 여부 (진행예정/진행중: false -> 상단 배치, 완료: true -> 하단 배치)
+                        .comparing(Course::isCompleted)
+                        // 2순위: 시작 날짜가 빠른 순 (오름차순)
+                        .thenComparing(Course::getStartDate, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+                        // 3순위 (동률 시): 최신 생성 순 (내림차순)
+                        .thenComparing(Course::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
+                )
                 .map(this::toCourseResponse)
                 .toList();
     }
