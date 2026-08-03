@@ -53,7 +53,7 @@ public class WeatherClient {
     }
 
     private String[] getLatestBaseDateAndTime() {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"));
         // 무조건 어제 2300 발표 데이터 사용
         return new String[]{
                 now.minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")),
@@ -87,7 +87,7 @@ public class WeatherClient {
                     .uri(uri)
                     .retrieve()
                     .bodyToMono(KmaWeatherApiResponse.class)
-                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                    .retryWhen(Retry.backoff(1, Duration.ofMillis(500))
                             .doBeforeRetry(retrySignal -> log.warn("기상청 단기예보 502/타임아웃 발생, 재시도합니다... ({}회차)", retrySignal.totalRetries() + 1)))
                     .block();
 
@@ -158,7 +158,7 @@ public class WeatherClient {
                     .uri(uri)
                     .retrieve()
                     .bodyToMono(KmaMidWeatherApiResponse.class)
-                    .retryWhen(Retry.backoff(3, Duration.ofSeconds(2))
+                    .retryWhen(Retry.backoff(1, Duration.ofMillis(500))
                             .doBeforeRetry(retrySignal -> log.warn("기상청 중기예보 에러 발생, 재시도합니다... ({}회차)", retrySignal.totalRetries() + 1)))
                     .block();
         } catch (Exception e) {

@@ -47,10 +47,12 @@ public class WeatherCacheService {
 
         List<WeatherForecastResponse> freshData = weatherForecastService.getCombined7DayForecast(lat, lng, date);
         
-        try {
-            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(freshData), TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.warn("Redis 단기예보 저장 실패 (key: {})", key, e);
+        if (freshData != null && !freshData.isEmpty()) {
+            try {
+                redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(freshData), TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.warn("Redis 단기예보 저장 실패 (key: {})", key, e);
+            }
         }
         
         return freshData;
