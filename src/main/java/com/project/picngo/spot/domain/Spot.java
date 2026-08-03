@@ -1,9 +1,11 @@
 package com.project.picngo.spot.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.spot.domain.enums.AccessType;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.common.domain.SpotCategory;
+import com.project.picngo.spot.dto.Coordinate;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -15,6 +17,7 @@ import org.hibernate.type.SqlTypes;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -155,6 +158,38 @@ public class Spot extends BaseTimeEntity {
     @Comment("화장실 여부")
     @Column(nullable = false)
     private boolean toilet = false;
+
+    @Comment("진입 도로 속성. ROAD_ACCESSIBLE | NEEDS_ENTRANCE | UNKNOWN")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_type", nullable = false, length = 30)
+    private AccessType accessType = AccessType.UNKNOWN;
+
+    @OneToMany(mappedBy = "spot", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<SpotAccessPoint> accessPoints = new ArrayList<>();
+
+    public void updateAccessType(AccessType accessType) {
+        if (accessType != null) {
+            this.accessType = accessType;
+        }
+    }
+
+    public void addAccessPoint(SpotAccessPoint accessPoint) {
+        if (this.accessPoints == null) {
+            this.accessPoints = new ArrayList<>();
+        }
+        this.accessPoints.add(accessPoint);
+    }
+
+    public Coordinate getNavigationTarget() {
+        if (this.accessType == AccessType.NEEDS_ENTRANCE && accessPoints != null) {
+            for (SpotAccessPoint ap : accessPoints) {
+                if (Boolean.TRUE.equals(ap.getIsPrimary())) {
+                    return new Coordinate(ap.getLatitude(), ap.getLongitude(), ap.getLabel());
+                }
+            }
+        }
+        return new Coordinate(this.latitude, this.longitude, this.name);
+    }
 
     public void updateCategories(Set<SpotCategory> categories) {
         Set<SpotCategory> target = (categories != null) ? categories : Set.of();
