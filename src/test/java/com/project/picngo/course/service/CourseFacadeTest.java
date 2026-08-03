@@ -61,8 +61,8 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "스팟2");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, List.of("명소"), "url", 5, 1, 1, "스팟1", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "스팟2", 33.2, 126.2, List.of("명소"), "url", 5, 1, 2, "스팟2", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, null, List.of("명소"), "url", 5, 1, 1, "스팟1", null);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "스팟2", 33.2, 126.2, null, List.of("명소"), "url", 5, 1, 2, "스팟2", null);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
         
@@ -100,8 +100,8 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "함덕해수욕장");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "성산일출봉", 33.458, 126.942, List.of("명소"), "url", 5, 1, 1, "성산일출봉", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "함덕해수욕장", 33.543, 126.669, List.of("명소"), "url", 5, 1, 2, "함덕해수욕장", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "성산일출봉", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 1, "성산일출봉", null);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "함덕해수욕장", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 2, "함덕해수욕장", null);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
 

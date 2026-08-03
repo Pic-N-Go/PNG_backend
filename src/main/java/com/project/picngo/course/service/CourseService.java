@@ -13,6 +13,9 @@ import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.enums.AccessType;
+import com.project.picngo.spot.dto.Coordinate;
+import com.project.picngo.spot.dto.NavigationInfo;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,7 @@ public class CourseService {
     private final CourseChecklistRepository courseChecklistRepository;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
+    private final RouteCacheService routeCacheService;
 
 
     // ==================== 코스 CRUD ====================
@@ -45,7 +49,7 @@ public class CourseService {
     public CourseResponse createCourse(Long userId, CourseCreateRequest request) {
         validateUserExists(userId);
         validateCourseDates(request.startDate(), request.endDate());
-        
+
         Course course = Course.builder()
                 .userId(userId)
                 .title(request.title())
@@ -97,7 +101,7 @@ public class CourseService {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
         validateCourseDates(request.startDate(), request.endDate());
-        
+
         course.update(request.title(), request.startDate(), request.endDate());
         return toCourseResponse(course);
     }
@@ -156,7 +160,7 @@ public class CourseService {
                         .memo(item.memo())
                         .travelTimeMinutes(null)
                         .build();
-                
+
                 CourseSpot saved = courseSpotRepository.save(newSpot);
                 course.getCourseSpots().add(saved);
             }
@@ -325,12 +329,23 @@ public class CourseService {
     }
 
     private CourseSpotResponse toCourseSpotResponse(CourseSpot spot, Spot actualSpot) {
+        Coordinate naviTarget = actualSpot != null ? actualSpot.getNavigationTarget() : null;
+
+        Integer walkingTimeMinutes = null;
+        if (actualSpot != null && actualSpot.getAccessType() == AccessType.NEEDS_ENTRANCE && naviTarget != null) {
+            walkingTimeMinutes = routeCacheService.calculateWalkingMinutes(
+                    naviTarget.latitude(), naviTarget.longitude(),
+                    actualSpot.getLatitude(), actualSpot.getLongitude()
+            );
+        }
+
         return new CourseSpotResponse(
                 spot.getId(),
                 spot.getSpotId(),
                 actualSpot != null ? actualSpot.getName() : null,
                 actualSpot != null ? actualSpot.getLatitude() : null,
                 actualSpot != null ? actualSpot.getLongitude() : null,
+                NavigationInfo.of(actualSpot, walkingTimeMinutes),
                 actualSpot != null ? actualSpot.getCategoryNames() : null,
                 actualSpot != null ? actualSpot.getThumbnailUrl() : null,
                 actualSpot != null ? actualSpot.getPhotogenicScore() : null,
