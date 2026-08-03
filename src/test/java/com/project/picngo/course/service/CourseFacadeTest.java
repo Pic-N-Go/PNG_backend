@@ -5,6 +5,7 @@ import com.project.picngo.course.dto.CourseSpotSyncItem;
 import com.project.picngo.course.dto.CourseSpotSyncRequest;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
+import com.project.picngo.spot.service.SpotNavigationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,9 +33,12 @@ class CourseFacadeTest {
     @Mock
     private SpotRepository spotRepository;
 
+    @Mock
+    private SpotNavigationService spotNavigationService;
+
     @BeforeEach
     void setUp() {
-        courseFacade = new CourseFacade(courseService, routeCacheService, spotRepository);
+        courseFacade = new CourseFacade(courseService, routeCacheService, spotRepository, spotNavigationService);
     }
 
     private Spot createSpot(Long id, double lat, double lng) {
@@ -65,14 +69,14 @@ class CourseFacadeTest {
         Spot spot1 = createSpot(100L, 33.1, 126.1);
         Spot spot2 = createSpot(200L, 33.2, 126.2);
         when(spotRepository.findByIdIn(List.of(100L, 200L))).thenReturn(List.of(spot1, spot2));
-        when(routeCacheService.getTravelTimeMinutes(33.1, 126.1, 33.2, 126.2)).thenReturn(45);
+        when(routeCacheService.getTravelInfoWithCache(33.1, 126.1, 33.2, 126.2)).thenReturn(new com.project.picngo.external.dto.DirectionsResponse(45, null, 0));
 
         // when
         courseFacade.syncCourseSpots(userId, courseId, request);
 
         // then
         verify(courseService).syncCourseSpots(userId, courseId, request);
-        verify(routeCacheService).getTravelTimeMinutes(33.1, 126.1, 33.2, 126.2);
+        verify(routeCacheService).getTravelInfoWithCache(33.1, 126.1, 33.2, 126.2);
         
         @SuppressWarnings("unchecked")
         Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
@@ -82,5 +86,54 @@ class CourseFacadeTest {
             
         assert capturedUpdates.get(10L) == null;
         assert capturedUpdates.get(11L) == 45;
+    }
+
+    @Test
+    @DisplayName("길찾기 API 102 에러 발생 시 온디맨드 보정 후 재계산 검증")
+    void syncCourseSpots_handlesResultCode102_withCorrection() {
+        // given
+        Long userId = 1L;
+        Long courseId = 1L;
+        Integer dayNumber = 1;
+
+        CourseSpotSyncItem item1 = new CourseSpotSyncItem(null, 100L, 1, 1, "성산일출봉");
+        CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "함덕해수욕장");
+        CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
+
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "성산일출봉", 33.458, 126.942, List.of("명소"), "url", 5, 1, 1, "성산일출봉", null);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "함덕해수욕장", 33.543, 126.669, List.of("명소"), "url", 5, 1, 2, "함덕해수욕장", null);
+
+        when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
+
+        Spot spot1 = createSpot(100L, 33.458, 126.942);
+        Spot spot2 = createSpot(200L, 33.543, 126.669);
+        when(spotRepository.findByIdIn(List.of(100L, 200L))).thenReturn(List.of(spot1, spot2));
+
+        // 1차 길찾기 시도: 102 에러
+        when(routeCacheService.getTravelInfoWithCache(33.458, 126.942, 33.543, 126.669))
+                .thenReturn(new com.project.picngo.external.dto.DirectionsResponse(null, null, 102));
+
+        // 온디맨드 보정: 주차장 좌표 반환
+        com.project.picngo.spot.dto.Coordinate parkingCoord = new com.project.picngo.spot.dto.Coordinate(33.462, 126.936, "성산일출봉 주차장");
+        when(spotNavigationService.correctSpotNavigation(spot1)).thenReturn(parkingCoord);
+
+        // 재시도 길찾기: 42분 반환
+        when(routeCacheService.getTravelInfoWithCache(33.462, 126.936, 33.543, 126.669))
+                .thenReturn(new com.project.picngo.external.dto.DirectionsResponse(42, null, 0));
+
+        // when
+        courseFacade.syncCourseSpots(userId, courseId, request);
+
+        // then
+        verify(spotNavigationService).correctSpotNavigation(spot1);
+        verify(routeCacheService).getTravelInfoWithCache(33.462, 126.936, 33.543, 126.669);
+
+        @SuppressWarnings("unchecked")
+        Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
+                .getInvocations().stream()
+                .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
+                .findFirst().get().getArgument(1);
+
+        assert capturedUpdates.get(11L) == 42;
     }
 }
