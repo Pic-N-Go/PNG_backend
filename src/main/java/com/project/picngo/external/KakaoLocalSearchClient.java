@@ -64,25 +64,52 @@ public class KakaoLocalSearchClient {
             return PlaceSearchResult.error();
         }
 
-        if (response == null || response.documents() == null || response.documents().isEmpty()) {
+        // 응답 본문이 없거나 documents 필드 자체가 없는 것은 "주차장이 없다"가 아니라 응답이 깨진 것이다.
+        // NOT_FOUND로 처리하면 호출부가 RESOLVE_FAILED로 확정해 재보정을 영구히 막는다.
+        if (response == null || response.documents() == null) {
+            log.warn("❌ [카카오 지도 검색 응답 형식 오류] 쿼리: '{}', 응답: {}", query, response);
+            return PlaceSearchResult.error();
+        }
+
+        if (response.documents().isEmpty()) {
             log.info("🔎 [카카오 지도 키워드 검색 결과 없음] 쿼리: '{}'", query);
             return PlaceSearchResult.notFound();
         }
 
         KakaoLocalSearchResponse.PlaceDocument doc = response.documents().get(0);
-        try {
-            Coordinate place = new Coordinate(
-                    Double.parseDouble(doc.y()),
-                    Double.parseDouble(doc.x()),
-                    doc.placeName());
-
-            log.info("🟢 [카카오 지도 키워드 검색 성공] 쿼리: '{}' -> 장소: '{}' (위도: {}, 경도: {})",
-                    query, place.name(), place.latitude(), place.longitude());
-            return PlaceSearchResult.found(place);
-        } catch (NumberFormatException e) {
-            // 좌표를 못 읽은 것은 "주차장이 없다"는 뜻이 아니므로 실패로 확정하지 않는다.
-            log.warn("❌ 카카오 지도 좌표 파싱 실패 (쿼리: {}, x: {}, y: {})", query, doc.x(), doc.y());
+        if (doc == null || doc.x() == null || doc.y() == null) {
+            // Double.parseDouble(null)은 NumberFormatException이 아니라 NPE를 던진다.
+            log.warn("❌ [카카오 지도 검색 결과에 좌표 없음] 쿼리: '{}'", query);
             return PlaceSearchResult.error();
         }
+
+        double latitude;
+        double longitude;
+        try {
+            latitude = Double.parseDouble(doc.y());
+            longitude = Double.parseDouble(doc.x());
+        } catch (NumberFormatException e) {
+            log.warn("❌ [카카오 지도 좌표 파싱 실패] 쿼리: '{}', x: {}, y: {}", query, doc.x(), doc.y());
+            return PlaceSearchResult.error();
+        }
+
+        // parseDouble은 "NaN", "Infinity"를 예외 없이 통과시킨다.
+        // 그대로 두면 거리 계산이 NaN이 되고, NaN 비교는 항상 false라 게이트에서 탈락해
+        // 멀쩡한 스팟이 보정 불가로 확정된다.
+        if (!isValidCoordinate(latitude, longitude)) {
+            log.warn("❌ [카카오 지도 좌표 범위 오류] 쿼리: '{}', 위도: {}, 경도: {}", query, latitude, longitude);
+            return PlaceSearchResult.error();
+        }
+
+        Coordinate place = new Coordinate(latitude, longitude, doc.placeName());
+        log.info("🟢 [카카오 지도 키워드 검색 성공] 쿼리: '{}' -> 장소: '{}' (위도: {}, 경도: {})",
+                query, place.name(), place.latitude(), place.longitude());
+        return PlaceSearchResult.found(place);
+    }
+
+    private boolean isValidCoordinate(double latitude, double longitude) {
+        return Double.isFinite(latitude) && Double.isFinite(longitude)
+                && latitude >= -90.0 && latitude <= 90.0
+                && longitude >= -180.0 && longitude <= 180.0;
     }
 }

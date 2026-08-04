@@ -118,6 +118,31 @@ class SpotNavigationServiceTest {
     }
 
     @Test
+    @DisplayName("주차장이 2km를 넘으면 포기하지 않고 매표소 검색으로 넘어간다")
+    void testCorrectSpotNavigation_FallsThroughToTicketOfficeWhenParkingTooFar() {
+        Spot spot = Spot.builder()
+                .name("한라산 백록담")
+                .address("제주 서귀포시 토평동")
+                .latitude(33.3617)
+                .longitude(126.5382)
+                .build();
+
+        // "주차장"은 반대편 탐방로가 걸려 10km 밖 -> 게이트 탈락
+        when(kakaoLocalSearchClient.searchNearbyPlace(eq("한라산 백록담 주차장"), anyDouble(), anyDouble(), anyInt()))
+                .thenReturn(PlaceSearchResult.found(new Coordinate(33.4500, 126.6000, "반대편 탐방로 주차장")));
+        // "매표소"는 500m 이내 -> 게이트 통과
+        when(kakaoLocalSearchClient.searchNearbyPlace(eq("한라산 백록담 매표소"), anyDouble(), anyDouble(), anyInt()))
+                .thenReturn(PlaceSearchResult.found(new Coordinate(33.3650, 126.5400, "성판악 매표소")));
+
+        Coordinate result = spotNavigationService.correctSpotNavigation(spot);
+
+        assertThat(result.name()).isEqualTo("성판악 매표소");
+        assertThat(spot.getAccessType()).isEqualTo(AccessType.NEEDS_ENTRANCE);
+
+        verify(spotAccessPointRepository, times(1)).save(any(SpotAccessPoint.class));
+    }
+
+    @Test
     @DisplayName("검색 API 호출이 실패하면 RESOLVE_FAILED로 확정하지 않고 상태를 유지한다")
     void testCorrectSpotNavigation_SearchApiError_KeepsStateForRetry() {
         Spot spot = Spot.builder()

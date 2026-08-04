@@ -70,39 +70,28 @@ public class SpotNavigationService {
             return originOf(spot);
         }
 
-        // 4. 2km 거리 검증 게이트 통과 여부 확인
+        // 4. 거리 게이트까지 통과한 후보가 있으면 저장
         if (searchResult.isFound()) {
             Coordinate candidate = searchResult.place();
-            double distanceMeters = calculateHaversineDistanceMeters(
-                    spot.getLatitude(), spot.getLongitude(),
-                    candidate.latitude(), candidate.longitude());
 
-            if (distanceMeters <= MAX_DISTANCE_METERS) {
-                log.info("✨ [보정 주차장 2km 거리 게이트 통과] spotId: {}, 주차장명: {}, 거리: {}m",
-                        spot.getId(), candidate.name(), Math.round(distanceMeters));
+            SpotAccessPoint accessPoint = SpotAccessPoint.builder()
+                    .spot(spot)
+                    .latitude(candidate.latitude())
+                    .longitude(candidate.longitude())
+                    .label(candidate.name())
+                    .source(AccessPointSource.KAKAO_LOCAL)
+                    .isPrimary(true)
+                    .build();
 
-                SpotAccessPoint accessPoint = SpotAccessPoint.builder()
-                        .spot(spot)
-                        .latitude(candidate.latitude())
-                        .longitude(candidate.longitude())
-                        .label(candidate.name())
-                        .source(AccessPointSource.KAKAO_LOCAL)
-                        .isPrimary(true)
-                        .build();
+            spotAccessPointRepository.save(accessPoint);
+            spot.addAccessPoint(accessPoint);
+            spot.updateAccessType(AccessType.NEEDS_ENTRANCE);
+            spotRepository.save(spot);
 
-                spotAccessPointRepository.save(accessPoint);
-                spot.addAccessPoint(accessPoint);
-                spot.updateAccessType(AccessType.NEEDS_ENTRANCE);
-                spotRepository.save(spot);
-
-                return candidate;
-            }
-
-            log.warn("❌ [검색된 주차장이 2km 초과로 무효 처리] spotId: {}, 거리: {}m",
-                    spot.getId(), Math.round(distanceMeters));
+            return candidate;
         }
 
-        // 5. 검색은 정상이었는데 후보가 없거나 게이트에서 탈락한 경우에만 실패로 확정한다.
+        // 5. 검색은 정상이었는데 쓸 만한 후보가 없는 경우에만 실패로 확정한다.
         //    재시도해도 결과가 달라지지 않으므로 다음부터는 탐색을 건너뛴다.
         log.warn("⚠️ [주차장 보정 탐색 실패 처리 - RESOLVE_FAILED] spotId: {}", spot.getId());
         spot.updateAccessType(AccessType.RESOLVE_FAILED);
@@ -111,23 +100,51 @@ public class SpotNavigationService {
     }
 
     /**
-     * 검색어를 우선순위대로 시도한다.
+     * 검색어를 우선순위대로 시도하며, 거리 게이트까지 통과한 후보만 FOUND로 돌려준다.
+     * 게이트를 검색 루프 안에서 적용해야 "주차장"이 엉뚱한 곳을 물어왔을 때
+     * "매표소"로 넘어갈 수 있다. 밖에서 검증하면 첫 후보가 탈락하는 순간 탐색이 끝난다.
+     *
      * 호출 실패(ERROR)가 나면 남은 검색어를 태우지 않고 즉시 중단한다.
      * 같은 원인으로 실패할 가능성이 높고, 재시도 여지를 남겨야 하기 때문이다.
      */
     private PlaceSearchResult searchAccessPoint(Spot spot) {
         for (String suffix : SEARCH_SUFFIXES) {
+            String query = spot.getName() + suffix;
             PlaceSearchResult result = kakaoLocalSearchClient.searchNearbyPlace(
-                    spot.getName() + suffix,
+                    query,
                     spot.getLatitude(),
                     spot.getLongitude(),
                     SEARCH_RADIUS_METERS);
 
-            if (result.isFound() || result.isError()) {
+            if (result.isError()) {
+                return result;
+            }
+
+            if (result.isFound() && passesDistanceGate(spot, query, result.place())) {
                 return result;
             }
         }
         return PlaceSearchResult.notFound();
+    }
+
+    /**
+     * 검색 결과가 원본 스팟에서 2km 이내인지 확인한다.
+     * 동명의 다른 지역 주차장(예: 반대편 탐방로)이 걸리는 것을 막는다.
+     */
+    private boolean passesDistanceGate(Spot spot, String query, Coordinate candidate) {
+        double distanceMeters = calculateHaversineDistanceMeters(
+                spot.getLatitude(), spot.getLongitude(),
+                candidate.latitude(), candidate.longitude());
+
+        if (distanceMeters <= MAX_DISTANCE_METERS) {
+            log.info("✨ [거리 게이트 통과] spotId: {}, 쿼리: '{}', 후보: {}, 거리: {}m",
+                    spot.getId(), query, candidate.name(), Math.round(distanceMeters));
+            return true;
+        }
+
+        log.warn("❌ [거리 게이트 탈락 - 다음 검색어로] spotId: {}, 쿼리: '{}', 후보: {}, 거리: {}m",
+                spot.getId(), query, candidate.name(), Math.round(distanceMeters));
+        return false;
     }
 
     private Coordinate originOf(Spot spot) {
