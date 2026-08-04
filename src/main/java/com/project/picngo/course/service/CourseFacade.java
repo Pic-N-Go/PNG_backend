@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -89,30 +90,32 @@ public class CourseFacade {
 
                 // 온디맨드 보정: 길찾기 실패 시 출발지(s1: 102) 또는 목적지(s2: 103)에 대해 주차장 보정 및 재계산
                 if (travelTime == null && resultCode != null) {
-                    boolean s1Corrected = false;
-                    boolean s2Corrected = false;
+                    // 보정을 "시도"했는지가 아니라 좌표가 실제로 "바뀌었는지"를 본다.
+                    // correctSpotNavigation은 검색 실패 시에도 원본 좌표를 돌려주므로,
+                    // 시도 여부로 판단하면 같은 좌표로 카카오를 한 번 더 부르고 같은 실패를 받는다.
+                    boolean coordinateChanged = false;
 
                     // 102: 출발 지점 주변의 도로를 탐색할 수 없음
                     if (resultCode == 102 && s1.getAccessType() != AccessType.ROAD_ACCESSIBLE && s1.getAccessType() != AccessType.RESOLVE_FAILED) {
                         log.info("⚠️ [길찾기 실패 -> 온디맨드 출발지 보정 진입] s1({})", s1.getName());
                         Coordinate target = spotNavigationService.correctSpotNavigation(s1);
-                        if (target != null) {
+                        if (isRelocated(c1, target)) {
                             updatedC1 = target;
+                            coordinateChanged = true;
                         }
-                        s1Corrected = true;
                     }
 
                     // 103: 도착 지점 주변의 도로를 탐색할 수 없음
                     if (resultCode == 103 && s2.getAccessType() != AccessType.ROAD_ACCESSIBLE && s2.getAccessType() != AccessType.RESOLVE_FAILED) {
                         log.info("⚠️ [길찾기 실패 -> 온디맨드 도착지 보정 진입] s2({})", s2.getName());
                         Coordinate target = spotNavigationService.correctSpotNavigation(s2);
-                        if (target != null) {
+                        if (isRelocated(c2, target)) {
                             updatedC2 = target;
+                            coordinateChanged = true;
                         }
-                        s2Corrected = true;
                     }
 
-                    if (s1Corrected || s2Corrected) {
+                    if (coordinateChanged) {
                         DirectionsResponse retryRouteInfo = routeCacheService.getTravelInfoWithCache(
                                 updatedC1.latitude(), updatedC1.longitude(),
                                 updatedC2.latitude(), updatedC2.longitude()
@@ -122,6 +125,8 @@ public class CourseFacade {
                                 s1.getName(), updatedC1.latitude(), updatedC1.longitude(),
                                 s2.getName(), updatedC2.latitude(), updatedC2.longitude(),
                                 travelTime);
+                    } else {
+                        log.info("ℹ️ [보정 좌표 없음 - 재계산 생략] ({}) -> ({})", s1.getName(), s2.getName());
                     }
                 }
 
@@ -135,6 +140,18 @@ public class CourseFacade {
         }
 
         courseService.updateTravelTimes(courseId, travelTimeUpdates);
+    }
+
+    /**
+     * 보정 결과가 원래 좌표와 다른 지점을 가리키는지 여부.
+     * 이름(라벨)은 경로 탐색에 영향이 없으므로 위경도만 비교한다.
+     */
+    private boolean isRelocated(Coordinate origin, Coordinate corrected) {
+        if (corrected == null) {
+            return false;
+        }
+        return !Objects.equals(origin.latitude(), corrected.latitude())
+                || !Objects.equals(origin.longitude(), corrected.longitude());
     }
 
     /**

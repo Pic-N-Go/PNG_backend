@@ -194,6 +194,55 @@ class CourseFacadeTest {
     }
 
     @Test
+    @DisplayName("보정 결과가 원본 좌표 그대로면 동일한 길찾기를 재호출하지 않는다")
+    void syncCourseSpots_skipsRetryWhenCoordinateUnchanged() {
+        // given
+        Long userId = 1L;
+        Long courseId = 1L;
+        Integer dayNumber = 1;
+
+        CourseSpotSyncItem item1 = new CourseSpotSyncItem(null, 100L, 1, 1, "함덕해수욕장");
+        CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "오지스팟");
+        CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
+
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "함덕해수욕장", "제주 제주시 조천읍", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 1, "함덕해수욕장", null, false);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "오지스팟", "제주 서귀포시", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 2, "오지스팟", null, false);
+
+        when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
+
+        Spot spot1 = createSpot(100L, 33.543, 126.669);
+        Spot spot2 = createSpot(200L, 33.458, 126.942);
+        when(spotRepository.findByIdIn(List.of(100L, 200L))).thenReturn(List.of(spot1, spot2));
+
+        // 1차 길찾기: 103(도착지 비도로) 실패
+        when(routeCacheService.getTravelInfoWithCache(33.543, 126.669, 33.458, 126.942))
+                .thenReturn(new com.project.picngo.external.dto.DirectionsResponse(null, null, 103));
+
+        // 보정 실패: 주차장을 못 찾아 원본 좌표를 그대로 돌려준다
+        when(spotNavigationService.correctSpotNavigation(spot2))
+                .thenReturn(new com.project.picngo.spot.dto.Coordinate(33.458, 126.942, "오지스팟"));
+
+        when(routeCacheService.calculateFallbackTime(33.543, 126.669, 33.458, 126.942))
+                .thenReturn(25);
+
+        // when
+        courseFacade.syncCourseSpots(userId, courseId, request);
+
+        // then: 좌표가 그대로이므로 동일한 길찾기를 두 번 부르지 않는다
+        verify(routeCacheService, times(1))
+                .getTravelInfoWithCache(33.543, 126.669, 33.458, 126.942);
+
+        @SuppressWarnings("unchecked")
+        Map<Long, TravelTimeResult> capturedUpdates = (Map<Long, TravelTimeResult>) mockingDetails(courseService)
+                .getInvocations().stream()
+                .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
+                .findFirst().get().getArgument(1);
+
+        assert capturedUpdates.get(11L).minutes() == 25;
+        assert capturedUpdates.get(11L).estimated();
+    }
+
+    @Test
     @DisplayName("추정 계산조차 불가능하면 임의의 기본값 대신 null로 저장")
     void syncCourseSpots_storesNullWhenTimeUnknown() {
         // given
