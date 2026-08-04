@@ -50,12 +50,9 @@ class SpotNavigationServiceTest {
                 .longitude(126.9365)
                 .label("성산일출봉 공영주차장")
                 .source(AccessPointSource.KAKAO_LOCAL)
-                .isPrimary(true)
                 .build();
         spot.getAccessPoints().add(accessPoint);
-
-        when(spotAccessPointRepository.findBySpotIdAndIsPrimaryTrue(spot.getId()))
-                .thenReturn(java.util.Optional.of(accessPoint));
+        spot.assignPrimaryAccessPoint(accessPoint);
 
         Coordinate result = spotNavigationService.correctSpotNavigation(spot);
 

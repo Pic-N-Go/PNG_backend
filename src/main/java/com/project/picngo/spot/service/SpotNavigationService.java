@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -39,9 +38,8 @@ public class SpotNavigationService {
         if (spot == null) return null;
 
         // 1. 이미 등록된 유효한 대표 주차장/진입점(SpotAccessPoint)이 존재하는지 확인
-        Optional<SpotAccessPoint> existingAp = spotAccessPointRepository.findBySpotIdAndIsPrimaryTrue(spot.getId());
-        if (existingAp.isPresent()) {
-            SpotAccessPoint ap = existingAp.get();
+        SpotAccessPoint ap = spot.getPrimaryAccessPoint();
+        if (ap != null) {
             log.info("🟢 [기존 보정 주차장 좌표 활용] spotId: {}, 주차장명: {} ({},{})",
                     spot.getId(), ap.getLabel(), ap.getLatitude(), ap.getLongitude());
             if (spot.getAccessType() != AccessType.NEEDS_ENTRANCE) {
@@ -80,11 +78,11 @@ public class SpotNavigationService {
                     .longitude(candidate.longitude())
                     .label(candidate.name())
                     .source(AccessPointSource.KAKAO_LOCAL)
-                    .isPrimary(true)
                     .build();
 
             spotAccessPointRepository.save(accessPoint);
             spot.addAccessPoint(accessPoint);
+            spot.assignPrimaryAccessPoint(accessPoint);
             spot.updateAccessType(AccessType.NEEDS_ENTRANCE);
             spotRepository.save(spot);
 
