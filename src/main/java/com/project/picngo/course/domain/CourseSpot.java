@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Getter
@@ -34,7 +35,9 @@ public class CourseSpot {
     private Integer travelTimeMinutes;
 
     // 위 이동시간이 카카오 실측이 아니라 자체 추정값인지 여부.
-    // 조회 시점에는 DB 값만 보므로 저장할 때 출처를 같이 남겨야 구분할 수 있다.
+    // false = 카카오가 준 값 || 알 수 없음
+    // true = 우리 서비스가 추정한 값
+    @ColumnDefault("false")
     @Column(nullable = false)
     private boolean travelTimeEstimated = false;
 
