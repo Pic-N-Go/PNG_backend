@@ -135,9 +135,17 @@ public class CourseFacade {
                             travelTime);
                 }
 
-                travelTimeUpdates.put(currentSpot.id(), travelTime != null ? travelTime : 30);
+                // 추정 계산조차 불가능한 경우(유효 범위 밖 좌표)는 null로 남긴다.
+                // 근거 없는 기본값을 넣으면 카카오 실측값과 구분되지 않은 채 일정에 반영된다.
+                if (travelTime == null) {
+                    log.warn("⚠️ [이동시간 산출 불가] ({}) -> ({}) 좌표가 유효하지 않아 null로 저장합니다",
+                            s1.getName(), s2.getName());
+                }
+                travelTimeUpdates.put(currentSpot.id(), travelTime);
             } else {
-                travelTimeUpdates.put(currentSpot.id(), 30); // fallback
+                log.warn("⚠️ [이동시간 산출 불가] 코스에 담긴 스팟을 찾을 수 없습니다. courseSpotId: {}, spotId: {}",
+                        currentSpot.id(), currentSpot.spotId());
+                travelTimeUpdates.put(currentSpot.id(), null);
             }
         }
 
