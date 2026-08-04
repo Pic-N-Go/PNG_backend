@@ -3,6 +3,7 @@ package com.project.picngo.course.service;
 import com.project.picngo.course.dto.CourseSpotResponse;
 import com.project.picngo.course.dto.CourseSpotSyncItem;
 import com.project.picngo.course.dto.CourseSpotSyncRequest;
+import com.project.picngo.course.dto.TravelTimeResult;
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.AccessType;
@@ -43,8 +44,9 @@ public class CourseFacade {
 
         if (daySpots.isEmpty()) return;
 
-        Map<Long, Integer> travelTimeUpdates = new HashMap<>();
-        travelTimeUpdates.put(daySpots.get(0).id(), null);
+        Map<Long, TravelTimeResult> travelTimeUpdates = new HashMap<>();
+        // 하루의 첫 스팟은 이전 스팟이 없어 이동시간이 존재하지 않는다
+        travelTimeUpdates.put(daySpots.get(0).id(), TravelTimeResult.unknown());
 
         if (daySpots.size() == 1) {
             courseService.updateTravelTimes(courseId, travelTimeUpdates);
@@ -123,32 +125,42 @@ public class CourseFacade {
                     }
                 }
 
-                // 만약 끝까지 실패했다면, 최종적으로 자체 Fallback 계산 적용
-                if (travelTime == null) {
-                    travelTime = routeCacheService.calculateFallbackTime(
-                            updatedC1.latitude(), updatedC1.longitude(),
-                            updatedC2.latitude(), updatedC2.longitude()
-                    );
-                    log.info("ℹ️ [최종 Fallback 적용] ({}) ({},{}) -> ({}) ({},{}) => 추정시간: {}분",
-                            s1.getName(), updatedC1.latitude(), updatedC1.longitude(),
-                            s2.getName(), updatedC2.latitude(), updatedC2.longitude(),
-                            travelTime);
-                }
-
-                // 추정 계산조차 불가능한 경우(유효 범위 밖 좌표)는 null로 남긴다.
-                // 근거 없는 기본값을 넣으면 카카오 실측값과 구분되지 않은 채 일정에 반영된다.
-                if (travelTime == null) {
-                    log.warn("⚠️ [이동시간 산출 불가] ({}) -> ({}) 좌표가 유효하지 않아 null로 저장합니다",
-                            s1.getName(), s2.getName());
-                }
-                travelTimeUpdates.put(currentSpot.id(), travelTime);
+                travelTimeUpdates.put(currentSpot.id(),
+                        resolveTravelTime(travelTime, s1, s2, updatedC1, updatedC2));
             } else {
                 log.warn("⚠️ [이동시간 산출 불가] 코스에 담긴 스팟을 찾을 수 없습니다. courseSpotId: {}, spotId: {}",
                         currentSpot.id(), currentSpot.spotId());
-                travelTimeUpdates.put(currentSpot.id(), null);
+                travelTimeUpdates.put(currentSpot.id(), TravelTimeResult.unknown());
             }
         }
 
         courseService.updateTravelTimes(courseId, travelTimeUpdates);
+    }
+
+    /**
+     * 카카오 실측값이 있으면 그대로, 없으면 자체 추정으로 대체하되 출처를 구분해 담는다.
+     * 추정 계산조차 불가능하면(유효 범위 밖 좌표) 근거 없는 기본값 대신 값 없음으로 남긴다.
+     */
+    private TravelTimeResult resolveTravelTime(Integer measuredMinutes, Spot s1, Spot s2,
+                                               Coordinate c1, Coordinate c2) {
+        if (measuredMinutes != null) {
+            return TravelTimeResult.measured(measuredMinutes);
+        }
+
+        Integer estimatedMinutes = routeCacheService.calculateFallbackTime(
+                c1.latitude(), c1.longitude(),
+                c2.latitude(), c2.longitude()
+        );
+
+        if (estimatedMinutes == null) {
+            log.warn("⚠️ [이동시간 산출 불가] ({}) -> ({}) 좌표가 유효하지 않습니다", s1.getName(), s2.getName());
+            return TravelTimeResult.unknown();
+        }
+
+        log.info("ℹ️ [최종 Fallback 적용] ({}) ({},{}) -> ({}) ({},{}) => 추정시간: {}분",
+                s1.getName(), c1.latitude(), c1.longitude(),
+                s2.getName(), c2.latitude(), c2.longitude(),
+                estimatedMinutes);
+        return TravelTimeResult.estimate(estimatedMinutes);
     }
 }

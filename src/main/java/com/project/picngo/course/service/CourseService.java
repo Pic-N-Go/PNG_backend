@@ -13,6 +13,7 @@ import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.course.dto.TravelTimeResult;
 import com.project.picngo.spot.dto.NavigationInfo;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
@@ -174,11 +175,12 @@ public class CourseService {
     }
 
     @Transactional
-    public void updateTravelTimes(Long courseId, Map<Long, Integer> travelTimeUpdates) {
+    public void updateTravelTimes(Long courseId, Map<Long, TravelTimeResult> travelTimeUpdates) {
         Course course = findCourseOrThrow(courseId);
         course.getCourseSpots().forEach(spot -> {
-            if (travelTimeUpdates.containsKey(spot.getId())) {
-                spot.updateTravelTime(travelTimeUpdates.get(spot.getId()));
+            TravelTimeResult result = travelTimeUpdates.get(spot.getId());
+            if (result != null) {
+                spot.updateTravelTime(result.minutes(), result.estimated());
             }
         });
     }
@@ -339,7 +341,8 @@ public class CourseService {
                 spot.getDayNumber(),
                 spot.getSequenceOrder(),
                 spot.getMemo(),
-                spot.getTravelTimeMinutes()
+                spot.getTravelTimeMinutes(),
+                spot.isTravelTimeEstimated()
         );
     }
 

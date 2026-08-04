@@ -33,6 +33,11 @@ public class CourseSpot {
 
     private Integer travelTimeMinutes;
 
+    // 위 이동시간이 카카오 실측이 아니라 자체 추정값인지 여부.
+    // 조회 시점에는 DB 값만 보므로 저장할 때 출처를 같이 남겨야 구분할 수 있다.
+    @Column(nullable = false)
+    private boolean travelTimeEstimated = false;
+
     @Builder
     public CourseSpot(Course course, Long spotId, Integer dayNumber, Integer sequenceOrder, String memo, Integer travelTimeMinutes) {
         this.course = course;
@@ -58,8 +63,9 @@ public class CourseSpot {
         this.memo = memo;
     }
 
-    public void updateTravelTime(Integer travelTimeMinutes) {
+    public void updateTravelTime(Integer travelTimeMinutes, boolean travelTimeEstimated) {
         this.travelTimeMinutes = travelTimeMinutes;
+        this.travelTimeEstimated = travelTimeEstimated;
     }
 }
 

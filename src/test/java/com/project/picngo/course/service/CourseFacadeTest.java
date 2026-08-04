@@ -3,6 +3,7 @@ package com.project.picngo.course.service;
 import com.project.picngo.course.dto.CourseSpotResponse;
 import com.project.picngo.course.dto.CourseSpotSyncItem;
 import com.project.picngo.course.dto.CourseSpotSyncRequest;
+import com.project.picngo.course.dto.TravelTimeResult;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.spot.service.SpotNavigationService;
@@ -61,11 +62,11 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "스팟2");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, null, List.of("명소"), "url", 5, 1, 1, "스팟1", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "스팟2", 33.2, 126.2, null, List.of("명소"), "url", 5, 1, 2, "스팟2", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, null, List.of("명소"), "url", 5, 1, 1, "스팟1", null, false);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "스팟2", 33.2, 126.2, null, List.of("명소"), "url", 5, 1, 2, "스팟2", null, false);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
-        
+
         Spot spot1 = createSpot(100L, 33.1, 126.1);
         Spot spot2 = createSpot(200L, 33.2, 126.2);
         when(spotRepository.findByIdIn(List.of(100L, 200L))).thenReturn(List.of(spot1, spot2));
@@ -79,13 +80,14 @@ class CourseFacadeTest {
         verify(routeCacheService).getTravelInfoWithCache(33.1, 126.1, 33.2, 126.2);
         
         @SuppressWarnings("unchecked")
-        Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
+        Map<Long, TravelTimeResult> capturedUpdates = (Map<Long, TravelTimeResult>) mockingDetails(courseService)
             .getInvocations().stream()
             .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
             .findFirst().get().getArgument(1);
             
-        assert capturedUpdates.get(10L) == null;
-        assert capturedUpdates.get(11L) == 45;
+        assert capturedUpdates.get(10L).minutes() == null;
+        assert capturedUpdates.get(11L).minutes() == 45;
+        assert !capturedUpdates.get(11L).estimated(); // 카카오 실측값
     }
 
     @Test
@@ -100,8 +102,8 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "함덕해수욕장");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "성산일출봉", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 1, "성산일출봉", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "함덕해수욕장", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 2, "함덕해수욕장", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "성산일출봉", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 1, "성산일출봉", null, false);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "함덕해수욕장", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 2, "함덕해수욕장", null, false);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
 
@@ -129,12 +131,13 @@ class CourseFacadeTest {
         verify(routeCacheService).getTravelInfoWithCache(33.462, 126.936, 33.543, 126.669);
 
         @SuppressWarnings("unchecked")
-        Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
+        Map<Long, TravelTimeResult> capturedUpdates = (Map<Long, TravelTimeResult>) mockingDetails(courseService)
                 .getInvocations().stream()
                 .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
                 .findFirst().get().getArgument(1);
 
-        assert capturedUpdates.get(11L) == 42;
+        assert capturedUpdates.get(11L).minutes() == 42;
+        assert !capturedUpdates.get(11L).estimated(); // 보정 후 재계산 성공이므로 실측값
     }
 
     @Test
@@ -149,8 +152,8 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "성산일출봉");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "함덕해수욕장", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 1, "함덕해수욕장", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "성산일출봉", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 2, "성산일출봉", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "함덕해수욕장", 33.543, 126.669, null, List.of("명소"), "url", 5, 1, 1, "함덕해수욕장", null, false);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "성산일출봉", 33.458, 126.942, null, List.of("명소"), "url", 5, 1, 2, "성산일출봉", null, false);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
 
@@ -181,12 +184,13 @@ class CourseFacadeTest {
         verify(routeCacheService, never()).calculateFallbackTime(33.543, 126.669, 33.458, 126.942);
 
         @SuppressWarnings("unchecked")
-        Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
+        Map<Long, TravelTimeResult> capturedUpdates = (Map<Long, TravelTimeResult>) mockingDetails(courseService)
                 .getInvocations().stream()
                 .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
                 .findFirst().get().getArgument(1);
 
-        assert capturedUpdates.get(11L) == 38;
+        assert capturedUpdates.get(11L).minutes() == 38;
+        assert capturedUpdates.get(11L).estimated(); // 카카오가 아닌 자체 추정값
     }
 
     @Test
@@ -201,8 +205,8 @@ class CourseFacadeTest {
         CourseSpotSyncItem item2 = new CourseSpotSyncItem(null, 200L, 1, 2, "좌표깨진스팟");
         CourseSpotSyncRequest request = new CourseSpotSyncRequest(List.of(item1, item2));
 
-        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, null, List.of("명소"), "url", 5, 1, 1, "스팟1", null);
-        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "좌표깨진스팟", 0.0, 0.0, null, List.of("명소"), "url", 5, 1, 2, "좌표깨진스팟", null);
+        CourseSpotResponse resp1 = new CourseSpotResponse(10L, 100L, "스팟1", 33.1, 126.1, null, List.of("명소"), "url", 5, 1, 1, "스팟1", null, false);
+        CourseSpotResponse resp2 = new CourseSpotResponse(11L, 200L, "좌표깨진스팟", 0.0, 0.0, null, List.of("명소"), "url", 5, 1, 2, "좌표깨진스팟", null, false);
 
         when(courseService.getDaySpots(courseId, dayNumber)).thenReturn(List.of(resp1, resp2));
 
@@ -220,13 +224,14 @@ class CourseFacadeTest {
 
         // then
         @SuppressWarnings("unchecked")
-        Map<Long, Integer> capturedUpdates = (Map<Long, Integer>) mockingDetails(courseService)
+        Map<Long, TravelTimeResult> capturedUpdates = (Map<Long, TravelTimeResult>) mockingDetails(courseService)
                 .getInvocations().stream()
                 .filter(inv -> inv.getMethod().getName().equals("updateTravelTimes"))
                 .findFirst().get().getArgument(1);
 
         // 30분 같은 근거 없는 기본값이 아니라 null이어야 한다
         assert capturedUpdates.containsKey(11L);
-        assert capturedUpdates.get(11L) == null;
+        assert capturedUpdates.get(11L).minutes() == null;
+        assert !capturedUpdates.get(11L).estimated(); // 값이 없으므로 추정 표시도 하지 않는다
     }
 }
