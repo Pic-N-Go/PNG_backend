@@ -11,7 +11,13 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "spot_access_point")
+// 한 스팟의 대표 진입점은 하나여야 한다.
+// 제약이 없으면 동시 요청이 각자 조회 후 저장해 primary 행이 둘 생기고,
+// 이후 findBySpotIdAndIsPrimaryTrue가 Optional에 담지 못해 조회할 때마다 실패한다.
+@Table(name = "spot_access_point",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_spot_access_point_primary",
+                columnNames = {"spot_id", "is_primary"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SpotAccessPoint extends BaseTimeEntity {
@@ -37,7 +43,7 @@ public class SpotAccessPoint extends BaseTimeEntity {
     @Column(nullable = false, length = 30)
     private AccessPointSource source;
 
-    @Column(nullable = false)
+    @Column(name = "is_primary", nullable = false)
     private Boolean isPrimary = true;
 
     private LocalDateTime verifiedAt;

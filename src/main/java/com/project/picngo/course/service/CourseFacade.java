@@ -98,7 +98,7 @@ public class CourseFacade {
                     // 102: 출발 지점 주변의 도로를 탐색할 수 없음
                     if (resultCode == 102 && s1.getAccessType() != AccessType.ROAD_ACCESSIBLE && s1.getAccessType() != AccessType.RESOLVE_FAILED) {
                         log.info("⚠️ [길찾기 실패 -> 온디맨드 출발지 보정 진입] s1({})", s1.getName());
-                        Coordinate target = spotNavigationService.correctSpotNavigation(s1);
+                        Coordinate target = correctQuietly(s1);
                         if (isRelocated(c1, target)) {
                             updatedC1 = target;
                             coordinateChanged = true;
@@ -108,7 +108,7 @@ public class CourseFacade {
                     // 103: 도착 지점 주변의 도로를 탐색할 수 없음
                     if (resultCode == 103 && s2.getAccessType() != AccessType.ROAD_ACCESSIBLE && s2.getAccessType() != AccessType.RESOLVE_FAILED) {
                         log.info("⚠️ [길찾기 실패 -> 온디맨드 도착지 보정 진입] s2({})", s2.getName());
-                        Coordinate target = spotNavigationService.correctSpotNavigation(s2);
+                        Coordinate target = correctQuietly(s2);
                         if (isRelocated(c2, target)) {
                             updatedC2 = target;
                             coordinateChanged = true;
@@ -140,6 +140,22 @@ public class CourseFacade {
         }
 
         courseService.updateTravelTimes(courseId, travelTimeUpdates);
+    }
+
+    /**
+     * 진입점 보정은 이동시간 정확도를 높이기 위한 부가 작업이므로,
+     * 실패하더라도 코스 저장 자체를 실패시키지 않는다.
+     * 동시 요청이 같은 스팟의 대표 진입점을 저장하려다 유니크 제약에 걸리는 경우가 대표적이다.
+     * 이때는 원본 좌표로 계산하고, 다음 요청이 이미 저장된 진입점을 찾아 쓰게 된다.
+     */
+    private Coordinate correctQuietly(Spot spot) {
+        try {
+            return spotNavigationService.correctSpotNavigation(spot);
+        } catch (Exception e) {
+            log.warn("⚠️ [진입점 보정 실패 - 원본 좌표로 계속 진행] spotId: {}, 사유: {}",
+                    spot.getId(), e.toString());
+            return null;
+        }
     }
 
     /**
