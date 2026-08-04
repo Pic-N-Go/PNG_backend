@@ -8,9 +8,10 @@ public record CourseSpotResponse(
         Long id,
         Long spotId,
         String spotName,
+        String address,
         Double latitude,
         Double longitude,
-        NavigationInfo navigation,
+        NavigationInfo navigation, // 원본 좌표로 길찾기 실패시 사용할 네비용 좌표
         List<String> categories,
         String thumbnailUrl,
         Integer photogenicScore,

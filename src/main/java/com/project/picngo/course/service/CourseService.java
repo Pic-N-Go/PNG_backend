@@ -332,6 +332,7 @@ public class CourseService {
                 spot.getId(),
                 spot.getSpotId(),
                 actualSpot != null ? actualSpot.getName() : null,
+                actualSpot != null ? actualSpot.getAddress() : null,
                 actualSpot != null ? actualSpot.getLatitude() : null,
                 actualSpot != null ? actualSpot.getLongitude() : null,
                 NavigationInfo.of(actualSpot),
