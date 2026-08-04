@@ -137,6 +137,10 @@ class SpotNavigationServiceTest {
         assertThat(spot.getAccessType()).isEqualTo(AccessType.NEEDS_ENTRANCE);
 
         verify(spotAccessPointRepository, times(1)).save(any(SpotAccessPoint.class));
+
+        // 게이트 탈락이 탐색을 끝내지 않고 다음 검색어로 넘어갔는지를 호출 횟수로 못박는다
+        verify(kakaoLocalSearchClient, times(2))
+                .searchNearbyPlace(anyString(), anyDouble(), anyDouble(), anyInt());
     }
 
     @Test

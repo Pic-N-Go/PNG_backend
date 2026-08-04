@@ -12,6 +12,7 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.course.dto.TravelTimeResult;
 import com.project.picngo.spot.dto.NavigationInfo;
@@ -143,6 +144,8 @@ public class CourseService {
         Map<Long, CourseSpot> existingSpotMap = existingSpots.stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
+        validateNewSpotIdsExist(requestSpots, existingSpotMap);
+
         for (CourseSpotSyncItem item : requestSpots) {
             if (item.courseSpotId() != null && existingSpotMap.containsKey(item.courseSpotId())) {
                 // 기존 스팟 업데이트 (dayNumber, sequenceOrder, memo)
@@ -162,6 +165,34 @@ public class CourseService {
                 CourseSpot saved = courseSpotRepository.save(newSpot);
                 course.getCourseSpots().add(saved);
             }
+        }
+    }
+
+    /**
+     * 신규로 추가될 항목의 spotId가 실제 존재하는 스팟인지 확인한다.
+     * course_spot.spot_id는 FK가 아니라 DB가 걸러주지 않는다. 검증 없이 저장하면
+     * 이름/주소/좌표가 전부 null인 유령 행이 조회할 때마다 응답에 섞여 나가고,
+     * 해당 구간 이동시간도 영구히 산출 불가로 남는다. 저장 전에 막는 편이 복구가 쉽다.
+     *
+     * 기존 항목은 dayNumber/순서/메모만 갱신하고 spotId를 건드리지 않으므로 검사 대상이 아니다.
+     */
+    private void validateNewSpotIdsExist(List<CourseSpotSyncItem> requestSpots,
+                                         Map<Long, CourseSpot> existingSpotMap) {
+        List<Long> newSpotIds = requestSpots.stream()
+                .filter(item -> item.courseSpotId() == null
+                        || !existingSpotMap.containsKey(item.courseSpotId()))
+                .map(CourseSpotSyncItem::spotId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (newSpotIds.isEmpty()) {
+            return;
+        }
+
+        // 개수만 비교하면 어떤 id가 없는지는 모르지만, 엔티티를 EAGER로 끌어오지 않아도 된다.
+        if (spotRepository.countByIdIn(newSpotIds) != newSpotIds.size()) {
+            throw new CustomException(SpotErrorCode.SPOT_NOT_FOUND);
         }
     }
 

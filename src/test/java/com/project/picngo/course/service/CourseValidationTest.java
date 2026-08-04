@@ -2,6 +2,7 @@ package com.project.picngo.course.service;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
+import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.course.domain.Course;
 import com.project.picngo.course.dto.CourseCreateRequest;
 import com.project.picngo.course.dto.CourseSpotSyncItem;
@@ -25,6 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -142,9 +144,43 @@ class CourseValidationTest {
         }
 
         CourseSpotSyncRequest syncReq = new CourseSpotSyncRequest(items);
+        // 신규 추가되는 spotId 10개가 모두 실존하는 상황
+        when(spotRepository.countByIdIn(anyCollection())).thenReturn(10L);
+
         courseService.syncCourseSpots(userId, courseId, syncReq);
 
         verify(courseRepository, times(1)).save(any(Course.class));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 spotId로 스팟을 추가하면 저장 전에 거부한다")
+    void testSyncCourseSpots_RejectsUnknownSpotId() {
+        Long userId = 1L;
+        Long courseId = 10L;
+
+        Course course = Course.builder()
+                .userId(userId)
+                .title("제주 코스")
+                .startDate(LocalDate.of(2026, 8, 1))
+                .endDate(LocalDate.of(2026, 8, 3))
+                .build();
+
+        when(courseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+        // 요청한 2건 중 1건만 실존한다
+        CourseSpotSyncRequest syncReq = new CourseSpotSyncRequest(List.of(
+                new CourseSpotSyncItem(null, 1L, 1, 1, "실존하는 스팟"),
+                new CourseSpotSyncItem(null, 999999L, 1, 2, "존재하지 않는 스팟")
+        ));
+        when(spotRepository.countByIdIn(anyCollection())).thenReturn(1L);
+
+        assertThatThrownBy(() -> courseService.syncCourseSpots(userId, courseId, syncReq))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(SpotErrorCode.SPOT_NOT_FOUND);
+
+        // 한 건이라도 유효하지 않으면 아무것도 저장하지 않는다
+        verify(courseSpotRepository, never()).save(any());
     }
 
     @Test
