@@ -13,13 +13,9 @@ public record NavigationInfo(
         Double latitude,
         Double longitude,
         String name,
-        NavigationStatus status,
-        Integer walkingMinutes
+        NavigationStatus status
 ) {
-    /**
-     * @param walkingMinutes 보정 좌표(주차장)에서 스팟 원본 좌표까지의 도보 소요시간. CORRECTED가 아니면 무시된다.
-     */
-    public static NavigationInfo of(Spot spot, Integer walkingMinutes) {
+    public static NavigationInfo of(Spot spot) {
         if (spot == null) {
             return null;
         }
@@ -37,8 +33,7 @@ public record NavigationInfo(
                 target.latitude(),
                 target.longitude(),
                 target.name(),
-                status,
-                status == NavigationStatus.CORRECTED ? walkingMinutes : null
+                status
         );
     }
 

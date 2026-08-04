@@ -13,8 +13,6 @@ import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.enums.AccessType;
-import com.project.picngo.spot.dto.Coordinate;
 import com.project.picngo.spot.dto.NavigationInfo;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
@@ -40,7 +38,6 @@ public class CourseService {
     private final CourseChecklistRepository courseChecklistRepository;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
-    private final RouteCacheService routeCacheService;
 
 
     // ==================== 코스 CRUD ====================
@@ -329,23 +326,13 @@ public class CourseService {
     }
 
     private CourseSpotResponse toCourseSpotResponse(CourseSpot spot, Spot actualSpot) {
-        Coordinate naviTarget = actualSpot != null ? actualSpot.getNavigationTarget() : null;
-
-        Integer walkingTimeMinutes = null;
-        if (actualSpot != null && actualSpot.getAccessType() == AccessType.NEEDS_ENTRANCE && naviTarget != null) {
-            walkingTimeMinutes = routeCacheService.calculateWalkingMinutes(
-                    naviTarget.latitude(), naviTarget.longitude(),
-                    actualSpot.getLatitude(), actualSpot.getLongitude()
-            );
-        }
-
         return new CourseSpotResponse(
                 spot.getId(),
                 spot.getSpotId(),
                 actualSpot != null ? actualSpot.getName() : null,
                 actualSpot != null ? actualSpot.getLatitude() : null,
                 actualSpot != null ? actualSpot.getLongitude() : null,
-                NavigationInfo.of(actualSpot, walkingTimeMinutes),
+                NavigationInfo.of(actualSpot),
                 actualSpot != null ? actualSpot.getCategoryNames() : null,
                 actualSpot != null ? actualSpot.getThumbnailUrl() : null,
                 actualSpot != null ? actualSpot.getPhotogenicScore() : null,

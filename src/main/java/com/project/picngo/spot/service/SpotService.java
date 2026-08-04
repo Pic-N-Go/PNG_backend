@@ -3,15 +3,12 @@ package com.project.picngo.spot.service;
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
-import com.project.picngo.course.service.RouteCacheService;
 import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.common.domain.SpotCategory;
-import com.project.picngo.spot.domain.enums.AccessType;
 import com.project.picngo.spot.domain.enums.SpotStatus;
-import com.project.picngo.spot.dto.Coordinate;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
@@ -44,7 +41,6 @@ public class SpotService {
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
-    private final RouteCacheService routeCacheService;
 
     public SpotDetailResponse getSpotDetail(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
@@ -70,20 +66,10 @@ public class SpotService {
         Long myReviewId = userId == null ? null
                 : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
 
-        // 주차장으로 보정된 스팟은 딥링크 실행 후 도보 이동이 남는다. 상세 화면에서 미리 알려준다.
-        Integer walkingMinutes = null;
-        if (spot.getAccessType() == AccessType.NEEDS_ENTRANCE) {
-            Coordinate naviTarget = spot.getNavigationTarget();
-            walkingMinutes = routeCacheService.calculateWalkingMinutes(
-                    naviTarget.latitude(), naviTarget.longitude(),
-                    spot.getLatitude(), spot.getLongitude()
-            );
-        }
-
         return SpotDetailResponse.of(
                 spot, tags, reviewTags, checklist,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
-                reviewCount, photoCount, isBookmarked, myReviewId, walkingMinutes
+                reviewCount, photoCount, isBookmarked, myReviewId
         );
     }
 

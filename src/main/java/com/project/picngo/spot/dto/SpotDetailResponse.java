@@ -68,8 +68,7 @@ public record SpotDetailResponse(
             Integer reviewCount,
             Long photoCount,
             Boolean isBookmarked,
-            Long myReviewId,
-            Integer walkingMinutes
+            Long myReviewId
     ) {
         return new SpotDetailResponse(
                 spot.getId(),
@@ -79,7 +78,7 @@ public record SpotDetailResponse(
                 spot.getImageUrl(),
                 spot.getLatitude(),
                 spot.getLongitude(),
-                NavigationInfo.of(spot, walkingMinutes),
+                NavigationInfo.of(spot),
                 spot.getCategoryNames(),
                 spot.getOverview(),
                 tags.stream().map(SpotTag::getTag).toList(),

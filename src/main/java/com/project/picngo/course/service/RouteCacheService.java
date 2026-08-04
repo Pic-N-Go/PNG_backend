@@ -133,29 +133,6 @@ public class RouteCacheService {
         return Math.max(3, minutes);
     }
 
-    /**
-     * 주차장(보정 좌표)에서 스팟 원본 좌표까지의 등산/도보 소요시간(분) 자체 추정 (케이스 B 지원)
-     * - 산악 탐방로 우회율: 1.5배
-     * - 등산/도보 평균 속도: 시속 3.6 km (분당 60m)
-     */
-    public Integer calculateWalkingMinutes(Double parkLat, Double parkLng, Double spotLat, Double spotLng) {
-        if (!isValidKoreaCoordinate(parkLat, parkLng) || !isValidKoreaCoordinate(spotLat, spotLng)) {
-            return null;
-        }
-        double R = 6371000.0; // m
-        double dLat = Math.toRadians(spotLat - parkLat);
-        double dLon = Math.toRadians(spotLng - parkLng);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(Math.toRadians(parkLat)) * Math.cos(Math.toRadians(spotLat)) *
-                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double straightMeters = R * c;
-
-        double walkingMeters = straightMeters * 1.5;
-        int walkingMinutes = (int) Math.round(walkingMeters / 60.0); // 분당 60m
-        return Math.max(1, walkingMinutes);
-    }
-
     private String generateCacheKey(Double startLat, Double startLng, Double goalLat, Double goalLng) {
         // 소수점 3자리(약 100m) 단위로 반올림하여 캐시 히트율 증가
         return String.format(Locale.US, "%s%.3f_%.3f:%.3f_%.3f",

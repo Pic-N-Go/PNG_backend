@@ -45,15 +45,6 @@ class RouteCacheServiceTest {
     }
 
     @Test
-    @DisplayName("주차장에서 스팟 원본 좌표까지의 등산/도보 소요시간 백엔드 자체 계산 (케이스 B 지원)")
-    void testCalculateWalkingMinutes() {
-        // 성산일출봉 주차장 -> 정상 (직선거리 684m -> 탐방 우회 1,026m -> 시속 3.6km -> 약 17분)
-        Integer walkingMinutes = routeCacheService.calculateWalkingMinutes(33.4621, 126.9365, 33.4580, 126.9420);
-        assertThat(walkingMinutes).isNotNull();
-        assertThat(walkingMinutes).isBetween(10, 20);
-    }
-
-    @Test
     @DisplayName("길찾기 API 실패 시 Redis 장기 캐시에 저장하지 않고 Fallback 값만 반환 (캐시 오염 100% 방지)")
     void testGetTravelTimeMinutes_ApiFailure_DoesNotCacheInRedis() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
