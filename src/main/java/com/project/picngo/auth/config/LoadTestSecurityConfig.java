@@ -26,8 +26,10 @@ public class LoadTestSecurityConfig {
         return new LoadTestPublicEndpoints(List.of(
                 // 서킷브레이커 부하테스트 전용으로 만든 엔드포인트
                 "/local-search",
-                // 실사용 API지만 부하테스트 대상이라 열어둔다
+                // 실사용 API지만 부하테스트 대상이라 열어둔다.
+                // (일출일몰 서킷을 때리는 /spots/{id}/golden-hour는 이미 /spots/**로 공개돼 있다)
                 "/directions",
+                "/weather",
                 // 관리자용 스팟 동기화. /tour-api/sync/all은 전국 데이터를 통째로
                 // 재동기화하는 무거운 작업이라 공개 상태로 두면 안 된다
                 "/tour-api/**"

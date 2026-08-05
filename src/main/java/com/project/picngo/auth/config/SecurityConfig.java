@@ -2,6 +2,7 @@ package com.project.picngo.auth.config;
 
 import com.project.picngo.auth.service.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
+@Slf4j
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -65,6 +67,8 @@ public class SecurityConfig {
 				// loadtest 프로파일일 때만 부하테스트/관리자용 엔드포인트를 추가로 연다.
 				LoadTestPublicEndpoints extra = loadTestPublicEndpoints.getIfAvailable();
 				if (extra != null) {
+					// 인증이 면제된 경로는 항상 로그로 드러나야 한다. 운영에서 이 줄이 보이면 잘못 뜬 것이다.
+					log.warn("⚠️ [loadtest 프로파일] 인증 면제 엔드포인트가 활성화되었습니다: {}", extra.patterns());
 					auth.requestMatchers(extra.patterns().toArray(String[]::new)).permitAll();
 				}
 
