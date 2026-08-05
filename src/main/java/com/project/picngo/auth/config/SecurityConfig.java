@@ -36,7 +36,9 @@ public class SecurityConfig {
 		"/ws",
 		"/ws/**",
 		"/notifications/test/**",
-		"/local-search" // 서킷브레이커 부하테스트용, 배포 전 제거 또는 hasRole("ADMIN")으로 변경 필요
+		// 서킷브레이커 부하테스트용, 배포 전 제거 또는 hasRole("ADMIN")으로 변경 필요
+		"/local-search",
+		"/directions"
 	};
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;

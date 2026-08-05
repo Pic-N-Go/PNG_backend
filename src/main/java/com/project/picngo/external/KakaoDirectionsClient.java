@@ -4,38 +4,78 @@ import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.KakaoDirectionsApiResponse;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ExternalApiErrorCode;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
+import java.util.function.Supplier;
+
 @Slf4j
 @Component
 public class KakaoDirectionsClient implements DirectionsClient {
 
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(3);
+
     private final WebClient webClient;
     private final String apiKey;
+    private final CircuitBreaker circuitBreaker;
 
     public KakaoDirectionsClient(
             WebClient.Builder webClientBuilder,
-            @Value("${kakao.rest.api.key}") String apiKey) {
-        
-        this.webClient = webClientBuilder.baseUrl("https://apis-navi.kakaomobility.com/v1/directions").build();
+            @Value("${kakao.rest.api.key}") String apiKey,
+            @Value("${kakao.directions.base-url}") String baseUrl) {
+
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
+
+        // 코스 이동시간은 스팟 쌍마다 이 API를 부르므로, 카카오가 느려지면 코스 하나 저장에
+        // 스팟 수만큼 대기가 누적된다. 빠르게 실패시켜 톰캣 스레드 점유를 끊는다.
+        // 설정 근거는 KakaoLocalSearchClient와 동일.
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .slidingWindowSize(10)
+                .minimumNumberOfCalls(5)
+                .slowCallDurationThreshold(CALL_TIMEOUT)
+                .slowCallRateThreshold(50.0f)
+                .failureRateThreshold(50.0f)
+                .waitDurationInOpenState(Duration.ofSeconds(10))
+                .permittedNumberOfCallsInHalfOpenState(3)
+                // 서킷이 열린 동안에는 거부가 초당 수백 건씩 발생한다. 그 예외마다 스택트레이스를
+                // 채우면 장애 상황에서 CPU를 태우는데, 스택은 항상 같은 지점이라 정보 가치도 없다.
+                .writableStackTraceEnabled(false)
+                .build();
+        this.circuitBreaker = CircuitBreaker.of("kakaoDirections", config);
     }
 
     public DirectionsResponse getTravelInfo(Double startLat, Double startLng, Double goalLat, Double goalLng) {
+        // 서킷브레이커로 감싸는 범위는 HTTP 호출까지다. result_code 102/103(비도로 목적지)은
+        // 카카오가 정상 응답한 "그 좌표에 길이 없다"는 결과지 API 장애가 아니므로,
+        // 산속 스팟이 많은 코스 하나 때문에 서킷이 열리면 안 된다.
+        Supplier<KakaoDirectionsApiResponse> call = CircuitBreaker.decorateSupplier(circuitBreaker, () ->
+                webClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .queryParam("origin", startLng + "," + startLat)
+                                .queryParam("destination", goalLng + "," + goalLat)
+                                .build())
+                        .header("Authorization", "KakaoAK " + apiKey)
+                        .retrieve()
+                        .bodyToMono(KakaoDirectionsApiResponse.class)
+                        .timeout(CALL_TIMEOUT)
+                        .block());
+
         KakaoDirectionsApiResponse apiResponse;
         try {
-            apiResponse = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .queryParam("origin", startLng + "," + startLat)
-                            .queryParam("destination", goalLng + "," + goalLat)
-                            .build())
-                    .header("Authorization", "KakaoAK " + apiKey)
-                    .retrieve()
-                    .bodyToMono(KakaoDirectionsApiResponse.class)
-                    .block();
+            apiResponse = call.get();
+        } catch (CallNotPermittedException e) {
+            // 서킷 open - 호출을 시도조차 하지 않고 즉시 실패. 기존 계약(예외)을 그대로 유지해
+            // RouteCacheService가 폴백 추정 계산으로 넘어가게 한다.
+            log.warn("⚡ [카카오 길찾기 서킷 open - 즉시 실패] 출발지: ({},{}), 목적지: ({},{})",
+                    startLat, startLng, goalLat, goalLng);
+            throw new CustomException(ExternalApiErrorCode.KAKAO_API_ERROR);
         } catch (Exception e) {
             log.warn("카카오 길찾기 API 호출 실패: {}", e.getMessage());
             throw new CustomException(ExternalApiErrorCode.KAKAO_API_ERROR);
