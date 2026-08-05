@@ -72,6 +72,7 @@ tour:
 air:
   quality:
     key: ${PUBLIC_DATA_SERVICE_KEY}
+    base-url: ${AIR_QUALITY_BASE_URL:https://apis.data.go.kr/B552584/ArpltnInforInqireSvc}
 
 kakao:
   rest:

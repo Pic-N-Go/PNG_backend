@@ -24,3 +24,7 @@ weather:
   api:
     kma-url: ${WEATHER_API_KMA_URL:http://localhost:9999}
     sunrise-url: ${WEATHER_API_SUNRISE_URL:http://localhost:9999}
+
+air:
+  quality:
+    base-url: ${AIR_QUALITY_BASE_URL:http://localhost:9999}
