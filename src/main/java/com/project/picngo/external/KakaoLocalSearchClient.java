@@ -5,7 +5,7 @@ import com.project.picngo.external.dto.PlaceSearchResult;
 import com.project.picngo.spot.dto.Coordinate;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -28,30 +28,15 @@ public class KakaoLocalSearchClient {
 
     public KakaoLocalSearchClient(
             WebClient.Builder webClientBuilder,
+            CircuitBreakerRegistry circuitBreakerRegistry,
             @Value("${kakao.rest.api.key}") String apiKey,
             @Value("${kakao.local-search.base-url}") String baseUrl) {
 
         this.webClient = webClientBuilder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
-
-        // 카카오 로컬 검색이 느려지거나(3초 타임아웃) 계속 실패하면, 매 요청마다 톰캣 스레드를
-        // 붙잡고 기다리는 대신 빠르게 실패시켜 스레드 풀 고갈을 막는다.
-        // 최근 10건 중 5건 이상 모이면 판단하고, 그중 절반 이상이 느리거나 실패면 open으로 전환.
-        // open 상태에서는 10초간 호출 자체를 막고(CallNotPermittedException), 이후 half-open으로
-        // 3건만 흘려보내 회복 여부를 확인한다.
-        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
-                .slidingWindowSize(10)
-                .minimumNumberOfCalls(5)
-                .slowCallDurationThreshold(CALL_TIMEOUT)
-                .slowCallRateThreshold(50.0f)
-                .failureRateThreshold(50.0f)
-                .waitDurationInOpenState(Duration.ofSeconds(10))
-                .permittedNumberOfCallsInHalfOpenState(3)
-                // 서킷이 열린 동안에는 거부가 초당 수백 건씩 발생한다. 그 예외마다 스택트레이스를
-                // 채우면 장애 상황에서 CPU를 태우는데, 스택은 항상 같은 지점이라 정보 가치도 없다.
-                .writableStackTraceEnabled(false)
-                .build();
-        this.circuitBreaker = CircuitBreaker.of("kakaoLocalSearch", config);
+        // 카카오 로컬 검색이 느려지거나 계속 실패하면, 매 요청마다 톰캣 스레드를 붙잡고
+        // 기다리는 대신 빠르게 실패시켜 스레드 풀 고갈을 막는다. 설정은 ExternalApiCircuitBreakerConfig 참고.
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("kakaoLocalSearch");
     }
 
     /**

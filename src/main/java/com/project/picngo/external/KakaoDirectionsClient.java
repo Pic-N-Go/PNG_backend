@@ -6,7 +6,7 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ExternalApiErrorCode;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -27,28 +27,15 @@ public class KakaoDirectionsClient implements DirectionsClient {
 
     public KakaoDirectionsClient(
             WebClient.Builder webClientBuilder,
+            CircuitBreakerRegistry circuitBreakerRegistry,
             @Value("${kakao.rest.api.key}") String apiKey,
             @Value("${kakao.directions.base-url}") String baseUrl) {
 
         this.webClient = webClientBuilder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
-
         // 코스 이동시간은 스팟 쌍마다 이 API를 부르므로, 카카오가 느려지면 코스 하나 저장에
         // 스팟 수만큼 대기가 누적된다. 빠르게 실패시켜 톰캣 스레드 점유를 끊는다.
-        // 설정 근거는 KakaoLocalSearchClient와 동일.
-        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
-                .slidingWindowSize(10)
-                .minimumNumberOfCalls(5)
-                .slowCallDurationThreshold(CALL_TIMEOUT)
-                .slowCallRateThreshold(50.0f)
-                .failureRateThreshold(50.0f)
-                .waitDurationInOpenState(Duration.ofSeconds(10))
-                .permittedNumberOfCallsInHalfOpenState(3)
-                // 서킷이 열린 동안에는 거부가 초당 수백 건씩 발생한다. 그 예외마다 스택트레이스를
-                // 채우면 장애 상황에서 CPU를 태우는데, 스택은 항상 같은 지점이라 정보 가치도 없다.
-                .writableStackTraceEnabled(false)
-                .build();
-        this.circuitBreaker = CircuitBreaker.of("kakaoDirections", config);
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("kakaoDirections");
     }
 
     public DirectionsResponse getTravelInfo(Double startLat, Double startLng, Double goalLat, Double goalLng) {
