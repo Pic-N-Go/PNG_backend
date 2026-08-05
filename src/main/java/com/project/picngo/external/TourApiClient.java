@@ -12,22 +12,37 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 한국관광공사 관광정보 Open API 클라이언트.
+ *
+ * 다른 외부 API 클라이언트와 달리 서킷브레이커를 달지 않았다.
+ * 이 클라이언트는 유저 요청이 아니라 관리자가 수동으로 트리거하는 배치(TourApiSyncService)에서만
+ * 쓰여 스레드 풀 고갈 위험이 없고, 오히려 서킷이 열리면 상세 조회가 전부 null을 돌려주는데
+ * 동기화 루프는 그걸 건너뛰고 계속 돌기 때문에 "빈 스팟 수천 건 저장 후 성공 보고"가 된다.
+ * 느리지만 정확한 배치가 빠르지만 데이터가 망가지는 배치로 바뀌는 셈이다.
+ *
+ * 대신 타임아웃은 반드시 필요하다. /tour-api/sync는 동기 요청이라
+ * 타임아웃이 없으면 관광공사 API가 응답하지 않을 때 요청이 무한정 매달린다.
+ */
 @Slf4j
 @Component
 public class TourApiClient {
 
-    // 한국관광공사 관광정보 Open API
-    private static final String BASE_URL = "https://apis.data.go.kr/B551011/KorService2";
+    // 전국 동기화는 스팟 수만큼 호출이 누적되므로 개별 호출은 넉넉하되 유한해야 한다.
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(10);
 
     private final WebClient webClient;
     private final String serviceKey;
 
-    public TourApiClient(WebClient.Builder builder, @Value("${tour.api.key}") String serviceKey) { // ponytail: tour.api.key → PUBLIC_DATA_SERVICE_KEY 경유
+    public TourApiClient(WebClient.Builder builder,
+                         @Value("${tour.api.key}") String serviceKey, // ponytail: tour.api.key → PUBLIC_DATA_SERVICE_KEY 경유
+                         @Value("${tour.api.base-url}") String baseUrl) {
         // 공공데이터포털 서비스키는 이미 URL 인코딩된 상태로 발급됨 → 이중 인코딩 방지
-        DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory(BASE_URL);
+        DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory(baseUrl);
         factory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.NONE);
         this.webClient = builder.uriBuilderFactory(factory).build();
         this.serviceKey = serviceKey;
@@ -48,9 +63,12 @@ public class TourApiClient {
                             .build())
                     .retrieve()
                     .bodyToMono(TourApiResponse.class)
+                    .timeout(CALL_TIMEOUT)
                     .block();
         } catch (Exception e) {
-            log.error("TourAPI areaBasedList 호출 실패", e);
+            // 스택트레이스는 남기지 않는다. 전국 동기화는 스팟 수만큼 이 경로를 탈 수 있어
+            // 스택을 남기면 장애 시 로그가 수백 MB로 불어난다.
+            log.warn("TourAPI areaBasedList 호출 실패: {}", e.getMessage());
         }
         return null;
     }
@@ -67,6 +85,7 @@ public class TourApiClient {
                             .build())
                     .retrieve()
                     .bodyToMono(TourApiResponse.class)
+                    .timeout(CALL_TIMEOUT)
                     .block();
 
             if (response != null && response.response() != null
@@ -76,7 +95,7 @@ public class TourApiClient {
                 if (items != null && !items.isEmpty()) return items.get(0);
             }
         } catch (Exception e) {
-            log.error("TourAPI detailCommon 호출 실패 contentId={}", contentId, e);
+            log.warn("TourAPI detailCommon 호출 실패 contentId={}: {}", contentId, e.getMessage());
         }
         return null;
     }
@@ -94,6 +113,7 @@ public class TourApiClient {
                             .build())
                     .retrieve()
                     .bodyToMono(TourApiIntroResponse.class)
+                    .timeout(CALL_TIMEOUT)
                     .block();
 
             if (response != null && response.response() != null
@@ -103,7 +123,7 @@ public class TourApiClient {
                 if (items != null && !items.isEmpty()) return items.get(0);
             }
         } catch (Exception e) {
-            log.error("TourAPI detailIntro 호출 실패 contentId={}", contentId, e);
+            log.warn("TourAPI detailIntro 호출 실패 contentId={}: {}", contentId, e.getMessage());
         }
         return null;
     }
@@ -121,6 +141,7 @@ public class TourApiClient {
                             .build())
                     .retrieve()
                     .bodyToMono(TourApiImageResponse.class)
+                    .timeout(CALL_TIMEOUT)
                     .block();
 
             if (response != null && response.response() != null
@@ -130,7 +151,7 @@ public class TourApiClient {
                 return items != null ? items : Collections.emptyList();
             }
         } catch (Exception e) {
-            log.error("TourAPI detailImage 호출 실패 contentId={}", contentId, e);
+            log.warn("TourAPI detailImage 호출 실패 contentId={}: {}", contentId, e.getMessage());
         }
         return Collections.emptyList();
     }
