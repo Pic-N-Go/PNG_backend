@@ -1,0 +1,26 @@
+# 부하테스트 전용 프로파일.
+#
+#   SPRING_PROFILES_ACTIVE=loadtest ./gradlew bootRun
+#   (PowerShell: $env:SPRING_PROFILES_ACTIVE = "loadtest")
+#
+# 이 프로파일에서만 LoadTestSecurityConfig가 로드되어 /local-search, /directions,
+# /tour-api/** 의 인증이 면제된다. 운영 프로파일에서는 설정 클래스 자체가 로드되지 않는다.
+#
+# 외부 API는 기본적으로 지연 목업 서버(load-test/mock-server)를 바라본다.
+# 서킷브레이커가 열리는지 보려면 목업이 필요하고, 실제 API로 성능만 재려면
+# 아래 환경변수로 각각 덮어쓰면 된다.
+#
+#   java load-test/mock-server/DelayedKakaoMockServer.java
+#
+kakao:
+  local-search:
+    base-url: ${KAKAO_LOCAL_SEARCH_BASE_URL:http://localhost:9999/v2/local/search/keyword.json}
+  directions:
+    base-url: ${KAKAO_DIRECTIONS_BASE_URL:http://localhost:9999/v1/directions}
+  local:
+    base-url: ${KAKAO_LOCAL_BASE_URL:http://localhost:9999}
+
+weather:
+  api:
+    kma-url: ${WEATHER_API_KMA_URL:http://localhost:9999}
+    sunrise-url: ${WEATHER_API_SUNRISE_URL:http://localhost:9999}

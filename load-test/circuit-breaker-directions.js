@@ -6,9 +6,12 @@ import { Trend, Counter } from 'k6/metrics';
 //
 // 사전 준비 (PowerShell 기준, 터미널 3개):
 //   1) java load-test/mock-server/DelayedKakaoMockServer.java
-//   2) $env:KAKAO_DIRECTIONS_BASE_URL = "http://localhost:9999/v1/directions"
+//   2) $env:SPRING_PROFILES_ACTIVE = "loadtest"
 //      ./gradlew bootRun
 //   3) k6 run load-test/circuit-breaker-directions.js
+//
+// loadtest 프로파일이 인증 면제와 목업 URL을 한꺼번에 걸어준다(application-loadtest.yaml).
+// 이 프로파일 없이 띄우면 /directions는 403이고 실제 카카오 API를 호출한다.
 //
 // 로컬 검색 테스트와 다른 점: /directions는 실패 시 CustomException을 그대로 던지는
 // 직통 엔드포인트라 HTTP 500이 나온다. 실제 유저 경로(코스 저장 -> RouteCacheService)는

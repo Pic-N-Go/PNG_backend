@@ -2,6 +2,7 @@ package com.project.picngo.auth.config;
 
 import com.project.picngo.auth.service.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -35,13 +36,13 @@ public class SecurityConfig {
 		"/swagger-resources/**",
 		"/ws",
 		"/ws/**",
-		"/notifications/test/**",
-		// 서킷브레이커 부하테스트용, 배포 전 제거 또는 hasRole("ADMIN")으로 변경 필요
-		"/local-search",
-		"/directions"
+		"/notifications/test/**"
 	};
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+	// loadtest 프로파일에서만 존재하는 빈. 운영에서는 비어 있어 아무 엔드포인트도 열리지 않는다.
+	private final ObjectProvider<LoadTestPublicEndpoints> loadTestPublicEndpoints;
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -51,17 +52,24 @@ public class SecurityConfig {
 			.formLogin(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-			.authorizeHttpRequests(auth -> auth
-				.requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
-				// 관심테마 기반 개인화 추천이라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
-				.requestMatchers(HttpMethod.GET, "/spots/recommended").authenticated()
-				.requestMatchers(HttpMethod.POST, "/spots/*/reviews").authenticated()
-				.requestMatchers(HttpMethod.PUT, "/reviews/**").authenticated()
-				.requestMatchers(HttpMethod.DELETE, "/reviews/**").authenticated()
-				.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-				.requestMatchers("/tour-api/**").permitAll() // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
-				.anyRequest().authenticated()
-			)
+			.authorizeHttpRequests(auth -> {
+				auth
+					.requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
+					// 관심테마 기반 개인화 추천이라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
+					.requestMatchers(HttpMethod.GET, "/spots/recommended").authenticated()
+					.requestMatchers(HttpMethod.POST, "/spots/*/reviews").authenticated()
+					.requestMatchers(HttpMethod.PUT, "/reviews/**").authenticated()
+					.requestMatchers(HttpMethod.DELETE, "/reviews/**").authenticated()
+					.requestMatchers(PUBLIC_ENDPOINTS).permitAll();
+
+				// loadtest 프로파일일 때만 부하테스트/관리자용 엔드포인트를 추가로 연다.
+				LoadTestPublicEndpoints extra = loadTestPublicEndpoints.getIfAvailable();
+				if (extra != null) {
+					auth.requestMatchers(extra.patterns().toArray(String[]::new)).permitAll();
+				}
+
+				auth.anyRequest().authenticated();
+			})
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 			.build();
 	}

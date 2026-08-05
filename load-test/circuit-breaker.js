@@ -4,10 +4,14 @@ import { Trend, Counter } from 'k6/metrics';
 
 // 카카오 로컬 검색 서킷브레이커 부하테스트.
 //
-// 사전 준비:
+// 사전 준비 (터미널 3개):
 //   1) java load-test/mock-server/DelayedKakaoMockServer.java   (5초 지연 목업, :9999)
-//   2) KAKAO_LOCAL_SEARCH_BASE_URL=http://localhost:9999 ./gradlew bootRun
+//   2) SPRING_PROFILES_ACTIVE=loadtest ./gradlew bootRun
+//      (PowerShell: $env:SPRING_PROFILES_ACTIVE = "loadtest")
 //   3) k6 run load-test/circuit-breaker.js
+//
+// loadtest 프로파일이 인증 면제와 목업 URL을 한꺼번에 걸어준다(application-loadtest.yaml).
+// 이 프로파일 없이 띄우면 /local-search는 403이고 실제 카카오 API를 호출한다.
 //
 // 기대 결과: 초반 요청들은 ~3초(타임아웃 캡)에 걸리다가, 서킷이 open되는 시점부터는
 // CallNotPermittedException으로 즉시(수 ms) PlaceSearchResult.error()가 반환된다.
