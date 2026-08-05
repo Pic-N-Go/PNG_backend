@@ -2,7 +2,6 @@ package com.project.picngo.album.controller;
 
 import com.project.picngo.album.dto.AlbumCreateRequest;
 import com.project.picngo.album.dto.AlbumDetailResponse;
-import com.project.picngo.album.dto.AlbumPhotoAddRequest;
 import com.project.picngo.album.dto.AlbumResponse;
 import com.project.picngo.album.dto.AlbumUpdateRequest;
 import com.project.picngo.auth.service.CustomUserDetails;
@@ -13,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -66,12 +67,12 @@ public interface AlbumControllerApiSpec {
 
     @Operation(
             summary = "앨범 사진 추가",
-            description = "현재 인증된 사용자의 앨범에 사진 URL을 추가합니다."
+            description = "현재 인증된 사용자의 앨범에 사진 파일을 업로드합니다."
     )
     ResponseEntity<AlbumDetailResponse> addAlbumPhoto(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "앨범 ID") @PathVariable Long albumId,
-            @RequestBody AlbumPhotoAddRequest request
+            @RequestPart("photos") List<MultipartFile> photos
     );
 
     @Operation(

@@ -15,5 +15,5 @@ public interface AlbumPhotoRepository extends JpaRepository<AlbumPhoto, Long> {
     long countByAlbum(Album album);
 
     // 특정 앨범에 포함된 사진 전체 삭제
-    void deleteByAlbum(Album album);
+    void deleteAllByAlbum(Album album);
 }

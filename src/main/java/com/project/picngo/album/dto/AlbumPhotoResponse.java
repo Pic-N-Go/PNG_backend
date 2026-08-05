@@ -6,10 +6,10 @@ public record AlbumPhotoResponse (
         Long id,
         String imageUrl
 ){
-    public static AlbumPhotoResponse from(AlbumPhoto albumPhoto) {
+    public static AlbumPhotoResponse from(AlbumPhoto albumPhoto, String imageUrl) {
         return new AlbumPhotoResponse(
                 albumPhoto.getId(),
-                albumPhoto.getImageUrl()
+                imageUrl
         );
     }
 }

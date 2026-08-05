@@ -4,7 +4,6 @@ import com.project.picngo.album.domain.Album;
 import com.project.picngo.album.domain.AlbumPhoto;
 import com.project.picngo.album.dto.AlbumCreateRequest;
 import com.project.picngo.album.dto.AlbumDetailResponse;
-import com.project.picngo.album.dto.AlbumPhotoAddRequest;
 import com.project.picngo.album.dto.AlbumResponse;
 import com.project.picngo.album.dto.AlbumUpdateRequest;
 import com.project.picngo.album.repository.AlbumPhotoRepository;
@@ -16,7 +15,11 @@ import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.project.picngo.common.image.dto.ImageUploadResult;
+import com.project.picngo.common.image.service.ImageStorageService;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -27,6 +30,7 @@ public class AlbumService {
     private final AlbumRepository albumRepository;
     private final AlbumPhotoRepository albumPhotoRepository;
     private final UserService userService;
+    private final ImageStorageService imageStorageService;
 
     // 내 앨범 목록 조회
     public List<AlbumResponse> getMyAlbums(Long userId) {
@@ -46,7 +50,7 @@ public class AlbumService {
 
         List<AlbumPhoto> photos = albumPhotoRepository.findAllByAlbum(album);
 
-        return AlbumDetailResponse.from(album, photos);
+        return AlbumDetailResponse.from(album, photos, imageStorageService);
     }
 
     // 앨범 생성
@@ -89,21 +93,46 @@ public class AlbumService {
         Album album = getAlbum(albumId);
         validateOwner(userId, album);
 
-        albumPhotoRepository.deleteByAlbum(album);
+        List<AlbumPhoto> photos = albumPhotoRepository.findAllByAlbum(album);
+
+        for(AlbumPhoto photo : photos){
+            imageStorageService.delete(photo.getImageUrl());
+        }
+
+        albumPhotoRepository.deleteAllByAlbum(album);
         albumRepository.delete(album);
     }
 
     // 앨범 사진 추가
     @Transactional
-    public AlbumDetailResponse addAlbumPhoto(Long userId, Long albumId, AlbumPhotoAddRequest request){
-
+    public AlbumDetailResponse addAlbumPhoto(Long userId, Long albumId, List<MultipartFile> photos) {
         Album album = getAlbum(albumId);
         validateOwner(userId, album);
 
-        albumPhotoRepository.save(AlbumPhoto.create(album, request.imageUrl()));
-        List<AlbumPhoto> photos = albumPhotoRepository.findAllByAlbum(album);
+        List<String> uploadedKeys = new ArrayList<>();
 
-        return AlbumDetailResponse.from(album, photos);
+        try{
+            for(MultipartFile photo : photos){
+                if(photo == null || photo.isEmpty()){
+                    continue;
+                }
+
+                ImageUploadResult uploadResult = imageStorageService.upload(photo, "albums/" + album.getId());
+                uploadedKeys.add(uploadResult.key());
+
+                albumPhotoRepository.save(AlbumPhoto.create(album, uploadResult.key()));
+            }
+
+            List<AlbumPhoto> albumPhotos = albumPhotoRepository.findAllByAlbum(album);
+
+            return AlbumDetailResponse.from(album, albumPhotos, imageStorageService);
+
+        } catch(RuntimeException e){
+            for(String uploadedKey : uploadedKeys){
+                imageStorageService.delete(uploadedKey);
+            }
+            throw e;
+        }
     }
 
     // 앨범 사진 삭제
@@ -119,6 +148,7 @@ public class AlbumService {
             throw new CustomException(AlbumErrorCode.ALBUM_ACCESS_DENIED);
         }
 
+        imageStorageService.delete(albumPhoto.getImageUrl());
         albumPhotoRepository.delete(albumPhoto);
     }
 

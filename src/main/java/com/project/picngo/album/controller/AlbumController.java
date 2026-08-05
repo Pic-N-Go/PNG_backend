@@ -2,7 +2,6 @@ package com.project.picngo.album.controller;
 
 import com.project.picngo.album.dto.AlbumCreateRequest;
 import com.project.picngo.album.dto.AlbumDetailResponse;
-import com.project.picngo.album.dto.AlbumPhotoAddRequest;
 import com.project.picngo.album.dto.AlbumResponse;
 import com.project.picngo.album.dto.AlbumUpdateRequest;
 import com.project.picngo.album.service.AlbumService;
@@ -11,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -67,13 +68,13 @@ public class AlbumController implements AlbumControllerApiSpec {
     }
 
     // 앨범 사진 추가 API
-    @PostMapping("/{albumId}/photos")
+    @PostMapping(value = "/{albumId}/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AlbumDetailResponse> addAlbumPhoto(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long albumId,
-            @RequestBody AlbumPhotoAddRequest request
+            @RequestPart("photos") List<MultipartFile> photos
     ) {
-        return ResponseEntity.ok(albumService.addAlbumPhoto(userDetails.getId(), albumId, request));
+        return ResponseEntity.ok(albumService.addAlbumPhoto(userDetails.getId(), albumId, photos));
     }
 
     // 앨범 사진 삭제 API
