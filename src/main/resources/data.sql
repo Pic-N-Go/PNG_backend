@@ -153,12 +153,12 @@ VALUES (1, 1, '제주도 2박 3일 풍경 출사', '2026-08-01', '2026-08-03', N
 ON DUPLICATE KEY UPDATE id=1;
 
 -- 코스 스팟 데이터 (1일차, 2일차)
-INSERT INTO course_spot (id, course_id, spot_id, day_number, sequence_order, memo, travel_time_minutes)
+INSERT INTO course_spot (id, course_id, spot_id, day_number, sequence_order, memo, travel_time_minutes, travel_time_estimated)
 VALUES
-(1, 1, 2, 1, 1, '도착 직후 함덕 바다 스냅', null), -- 1일차 첫번째: 함덕
-(2, 1, 1, 1, 2, '성산일출봉 일몰 촬영', 45),   -- 1일차 두번째: 성산
-(3, 1, 3, 2, 1, '녹차밭 아침햇살 촬영', null),   -- 2일차 첫번째: 오설록
-(4, 1, 4, 2, 2, '동백꽃 감성 샷', 20)           -- 2일차 두번째: 카멜리아힐
+(1, 1, 2, 1, 1, '도착 직후 함덕 바다 스냅', null, false), -- 1일차 첫번째: 함덕
+(2, 1, 1, 1, 2, '성산일출봉 일몰 촬영', 45, false),   -- 1일차 두번째: 성산
+(3, 1, 3, 2, 1, '녹차밭 아침햇살 촬영', null, false),   -- 2일차 첫번째: 오설록
+(4, 1, 4, 2, 2, '동백꽃 감성 샷', 20, false)           -- 2일차 두번째: 카멜리아힐
 ON DUPLICATE KEY UPDATE id=id;
 
 -- 코스 체크리스트 데이터

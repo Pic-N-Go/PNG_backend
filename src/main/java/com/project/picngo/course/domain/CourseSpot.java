@@ -5,6 +5,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Getter
@@ -33,6 +34,13 @@ public class CourseSpot {
 
     private Integer travelTimeMinutes;
 
+    // 위 이동시간이 카카오 실측이 아니라 자체 추정값인지 여부.
+    // false = 카카오가 준 값 || 알 수 없음
+    // true = 우리 서비스가 추정한 값
+    @ColumnDefault("false")
+    @Column(nullable = false)
+    private boolean travelTimeEstimated = false;
+
     @Builder
     public CourseSpot(Course course, Long spotId, Integer dayNumber, Integer sequenceOrder, String memo, Integer travelTimeMinutes) {
         this.course = course;
@@ -58,8 +66,9 @@ public class CourseSpot {
         this.memo = memo;
     }
 
-    public void updateTravelTime(Integer travelTimeMinutes) {
+    public void updateTravelTime(Integer travelTimeMinutes, boolean travelTimeEstimated) {
         this.travelTimeMinutes = travelTimeMinutes;
+        this.travelTimeEstimated = travelTimeEstimated;
     }
 }
 

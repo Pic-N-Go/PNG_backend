@@ -1,9 +1,11 @@
 package com.project.picngo.spot.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.spot.domain.enums.AccessType;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.common.domain.SpotCategory;
+import com.project.picngo.spot.dto.Coordinate;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -15,6 +17,7 @@ import org.hibernate.type.SqlTypes;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -155,6 +158,47 @@ public class Spot extends BaseTimeEntity {
     @Comment("화장실 여부")
     @Column(nullable = false)
     private boolean toilet = false;
+
+    @Comment("진입 도로 속성. ROAD_ACCESSIBLE | NEEDS_ENTRANCE | UNKNOWN")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "access_type", nullable = false, length = 30)
+    private AccessType accessType = AccessType.UNKNOWN;
+
+    @OneToMany(mappedBy = "spot", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<SpotAccessPoint> accessPoints = new ArrayList<>();
+
+    // 대표 진입점 참조 컬럼. 컬럼은 값을 하나만 가질 수 있으므로
+    // "대표는 하나"라는 불변식이 구조적으로 성립한다(자식 테이블에 유니크 제약을 걸지 않아도 됨).
+    // accessPoints EAGER 로딩과 같은 이유로 EAGER: 이 엔티티가 트랜잭션 경계를 넘나들며
+    // 전달되는 곳(CourseFacade)에서 지연 로딩 예외가 나지 않아야 한다.
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "primary_access_point_id")
+    private SpotAccessPoint primaryAccessPoint;
+
+    public void updateAccessType(AccessType accessType) {
+        if (accessType != null) {
+            this.accessType = accessType;
+        }
+    }
+
+    public void addAccessPoint(SpotAccessPoint accessPoint) {
+        if (this.accessPoints == null) {
+            this.accessPoints = new ArrayList<>();
+        }
+        this.accessPoints.add(accessPoint);
+    }
+
+    public void assignPrimaryAccessPoint(SpotAccessPoint accessPoint) {
+        this.primaryAccessPoint = accessPoint;
+    }
+
+    public Coordinate getNavigationTarget() {
+        if (this.accessType == AccessType.NEEDS_ENTRANCE && this.primaryAccessPoint != null) {
+            SpotAccessPoint ap = this.primaryAccessPoint;
+            return new Coordinate(ap.getLatitude(), ap.getLongitude(), ap.getLabel());
+        }
+        return new Coordinate(this.latitude, this.longitude, this.name);
+    }
 
     public void updateCategories(Set<SpotCategory> categories) {
         Set<SpotCategory> target = (categories != null) ? categories : Set.of();
