@@ -79,6 +79,9 @@ kakao:
       key: ${KAKAO_REST_API_KEY}
   auth:
     user-info-url: https://kapi.kakao.com/v2/user/me
+  local-search:
+    # 부하테스트 시 지연 응답 목업 서버로 바꿔치기할 수 있도록 외부 설정으로 뺀다.
+    base-url: ${KAKAO_LOCAL_SEARCH_BASE_URL:https://dapi.kakao.com/v2/local/search/keyword.json}
 
 jwt:
   secret: ${JWT_SECRET}

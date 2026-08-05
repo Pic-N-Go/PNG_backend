@@ -3,27 +3,52 @@ package com.project.picngo.external;
 import com.project.picngo.external.dto.KakaoLocalSearchResponse;
 import com.project.picngo.external.dto.PlaceSearchResult;
 import com.project.picngo.spot.dto.Coordinate;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.Duration;
+import java.util.function.Supplier;
+
 @Slf4j
 @Component
 public class KakaoLocalSearchClient {
 
     private static final int DEFAULT_RADIUS_METERS = 2000;
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(3);
 
     private final WebClient webClient;
     private final String apiKey;
+    private final CircuitBreaker circuitBreaker;
 
     public KakaoLocalSearchClient(
             WebClient.Builder webClientBuilder,
-            @Value("${kakao.rest.api.key}") String apiKey) {
+            @Value("${kakao.rest.api.key}") String apiKey,
+            @Value("${kakao.local-search.base-url}") String baseUrl) {
 
-        this.webClient = webClientBuilder.baseUrl("https://dapi.kakao.com/v2/local/search/keyword.json").build();
+        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
+
+        // 카카오 로컬 검색이 느려지거나(3초 타임아웃) 계속 실패하면, 매 요청마다 톰캣 스레드를
+        // 붙잡고 기다리는 대신 빠르게 실패시켜 스레드 풀 고갈을 막는다.
+        // 최근 10건 중 5건 이상 모이면 판단하고, 그중 절반 이상이 느리거나 실패면 open으로 전환.
+        // open 상태에서는 10초간 호출 자체를 막고(CallNotPermittedException), 이후 half-open으로
+        // 3건만 흘려보내 회복 여부를 확인한다.
+        CircuitBreakerConfig config = CircuitBreakerConfig.custom()
+                .slidingWindowSize(10)
+                .minimumNumberOfCalls(5)
+                .slowCallDurationThreshold(CALL_TIMEOUT)
+                .slowCallRateThreshold(50.0f)
+                .failureRateThreshold(50.0f)
+                .waitDurationInOpenState(Duration.ofSeconds(10))
+                .permittedNumberOfCallsInHalfOpenState(3)
+                .build();
+        this.circuitBreaker = CircuitBreaker.of("kakaoLocalSearch", config);
     }
 
     /**
@@ -40,20 +65,28 @@ public class KakaoLocalSearchClient {
         log.info("🔍 [카카오 지도 키워드 검색 요청] 쿼리: '{}', 기준: ({},{}), 반경: {}m",
                 query, originLat, originLng, radius);
 
+        Supplier<KakaoLocalSearchResponse> call = CircuitBreaker.decorateSupplier(circuitBreaker, () ->
+                webClient.get()
+                        .uri(uriBuilder -> uriBuilder
+                                .queryParam("query", query)
+                                .queryParam("x", originLng)
+                                .queryParam("y", originLat)
+                                .queryParam("radius", radius)
+                                .queryParam("sort", "distance")
+                                .build())
+                        .header("Authorization", "KakaoAK " + apiKey)
+                        .retrieve()
+                        .bodyToMono(KakaoLocalSearchResponse.class)
+                        .timeout(CALL_TIMEOUT)
+                        .block());
+
         KakaoLocalSearchResponse response;
         try {
-            response = webClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .queryParam("query", query)
-                            .queryParam("x", originLng)
-                            .queryParam("y", originLat)
-                            .queryParam("radius", radius)
-                            .queryParam("sort", "distance")
-                            .build())
-                    .header("Authorization", "KakaoAK " + apiKey)
-                    .retrieve()
-                    .bodyToMono(KakaoLocalSearchResponse.class)
-                    .block();
+            response = call.get();
+        } catch (CallNotPermittedException e) {
+            // 서킷이 open 상태 - 호출 자체를 시도하지 않고 즉시 폴백. 응답에 수 ms만 걸린다.
+            log.warn("⚡ [카카오 로컬 검색 서킷 open - 즉시 폴백] 쿼리: '{}'", query);
+            return PlaceSearchResult.error();
         } catch (WebClientResponseException e) {
             // 상태코드만으론 원인을 못 찾는다. 카카오는 응답 본문에 사유를 적어서 보낸다.
             log.warn("❌ 카카오 지도 키워드 검색 API 오류 (쿼리: {}): {} - 응답 본문: {}",
