@@ -47,6 +47,9 @@ public class KakaoLocalSearchClient {
                 .failureRateThreshold(50.0f)
                 .waitDurationInOpenState(Duration.ofSeconds(10))
                 .permittedNumberOfCallsInHalfOpenState(3)
+                // 서킷이 열린 동안에는 거부가 초당 수백 건씩 발생한다. 그 예외마다 스택트레이스를
+                // 채우면 장애 상황에서 CPU를 태우는데, 스택은 항상 같은 지점이라 정보 가치도 없다.
+                .writableStackTraceEnabled(false)
                 .build();
         this.circuitBreaker = CircuitBreaker.of("kakaoLocalSearch", config);
     }

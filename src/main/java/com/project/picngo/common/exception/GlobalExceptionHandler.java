@@ -23,8 +23,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
-        log.error("CustomException: {}", e.getMessage(), e);
         BaseErrorCode errorCode = e.getErrorCode();
+
+        // 스택트레이스는 5xx에만 남긴다.
+        // CustomException은 우리가 원인을 알고 의도적으로 던지는 예외라 스택 96줄 중
+        // 의미 있는 건 발생 지점 1~2줄뿐이고, 나머지는 매번 동일한 프레임워크 경로다.
+        // 4xx(없는 스팟 조회, 권한 없음 등)는 버그가 아니라 정상적인 클라이언트 오류이므로
+        // ERROR 레벨로 스택까지 남길 이유가 없다.
+        // 외부 API 장애처럼 5xx가 초당 수백 건 쏟아지는 상황에서는 이 한 줄이
+        // 분당 수백 MB의 로그를 만든다(부하테스트에서 예외 1건당 96줄·13KB 확인).
+        if (errorCode.getStatus().is5xxServerError()) {
+            log.error("CustomException: {}", e.getMessage(), e);
+        } else {
+            log.warn("CustomException: {}", e.getMessage());
+        }
+
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode));
