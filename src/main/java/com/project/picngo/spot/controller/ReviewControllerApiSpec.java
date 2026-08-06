@@ -1,6 +1,7 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.spot.dto.ReviewExifResponse;
 import com.project.picngo.spot.dto.ReviewPhotoResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
@@ -52,6 +53,11 @@ public interface ReviewControllerApiSpec {
     @Operation(summary = "리뷰 삭제", description = "본인 리뷰만 삭제할 수 있습니다.")
     ResponseEntity<Void> deleteReview(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "리뷰 ID") @PathVariable Long id
+    );
+
+    @Operation(summary = "리뷰 사진 EXIF 조회", description = "리뷰에 첨부된 모든 사진의 EXIF 정보를 사진 ID 순서로 반환합니다.")
+    ResponseEntity<ReviewExifResponse> getReviewExif(
             @Parameter(description = "리뷰 ID") @PathVariable Long id
     );
 }

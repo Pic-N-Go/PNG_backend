@@ -11,5 +11,7 @@ public interface ReviewPhotoRepository extends JpaRepository<ReviewPhoto, Long> 
     // 정렬을 명시하지 않으면 순서가 DB 재량이라 화면에서 사진이 뒤섞일 수 있다.
     List<ReviewPhoto> findByReview_IdInOrderByIdAsc(List<Long> reviewIds);
 
+    List<ReviewPhoto> findByReviewIdOrderByIdAsc(Long reviewId);
+
     int countByReviewId(Long reviewId);
 }

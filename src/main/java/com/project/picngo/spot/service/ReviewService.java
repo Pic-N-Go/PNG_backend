@@ -4,16 +4,15 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ReviewErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
+import com.project.picngo.common.image.dto.PhotoExifInfo;
+import com.project.picngo.common.image.dto.PhotoExifResponse;
+import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.ReviewPhoto;
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.dto.MyReviewListResponse;
-import com.project.picngo.spot.dto.ReviewListResponse;
-import com.project.picngo.spot.dto.ReviewPhotoResponse;
-import com.project.picngo.spot.dto.ReviewRequest;
-import com.project.picngo.spot.dto.ReviewResponse;
+import com.project.picngo.spot.dto.*;
 import com.project.picngo.spot.repository.ReviewPhotoRepository;
 import com.project.picngo.spot.repository.ReviewRepository;
 import com.project.picngo.spot.repository.SpotRepository;
@@ -52,6 +51,7 @@ public class ReviewService {
     private final SpotRepository spotRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final ExifExtractor exifExtractor;
 
     public ReviewListResponse getReviews(Long spotId, String sort, int page, int size) {
         if (!spotRepository.existsById(spotId)) {
@@ -219,6 +219,43 @@ public class ReviewService {
         }
     }
 
+    public ReviewExifResponse getReviewExif(Long reviewId){
+        if(!reviewRepository.existsById(reviewId)) {
+            throw new CustomException(ReviewErrorCode.REVIEW_NOT_FOUND);
+        }
+
+        List<PhotoExifResponse> images = reviewPhotoRepository
+                .findByReviewIdOrderByIdAsc(reviewId)
+                .stream()
+                .map(this::toExifResponse)
+                .toList();
+
+        return new ReviewExifResponse(reviewId, images);
+    }
+
+    private PhotoExifResponse toExifResponse(ReviewPhoto photo) {
+        return new PhotoExifResponse(
+                photo.getId(),
+                photo.getCameraModel(),
+                photo.getLensModel(),
+                photo.getIso(),
+                photo.getFNumber(),
+                photo.getExposureTime(),
+                photo.getFocalLength(),
+                photo.getExposureMode(),
+                photo.getMeteringMode(),
+                photo.getWhiteBalance(),
+                photo.getFlash(),
+                photo.getFocalLength35mm(),
+                photo.getSoftware(),
+                photo.getLatitude(),
+                photo.getLongitude(),
+                photo.getFileSize(),
+                photo.getFileFormat(),
+                photo.getOriginalFileName()
+        );
+    }
+
     @Transactional
     public void deleteReviewPhoto(Long userId, Long reviewId, Long photoId) {
         findMyReview(userId, reviewId);
@@ -231,7 +268,7 @@ public class ReviewService {
         reviewPhotoRepository.delete(photo);
         reviewPhotoRepository.flush();
 
-        deleteUploadedImages(List.of(photo.getPhotoUrl()));
+        deleteUploadedImages(List.of(photo.getObjectKey()));
     }
 
     @Transactional
@@ -240,7 +277,7 @@ public class ReviewService {
         Spot spot = review.getSpot();
 
         List<String> photoKeys = reviewPhotoRepository.findByReviewId(reviewId).stream()
-                .map(ReviewPhoto::getPhotoUrl)
+                .map(ReviewPhoto::getObjectKey)
                 .toList();
 
         reviewRepository.delete(review);
@@ -310,7 +347,7 @@ public class ReviewService {
     }
 
     private ReviewPhotoResponse toPhotoResponse(ReviewPhoto photo) {
-        return new ReviewPhotoResponse(photo.getId(), imageStorageService.getPresignedUrl(photo.getPhotoUrl()));
+        return new ReviewPhotoResponse(photo.getId(), imageStorageService.getPresignedUrl(photo.getObjectKey()));
     }
 
     private Set<ReviewTag> tagsOf(Long reviewId) {
@@ -341,13 +378,12 @@ public class ReviewService {
                 continue;
             }
 
+            PhotoExifInfo exif = exifExtractor.extract(photo);
+
             ImageUploadResult uploadResult = imageStorageService.upload(photo, "reviews/" + review.getId());
             uploadedKeys.add(uploadResult.key());
 
-            ReviewPhoto reviewPhoto = ReviewPhoto.builder()
-                    .review(review)
-                    .photoUrl(uploadResult.key())
-                    .build();
+            ReviewPhoto reviewPhoto = ReviewPhoto.uploaded(review, uploadResult.key(), exif);
 
             reviewPhotoRepository.save(reviewPhoto);
             uploaded.add(new ReviewPhotoResponse(reviewPhoto.getId(), uploadResult.url()));
