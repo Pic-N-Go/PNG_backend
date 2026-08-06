@@ -6,12 +6,12 @@ import com.project.picngo.user.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.data.repository.query.Param;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import com.project.picngo.user.dto.UserStatsResponse;
 
 import java.util.List;
 
@@ -84,4 +84,12 @@ public interface UserControllerApiSpec {
 	ResponseEntity<List<FollowUserResponse>> getFollowing(
 			@Parameter(description = "조회할 사용자 ID") @PathVariable Long id
 	);
+
+    @Operation(
+            summary = "내 활동 통계 조회",
+            description = "현재 인증된 사용자의 팔로워 수, 팔로잉 수, 리뷰 수, 방문 장소 수를 조회합니다."
+    )
+    ResponseEntity<UserStatsResponse> getMyStats(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
 }
