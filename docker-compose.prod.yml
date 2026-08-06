@@ -1,0 +1,137 @@
+# 운영 배포용 전체 스택. 로컬 개발용 docker-compose.yml(Redis·RabbitMQ만)과는 별개다.
+#
+# 사용법:
+#   1) .env.prod 파일을 이 파일과 같은 위치에 준비 (DB_URL 등 전체 값)
+#   2) secrets/firebase-key.json 배치 (git에 안 올라가는 서비스 계정 키)
+#   3) docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# DB/Redis/RabbitMQ/Prometheus/Grafana 포트는 호스트에 노출하지 않는다.
+# app 컨테이너만 8080을 열어 외부에서 접근 가능하고, 나머지는 내부 네트워크로만 통신한다.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: picngo-app
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/picngo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      JWT_SECRET: ${JWT_SECRET}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY}
+      WEATHER_SERVICE_KEY: ${WEATHER_SERVICE_KEY}
+      PUBLIC_DATA_SERVICE_KEY: ${PUBLIC_DATA_SERVICE_KEY}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
+      WEBSOCKET_ALLOWED_ORIGIN_PATTERNS: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
+      # firebase-key.json을 이미지에 굽지 않고 아래 volumes로 마운트한 파일을 가리킨다.
+      FIREBASE_CONFIG_PATH: file:/app/secrets/firebase-key.json
+    volumes:
+      - ./secrets/firebase-key.json:/app/secrets/firebase-key.json:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - picngo-net
+
+  mysql:
+    image: mysql:8
+    container_name: picngo-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: picngo
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # 로컬 검증 때만 접근하려면 아래 주석을 풀고, 실제 배포에서는 반드시 막아둔다.
+    # ports:
+    #   - "3306:3306"
+    networks:
+      - picngo-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: picngo-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    networks:
+      - picngo-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: picngo-rabbitmq
+    restart: always
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - picngo-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: picngo-prometheus
+    restart: always
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - picngo-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: picngo-grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      # Grafana는 관리 도구라 임시로 열어둔다. 운영 확정되면 SSH 터널이나
+      # VPN으로만 접근하도록 이 포트 노출도 제거하는 게 안전하다.
+      # 호스트 포트를 8081로 잡은 이유: Windows가 Hyper-V/WSL2용으로 3000번을 포함한
+      # 대역을 동적 포트로 예약해두는 경우가 있어(netsh interface ipv4 show
+      # excludedportrange) 로컬에서 3000:3000이 바인딩 실패할 수 있다. 컨테이너
+      # 내부 포트는 그대로 3000이라 실제 배포 서버(Linux)에는 영향 없다.
+      - "8081:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - picngo-net
+
+networks:
+  picngo-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:

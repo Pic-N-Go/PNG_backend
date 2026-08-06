@@ -35,7 +35,10 @@ public class SecurityConfig {
 		"/swagger-resources/**",
 		"/ws",
 		"/ws/**",
-		"/notifications/test/**"
+		"/notifications/test/**",
+		// Docker HEALTHCHECK·로드밸런서가 인증 없이 때린다. management.endpoints에서
+		// health만 노출하도록 이미 제한해뒀다(application-prod.yaml).
+		"/actuator/health"
 	};
 
 	private final JwtAuthenticationFilter jwtAuthenticationFilter;

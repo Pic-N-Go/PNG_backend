@@ -1,0 +1,41 @@
+# 운영 프로파일. application.yaml(베이스) 위에 겹쳐진다(대체가 아니라 오버레이).
+# 활성화: SPRING_PROFILES_ACTIVE=prod
+#
+# 여기서 손대는 건 "값"이 아니라 "동작"이다. DB 접속정보·API 키 등은 이미
+# application.yaml에서 환경변수로 빠져 있어 운영에서도 그대로 쓰면 된다.
+
+spring:
+  jpa:
+    hibernate:
+      # update는 기동 시 엔티티 변경사항을 실제 운영 DB 스키마에 자동 반영한다.
+      # 로컬 개발 편의용이지 운영에 쓸 게 아니다 - 실수로 필드 하나 바꾸고 배포하면
+      # 운영 스키마가 조용히 바뀐다. validate는 코드와 스키마가 다르면 기동 자체를 실패시켜
+      # 마이그레이션을 빠뜨린 배포를 그 자리에서 막는다.
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+springdoc:
+  # Swagger UI/API 문서를 운영에 노출하지 않는다. 켜두면 기동 로그에
+  # "consider disabling in production" 경고가 계속 뜬다.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.project.picngo: INFO
+    # SQL 로깅은 show-sql: false로 이미 꺼지지만, 혹시 남아있는 DEBUG 카테고리도 명시적으로 잠근다
+    org.hibernate.SQL: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # actuator를 아직 안 붙였지만, 나중에 추가할 때 이 파일에서
+        # 헬스체크/메트릭만 열도록 미리 자리를 잡아둔다. 전부(*) 노출은 금지.
+        include: health
