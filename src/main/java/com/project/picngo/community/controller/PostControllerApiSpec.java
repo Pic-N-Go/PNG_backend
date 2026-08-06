@@ -31,7 +31,7 @@ public interface PostControllerApiSpec {
             description = """
                     게시글 목록을 조회합니다. 인증은 선택 사항이며, 인증된 경우 좋아요·북마크 여부가 함께 반환됩니다.
                     sort는 POPULAR(기본), LATEST, MY_POSTS, FOLLOWING을 지원합니다.
-                    MY_POSTS는 로그인이 필요하고 FOLLOWING은 팔로우 기능 연동 전까지 사용할 수 없습니다.
+                    MY_POSTS와 FOLLOWING은 로그인이 필요합니다.
                     keyword는 게시글 내용과 스팟 이름을 검색합니다.
                     """
     )
