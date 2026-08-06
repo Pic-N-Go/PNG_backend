@@ -60,7 +60,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
         select p
         from Post p
         left join p.spot spot
-        where exists (
+        where p.author.id <> :userId and exists (
             select f.id
             from Follow f
             where f.follower.id = :userId
