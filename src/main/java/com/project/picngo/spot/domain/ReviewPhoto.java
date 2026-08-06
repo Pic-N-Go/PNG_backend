@@ -24,7 +24,7 @@ public class ReviewPhoto {
     @JoinColumn(name = "review_id", nullable = false)
     private Review review;
 
-    @Comment("사진 URL")
+    @Comment("S3 Object Key")
     @Column(name = "object_key", nullable = false, unique = true, length = 500)
     private String objectKey;
 
