@@ -7,6 +7,16 @@
 #
 # DB/Redis/RabbitMQ/Prometheus/Grafana 포트는 호스트에 노출하지 않는다.
 # app 컨테이너만 8080을 열어 외부에서 접근 가능하고, 나머지는 내부 네트워크로만 통신한다.
+#
+# 모든 서비스에 x-logging을 공유한다. 컨테이너 6개 전부 무제한 로그 드라이버를 쓰면
+# 디스크가 로그만으로 꽉 찰 수 있다 - 실제로 부하테스트 중 예외 스택트레이스 버그 하나로
+# 60초에 117MB가 쌓인 적이 있다(이번엔 고쳤지만, 앱 코드가 다시 그런 실수를 하지 않는다는
+# 보장은 없다). 서비스당 최대 150MB(50MB x 3파일)로 상한을 건다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
 
 services:
   app:
@@ -15,6 +25,7 @@ services:
       dockerfile: Dockerfile
     container_name: picngo-app
     restart: always
+    logging: *default-logging
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/picngo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
@@ -24,8 +35,8 @@ services:
       REDIS_PORT: 6379
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
-      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY}
       WEATHER_SERVICE_KEY: ${WEATHER_SERVICE_KEY}
@@ -58,6 +69,7 @@ services:
     image: mysql:8
     container_name: picngo-mysql
     restart: always
+    logging: *default-logging
     environment:
       MYSQL_DATABASE: picngo
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
@@ -80,6 +92,7 @@ services:
     image: redis:7-alpine
     container_name: picngo-redis
     restart: always
+    logging: *default-logging
     volumes:
       - redis-data:/data
     networks:
@@ -89,6 +102,13 @@ services:
     image: rabbitmq:3-management
     container_name: picngo-rabbitmq
     restart: always
+    logging: *default-logging
+    # RabbitMQ 기본 guest 계정은 localhost(loopback)에서만 로그인이 허용된다.
+    # app 컨테이너는 브로커 입장에서 다른 호스트라 guest로는 연결 자체가 거부된다
+    # (ACCESS_REFUSED). RABBITMQ_USERNAME을 guest가 아닌 값으로 채워야 한다.
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
@@ -98,6 +118,7 @@ services:
     image: prom/prometheus:latest
     container_name: picngo-prometheus
     restart: always
+    logging: *default-logging
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -108,6 +129,7 @@ services:
     image: grafana/grafana:latest
     container_name: picngo-grafana
     restart: always
+    logging: *default-logging
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
     volumes:
