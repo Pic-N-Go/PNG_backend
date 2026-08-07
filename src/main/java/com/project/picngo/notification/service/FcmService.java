@@ -13,17 +13,27 @@ import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class FcmService {
 
     private final FirebaseMessaging firebaseMessaging;
 
+    public FcmService(@org.springframework.beans.factory.annotation.Autowired(required = false) FirebaseMessaging firebaseMessaging) {
+        this.firebaseMessaging = firebaseMessaging;
+    }
+
     public void sendMessage(String targetToken, String title, String body, String deepLink) {
+
         sendMessage(targetToken, title, body, deepLink, null);
     }
 
     public void sendMessage(String targetToken, String title, String body, String deepLink, Long spotId) {
+        if (firebaseMessaging == null) {
+            log.warn("FCM 서비스가 초기화되지 않아 메시지를 발송할 수 없습니다.");
+            throw new CustomException(NotificationErrorCode.FCM_SEND_FAILED);
+        }
+
         if (targetToken == null || targetToken.isEmpty()) {
+
             log.warn("FCM Token이 없어 알림을 보낼 수 없습니다.");
             throw new CustomException(NotificationErrorCode.FCM_TOKEN_NOT_FOUND);
         }
