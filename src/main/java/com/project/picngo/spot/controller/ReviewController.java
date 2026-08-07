@@ -1,6 +1,7 @@
 package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
+import com.project.picngo.spot.dto.ReviewExifResponse;
 import com.project.picngo.spot.dto.ReviewPhotoResponse;
 import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
@@ -73,5 +74,12 @@ public class ReviewController implements ReviewControllerApiSpec {
     ) {
         reviewService.deleteReview(userDetails.getId(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/exif")
+    public ResponseEntity<ReviewExifResponse> getReviewExif(
+            @PathVariable Long id
+    ){
+        return ResponseEntity.ok(reviewService.getReviewExif(id));
     }
 }

@@ -49,11 +49,8 @@ public class PostService {
     private final ImageStorageService imageStorageService;
 
     public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, int page, int size) {
-        //Todo : 팔로잉 기능 연동 후 구현
-        if (sort == PostSort.FOLLOWING) {
-            throw new CustomException(CommunityErrorCode.FOLLOWING_FEED_NOT_AVAILABLE);
-        }
-        if (sort == PostSort.MY_POSTS && userId == null) {
+
+        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING) && userId == null) {
             throw new CustomException(AuthErrorCode.LOGIN_REQUIRED);
         }
         // 너무 큰 사이즈 요청이 올 경우 100으로 조정
@@ -64,7 +61,7 @@ public class PostService {
         Page<Post> result = switch (sort) {
             case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
             case POPULAR, LATEST -> postRepository.search(normalizedKeyword, null, pageable);
-            case FOLLOWING -> throw new CustomException(CommunityErrorCode.FOLLOWING_FEED_NOT_AVAILABLE);
+            case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
         };
         List<PostResponse> posts = toFeedResponses(result.getContent(), userId);
 
@@ -386,11 +383,10 @@ public class PostService {
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
-            case MY_POSTS, LATEST -> Sort.by(
+            case MY_POSTS, LATEST, FOLLOWING -> Sort.by(
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
-            case FOLLOWING -> throw new CustomException(CommunityErrorCode.FOLLOWING_FEED_NOT_AVAILABLE);
         };
     }
 

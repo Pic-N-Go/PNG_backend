@@ -45,6 +45,10 @@ dependencies {
 	// WebFlux (for WebClient - 비동기 외부 API 호출용)
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
+	// Resilience4j (서킷브레이커). Spring Boot 4용 스타터 모듈이 아직 없어 코어 모듈만 쓰고
+	// @CircuitBreaker 어노테이션 대신 CircuitBreaker.decorateSupplier로 직접 감싼다.
+	implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.3.0'
+
 	// Swagger UI (API 문서화)
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 

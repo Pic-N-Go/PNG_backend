@@ -43,8 +43,12 @@ out/
 !.env.*.example
 firebase-key.json
 secrets/
+*.pem
+deploy.tar
+
 
 .claude/
+
 CLAUDE.md
 
 # 팀 문서 (git 미추적)
