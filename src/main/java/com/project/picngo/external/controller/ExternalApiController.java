@@ -1,9 +1,11 @@
 package com.project.picngo.external.controller;
 
 import com.project.picngo.external.DirectionsClient;
+import com.project.picngo.external.KakaoLocalSearchClient;
 import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
+import com.project.picngo.external.dto.PlaceSearchResult;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.spot.service.TourApiSyncService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
     private final WeatherClient weatherClient;
     private final DirectionsClient directionsClient;
     private final TourApiSyncService tourApiSyncService;
+    private final KakaoLocalSearchClient kakaoLocalSearchClient;
 
     // 1. 길찾기 API (바로 출발 시 호출)
     @GetMapping("/directions")
@@ -76,5 +79,15 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         Double mockLat = 37.5665;
         Double mockLng = 126.9780;
         return ResponseEntity.ok(weatherClient.getGoldenHour(mockLat, mockLng, date));
+    }
+
+    // 6. 카카오 로컬 검색 직접 호출 (서킷브레이커 부하테스트용)
+    @GetMapping("/local-search")
+    public ResponseEntity<PlaceSearchResult> searchLocal(
+            @RequestParam String query,
+            @RequestParam Double lat,
+            @RequestParam Double lng
+    ) {
+        return ResponseEntity.ok(kakaoLocalSearchClient.searchNearbyPlace(query, lat, lng, null));
     }
 }

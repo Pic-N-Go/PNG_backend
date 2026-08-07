@@ -46,7 +46,11 @@ public class RouteCacheService {
         try {
             response = directionsClient.getTravelInfo(startLat, startLng, goalLat, goalLng);
         } catch (Exception e) {
-            log.error("카카오 길찾기 API 호출 실패", e);
+            // 스택트레이스를 남기지 않는다. 외부 API 실패는 예외 상황이 아니라 폴백으로 처리되는
+            // 정상 분기이고, 스택도 항상 같은 지점이라 정보 가치가 없다.
+            // 카카오 장애 중에는 코스 하나 저장에 스팟 수만큼 이 경로를 타서,
+            // 스택을 남기면 분당 수백 MB의 로그가 쌓인다(부하테스트에서 60초 117MB 확인).
+            log.warn("카카오 길찾기 API 호출 실패 - 폴백 추정으로 진행: {}", e.getMessage());
         }
 
         if (response != null && response.travelTimeMinutes() != null) {
