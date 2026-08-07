@@ -1,0 +1,17 @@
+.git
+.gitignore
+.gradle
+build
+out
+*.log
+.env
+.env.*
+!.env.example
+.idea
+*.iml
+.vscode
+load-test
+docs
+README.md
+*.md
+retry-instance.sh

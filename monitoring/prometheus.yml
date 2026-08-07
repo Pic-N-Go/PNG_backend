@@ -1,0 +1,19 @@
+# app 타겟은 지금 주석 처리되어 있다. Spring Boot 프로젝트에 아직
+# spring-boot-starter-actuator + micrometer-registry-prometheus 의존성이 없어서
+# /actuator/prometheus 엔드포인트 자체가 없다 (build.gradle 확인 결과).
+# 그 두 의존성을 추가하고 management.endpoints.web.exposure.include에
+# prometheus를 넣은 뒤 아래 주석을 풀면 서킷브레이커 상태 등을 실시간으로 수집할 수 있다.
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'picngo-app'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['app:8080']
+
