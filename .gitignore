@@ -36,7 +36,25 @@ out/
 ### VS Code ###
 .vscode/
 
-# application 설정
-application.yml
+# 환경변수 및 민감한 키 파일
 .env
+.env.*
+!*.env.example
+!.env.*.example
+firebase-key.json
+secrets/
+*.pem
+deploy.tar
 
+
+.claude/
+
+CLAUDE.md
+
+# 팀 문서 (git 미추적)
+docs/spot-category-set-progress.md
+
+# OS / 로컬 덤프 / 스킬 산출물
+.DS_Store
+picngo_spots.sql
+docs/superpowers/

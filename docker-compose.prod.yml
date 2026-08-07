@@ -1,0 +1,164 @@
+# 운영 배포용 전체 스택. 로컬 개발용 docker-compose.yml(Redis·RabbitMQ만)과는 별개다.
+#
+# 사용법:
+#   1) .env.prod 파일을 이 파일과 같은 위치에 준비 (DB_URL 등 전체 값)
+#   2) secrets/firebase-key.json 배치 (git에 안 올라가는 서비스 계정 키)
+#   3) docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# DB/Redis/RabbitMQ/Prometheus/Grafana 포트는 호스트에 노출하지 않는다.
+# app 컨테이너만 8080을 열어 외부에서 접근 가능하고, 나머지는 내부 네트워크로만 통신한다.
+#
+# 모든 서비스에 x-logging을 공유한다. 컨테이너 6개 전부 무제한 로그 드라이버를 쓰면
+# 디스크가 로그만으로 꽉 찰 수 있다 - 실제로 부하테스트 중 예외 스택트레이스 버그 하나로
+# 60초에 117MB가 쌓인 적이 있다(이번엔 고쳤지만, 앱 코드가 다시 그런 실수를 하지 않는다는
+# 보장은 없다). 서비스당 최대 150MB(50MB x 3파일)로 상한을 건다.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # 이름을 고정해둔다. 태그 없이 build만 있으면 compose가 프로젝트 폴더명 기준으로
+    # 자동 생성한 이름을 쓰는데, 로컬에서 build한 이미지를 docker save/load로 옮길 때
+    # 이름이 어긋나기 쉽다. image를 명시하면 로컬 빌드든 CI/CD든 항상 같은 이름을 쓴다.
+    image: picngo-app:prod
+    container_name: picngo-app
+    restart: always
+    logging: *default-logging
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql:3306/picngo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY}
+      WEATHER_SERVICE_KEY: ${WEATHER_SERVICE_KEY}
+      PUBLIC_DATA_SERVICE_KEY: ${PUBLIC_DATA_SERVICE_KEY}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
+      WEBSOCKET_ALLOWED_ORIGIN_PATTERNS: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
+      # firebase-key.json을 이미지에 굽지 않고 아래 volumes로 마운트한 파일을 가리킨다.
+      FIREBASE_CONFIG_PATH: file:/app/secrets/firebase-key.json
+    volumes:
+      - ./secrets/firebase-key.json:/app/secrets/firebase-key.json:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - picngo-net
+
+  mysql:
+    image: mysql:8
+    container_name: picngo-mysql
+    restart: always
+    logging: *default-logging
+    environment:
+      MYSQL_DATABASE: picngo
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # SSH 터널링 접속을 위해 EC2 내부 localhost:3306 포트를 개방한다.
+    ports:
+      - "3306:3306"
+    networks:
+
+      - picngo-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: picngo-redis
+    restart: always
+    logging: *default-logging
+    volumes:
+      - redis-data:/data
+    networks:
+      - picngo-net
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: picngo-rabbitmq
+    restart: always
+    logging: *default-logging
+    # RabbitMQ 기본 guest 계정은 localhost(loopback)에서만 로그인이 허용된다.
+    # app 컨테이너는 브로커 입장에서 다른 호스트라 guest로는 연결 자체가 거부된다
+    # (ACCESS_REFUSED). RABBITMQ_USERNAME을 guest가 아닌 값으로 채워야 한다.
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - picngo-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: picngo-prometheus
+    restart: always
+    logging: *default-logging
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - picngo-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: picngo-grafana
+    restart: always
+    logging: *default-logging
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      # Grafana는 관리 도구라 임시로 열어둔다. 운영 확정되면 SSH 터널이나
+      # VPN으로만 접근하도록 이 포트 노출도 제거하는 게 안전하다.
+      # 호스트 포트를 8081로 잡은 이유: Windows가 Hyper-V/WSL2용으로 3000번을 포함한
+      # 대역을 동적 포트로 예약해두는 경우가 있어(netsh interface ipv4 show
+      # excludedportrange) 로컬에서 3000:3000이 바인딩 실패할 수 있다. 컨테이너
+      # 내부 포트는 그대로 3000이라 실제 배포 서버(Linux)에는 영향 없다.
+      - "8081:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - picngo-net
+
+networks:
+  picngo-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:

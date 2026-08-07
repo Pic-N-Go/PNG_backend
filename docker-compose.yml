@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  png-redis:
+    image: redis:7-alpine
+    container_name: png-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  png-rabbitmq:
+    image: rabbitmq:3-management
+    container_name: png-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    restart: always

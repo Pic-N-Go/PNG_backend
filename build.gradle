@@ -21,6 +21,12 @@ dependencies {
 	// Spring Data JPA
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+	// Redis
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+	// RabbitMQ (비동기 메시지 큐)
+	implementation 'org.springframework.boot:spring-boot-starter-amqp'
+
 	// Spring Security
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
@@ -33,6 +39,24 @@ dependencies {
 	// Spring MVC + Rest API
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
+	// Actuator (헬스체크·메트릭). health만 노출 (application-prod.yaml에서 제한)
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
+
+	// WebFlux (for WebClient - 비동기 외부 API 호출용)
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+	// Resilience4j (서킷브레이커). Spring Boot 4용 스타터 모듈이 아직 없어 코어 모듈만 쓰고
+	// @CircuitBreaker 어노테이션 대신 CircuitBreaker.decorateSupplier로 직접 감싼다.
+	implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.3.0'
+
+	// Swagger UI (API 문서화)
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
+	//SMTP
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
+
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
 
@@ -42,18 +66,41 @@ dependencies {
 	// MySQL JDBC Driver
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
+	// JWT
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
 	// Lombok Annotation 처리기
 	annotationProcessor 'org.projectlombok:lombok'
 
 	// YAML 파일 파싱 라이브러리
 	implementation 'org.yaml:snakeyaml:2.5'
 
+
+	// Firebase Admin SDK (푸시 알림)
+	implementation 'com.google.firebase:firebase-admin:9.2.0'
+
+	// WebSocket
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+
+	// EXIF 추출 라이브러리
+	implementation 'com.drewnoakes:metadata-extractor:2.19.0'
+
+	// AWS S3
+	implementation platform('software.amazon.awssdk:bom:2.25.70')
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:auth'
+
 	// 테스트용 라이브러리
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testImplementation 'com.squareup.okhttp3:mockwebserver:4.11.0'
+	testImplementation 'com.h2database:h2'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
@@ -61,4 +108,8 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+jar {
+	enabled = false
 }
