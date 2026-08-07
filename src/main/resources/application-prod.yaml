@@ -36,4 +36,5 @@ management:
       exposure:
         # actuator를 아직 안 붙였지만, 나중에 추가할 때 이 파일에서
         # 헬스체크/메트릭만 열도록 미리 자리를 잡아둔다. 전부(*) 노출은 금지.
-        include: health
+        include: health, prometheus
+

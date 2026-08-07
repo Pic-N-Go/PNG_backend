@@ -41,6 +41,8 @@ dependencies {
 
 	// Actuator (헬스체크·메트릭). health만 노출 (application-prod.yaml에서 제한)
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	implementation 'io.micrometer:micrometer-registry-prometheus'
+
 
 	// WebFlux (for WebClient - 비동기 외부 API 호출용)
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'

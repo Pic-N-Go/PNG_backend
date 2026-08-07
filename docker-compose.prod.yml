@@ -86,10 +86,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    # 로컬 검증 때만 접근하려면 아래 주석을 풀고, 실제 배포에서는 반드시 막아둔다.
-    # ports:
-    #   - "3306:3306"
+    # SSH 터널링 접속을 위해 EC2 내부 localhost:3306 포트를 개방한다.
+    ports:
+      - "3306:3306"
     networks:
+
       - picngo-net
 
   redis:
