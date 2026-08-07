@@ -109,3 +109,13 @@ cloud:
     s3:
       bucket: ${AWS_S3_BUCKET}
       presigned-url-expiration-minutes: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
+
+management:
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+
