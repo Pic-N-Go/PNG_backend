@@ -54,4 +54,27 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             where p.id = :postId
             """)
     void decrementCommentCount(@Param("postId") Long postId);
+
+    @EntityGraph(attributePaths = {"author", "spot"})
+    @Query("""
+        select p
+        from Post p
+        left join p.spot spot
+        where p.author.id <> :userId and exists (
+            select f.id
+            from Follow f
+            where f.follower.id = :userId
+              and f.following.id = p.author.id
+        )
+        and (
+            :keyword is null
+            or lower(p.content) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(spot.name, '')) like lower(concat('%', :keyword, '%'))
+        )
+        """)
+    Page<Post> searchFollowing(
+            @Param("keyword") String keyword,
+            @Param("userId") Long userId,
+            Pageable pageable
+    );
 }

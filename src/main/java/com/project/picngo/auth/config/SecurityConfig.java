@@ -18,6 +18,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.List;
 
 @Slf4j
@@ -26,22 +27,22 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-	private static final String[] PUBLIC_ENDPOINTS = {
-		"/auth/**",
-		"/version/check",
-		"/categories",
-		"/spots/**",
-		"/bookmark-collections/**", // Spot Detail: TEMP_USER_ID 기반, 실 인증 연동 시 제거 필요
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/auth/**",
+            "/version/check",
+            "/categories",
+            "/spots/**",
+            "/bookmark-collections/**", // Spot Detail: TEMP_USER_ID 기반, 실 인증 연동 시 제거 필요
 
-		"/swagger-ui/**",
-		"/v3/api-docs/**",
-		"/swagger-resources/**",
-		"/ws",
-		"/ws/**",
-		"/notifications/test/**"
-	};
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/swagger-resources/**",
+            "/ws",
+            "/ws/**",
+            "/notifications/test/**"
+    };
 
-	private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
 	// loadtest 프로파일에서만 존재하는 빈. 운영에서는 비어 있어 아무 엔드포인트도 열리지 않는다.
 	private final ObjectProvider<LoadTestPublicEndpoints> loadTestPublicEndpoints;
@@ -62,7 +63,9 @@ public class SecurityConfig {
 					.requestMatchers(HttpMethod.POST, "/spots/*/reviews").authenticated()
 					.requestMatchers(HttpMethod.PUT, "/reviews/**").authenticated()
 					.requestMatchers(HttpMethod.DELETE, "/reviews/**").authenticated()
-					.requestMatchers(PUBLIC_ENDPOINTS).permitAll();
+					.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll()
+					.requestMatchers("/tour-api/**").permitAll(); // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
 
 				// loadtest 프로파일일 때만 부하테스트/관리자용 엔드포인트를 추가로 연다.
 				LoadTestPublicEndpoints extra = loadTestPublicEndpoints.getIfAvailable();
@@ -78,20 +81,21 @@ public class SecurityConfig {
 			.build();
 	}
 
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
 
-	@Bean
-	public CorsConfigurationSource corsConfigurationSource() {
-		CorsConfiguration config = new CorsConfiguration();
-		config.addAllowedOriginPattern("http://localhost:*");
-		config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-		config.setAllowedHeaders(List.of("*"));
-		config.setAllowCredentials(true);
-		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", config);
-		return source;
-	}
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.addAllowedOriginPattern("http://localhost:*");
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
 }

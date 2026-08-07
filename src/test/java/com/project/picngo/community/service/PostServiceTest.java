@@ -103,15 +103,39 @@ class PostServiceTest {
     }
 
     @Test
-    @DisplayName("팔로우 기능이 연결되기 전에는 팔로잉 피드를 명시적으로 거부한다")
-    void followingFeedFailsUntilFollowFeatureIsConnected() {
+    @DisplayName("비로그인 사용자는 팔로잉 피드를 조회할 수 없다")
+    void followingFeedRequiresAuthentication() {
         CustomException exception = assertThrows(
                 CustomException.class,
                 () -> service.getPosts(null, PostSort.FOLLOWING, null, 0, 20)
         );
 
-        assertEquals(CommunityErrorCode.FOLLOWING_FEED_NOT_AVAILABLE, exception.getErrorCode());
+        assertEquals(AuthErrorCode.LOGIN_REQUIRED, exception.getErrorCode());
         verifyNoInteractions(postRepository);
+    }
+
+    @Test
+    @DisplayName("팔로잉 피드는 로그인 사용자가 팔로우한 작성자의 게시글을 최신순으로 조회한다")
+    void followingFeedSearchesFollowedAuthorsPostsInLatestOrder() {
+        when(postRepository.searchFollowing(isNull(), eq(9L), any(Pageable.class)))
+                .thenAnswer(invocation -> {
+                    Pageable pageable = invocation.getArgument(2);
+                    return new PageImpl<>(List.of(), pageable, 0);
+                });
+
+        var response = service.getPosts(9L, PostSort.FOLLOWING, null, 0, 20);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(postRepository).searchFollowing(isNull(), eq(9L), pageableCaptor.capture());
+        Pageable pageable = pageableCaptor.getValue();
+        assertEquals(0, pageable.getPageNumber());
+        assertEquals(20, pageable.getPageSize());
+        assertEquals(
+                org.springframework.data.domain.Sort.Direction.DESC,
+                pageable.getSort().getOrderFor("createdAt").getDirection()
+        );
+        assertEquals(0, response.totalElements());
+        assertEquals(List.of(), response.posts());
     }
 
     @Test

@@ -94,4 +94,12 @@ public class UserController implements UserControllerApiSpec {
 	public ResponseEntity<List<FollowUserResponse>> getFollowing(@PathVariable Long id){
 		return ResponseEntity.ok(userService.getFollowing(id));
 	}
+
+    // 내 활동 통계 조회 API
+    @GetMapping("/me/stats")
+    public ResponseEntity<UserStatsResponse> getMyStats(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ){
+        return ResponseEntity.ok(userService.getMyStats(userDetails.getId()));
+    }
 }

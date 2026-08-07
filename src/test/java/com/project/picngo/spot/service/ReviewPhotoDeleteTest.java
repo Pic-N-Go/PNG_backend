@@ -1,6 +1,7 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.ReviewPhoto;
@@ -38,6 +39,7 @@ class ReviewPhotoDeleteTest {
     @Mock private SpotRepository spotRepository;
     @Mock private UserRepository userRepository;
     @Mock private ImageStorageService imageStorageService;
+    @Mock private ExifExtractor exifExtractor;
 
     @InjectMocks private ReviewService reviewService;
 
@@ -50,7 +52,8 @@ class ReviewPhotoDeleteTest {
 
         Review otherReview = mock(Review.class);
         given(otherReview.getId()).willReturn(OTHER_REVIEW_ID);
-        ReviewPhoto otherPhoto = ReviewPhoto.builder().review(otherReview).photoUrl("reviews/20/x.jpg").build();
+        ReviewPhoto otherPhoto = mock(ReviewPhoto.class);
+        given(otherPhoto.getReview()).willReturn(otherReview);
         given(reviewPhotoRepository.findById(PHOTO_ID)).willReturn(Optional.of(otherPhoto));
 
         assertThatThrownBy(() -> reviewService.deleteReviewPhoto(MY_ID, MY_REVIEW_ID, PHOTO_ID))

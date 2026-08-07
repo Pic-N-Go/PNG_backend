@@ -7,10 +7,7 @@ import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.user.domain.Follow;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
-import com.project.picngo.user.dto.FollowUserResponse;
-import com.project.picngo.user.dto.UserProfileResponse;
-import com.project.picngo.user.dto.UserProfileUpdateRequest;
-import com.project.picngo.user.dto.UserResponse;
+import com.project.picngo.user.dto.*;
 import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -168,4 +165,23 @@ public class UserService {
 				.map(follow -> FollowUserResponse.from(follow.getFollowing()))
 				.toList();
 	}
+
+    // 내 활동 통계 조회 서비스
+    public UserStatsResponse getMyStats(Long userId){
+        User user = getById(userId);
+
+        long followerCount = followRepository.countByFollowing(user);
+        long followingCount = followRepository.countByFollower(user);
+
+        // TODO: 리뷰/방문 장소 기준은 아직 확정되지 않아 임시로 0을 반환한다
+        long reviewCount = 0;
+        long visitedSpotCount = 0;
+
+        return new UserStatsResponse(
+                followerCount,
+                followingCount,
+                reviewCount,
+                visitedSpotCount
+        );
+    }
 }
