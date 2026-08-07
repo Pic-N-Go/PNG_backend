@@ -23,6 +23,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # 이름을 고정해둔다. 태그 없이 build만 있으면 compose가 프로젝트 폴더명 기준으로
+    # 자동 생성한 이름을 쓰는데, 로컬에서 build한 이미지를 docker save/load로 옮길 때
+    # 이름이 어긋나기 쉽다. image를 명시하면 로컬 빌드든 CI/CD든 항상 같은 이름을 쓴다.
+    image: picngo-app:prod
     container_name: picngo-app
     restart: always
     logging: *default-logging
