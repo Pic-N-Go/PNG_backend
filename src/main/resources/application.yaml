@@ -87,7 +87,8 @@ jwt:
 
 firebase:
   config:
-    path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
+    path: ${FIREBASE_CONFIG_PATH:file:secrets/firebase-key.json}
+
 
 websocket:
   allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
