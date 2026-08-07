@@ -7,8 +7,9 @@
 spring:
   jpa:
     hibernate:
-      # update로 설정하여 최초 배포 시 운영 DB 테이블을 자동 생성하도록 함
-      ddl-auto: update
+      # validate: 운영 DB 스키마 자동 변경을 막고 기존 스키마 검증만 수행
+      ddl-auto: validate
+
 
     show-sql: false
     properties:
