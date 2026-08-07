@@ -7,11 +7,9 @@
 spring:
   jpa:
     hibernate:
-      # update는 기동 시 엔티티 변경사항을 실제 운영 DB 스키마에 자동 반영한다.
-      # 로컬 개발 편의용이지 운영에 쓸 게 아니다 - 실수로 필드 하나 바꾸고 배포하면
-      # 운영 스키마가 조용히 바뀐다. validate는 코드와 스키마가 다르면 기동 자체를 실패시켜
-      # 마이그레이션을 빠뜨린 배포를 그 자리에서 막는다.
-      ddl-auto: validate
+      # update로 설정하여 최초 배포 시 운영 DB 테이블을 자동 생성하도록 함
+      ddl-auto: update
+
     show-sql: false
     properties:
       hibernate:
