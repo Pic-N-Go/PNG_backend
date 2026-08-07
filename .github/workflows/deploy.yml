@@ -1,0 +1,63 @@
+name: Pic-N-Go Backend Production CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. 레포지토리 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 2. JDK 21 (Temurin) 세팅
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: 3. Gradle 실행 권한 부여 및 자바 빌드
+        run: |
+          chmod +x gradlew
+          ./gradlew bootJar -x test
+
+      - name: 4. 배포용 파일 압축
+        run: |
+          tar -cvf deploy.tar \
+            Dockerfile \
+            docker-compose.prod.yml \
+            build.gradle \
+            settings.gradle \
+            gradlew \
+            gradle \
+            src \
+            monitoring \
+            build/libs/*.jar
+
+      - name: 5. EC2 서버로 배포 파일 전송 (SCP)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy.tar"
+          target: "/home/ubuntu"
+
+      - name: 6. EC2 서버에서 .env.prod 생성 및 도커 배포 재실행 (SSH)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu
+            tar -xvf deploy.tar
+            echo "${{ secrets.ENV_PROD }}" > .env.prod
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+            docker image prune -f
