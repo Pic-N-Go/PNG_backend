@@ -25,8 +25,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class BookmarkCollectionService {
 
-    // ponytail: Spring Security 연동 전까지 하드코딩 (스팟 상세 영역 공통 컨벤션)
-    private static final Long TEMP_USER_ID = 1L;
     private static final int MAX_COLLECTIONS = 5;
 
     // color/icon 허용 키 — 프론트 피커와 합의된 값. 추가되면 여기에만 반영하면 됨.
@@ -44,15 +42,15 @@ public class BookmarkCollectionService {
 
     // 시트 오픈용: 유저의 컬렉션 목록 + 각 컬렉션의 스팟 수 + 이 스팟 소속 여부(contains)
     @Transactional // 최초 접근 시 기본 컬렉션 자동 생성이 있어 쓰기 트랜잭션
-    public List<BookmarkCollectionResponse> getCollections(Long spotId) {
-        ensureDefaultCollection(TEMP_USER_ID);
+    public List<BookmarkCollectionResponse> getCollections(Long userId, Long spotId) {
+        ensureDefaultCollection(userId);
 
         Set<Long> containingIds = (spotId == null) ? Set.of()
-                : membershipRepository.findByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId).stream()
+                : membershipRepository.findByCollection_UserIdAndSpotId(userId, spotId).stream()
                         .map(m -> m.getCollection().getId())
                         .collect(Collectors.toSet());
 
-        return collectionRepository.findByUserIdOrderByCreatedAtAsc(TEMP_USER_ID).stream()
+        return collectionRepository.findByUserIdOrderByCreatedAtAsc(userId).stream()
                 .map(c -> BookmarkCollectionResponse.of(
                         c,
                         membershipRepository.countByCollectionId(c.getId()),
@@ -61,21 +59,21 @@ public class BookmarkCollectionService {
     }
 
     @Transactional
-    public BookmarkCollectionResponse createCollection(CreateCollectionRequest request) {
+    public BookmarkCollectionResponse createCollection(Long userId, CreateCollectionRequest request) {
         validateColorIcon(request.color(), request.icon());
         String name = request.name().trim(); // 프론트와 동일하게 trim 기준으로 비교/저장
 
-        if (collectionRepository.countByUserId(TEMP_USER_ID) >= MAX_COLLECTIONS) {
+        if (collectionRepository.countByUserId(userId) >= MAX_COLLECTIONS) {
             throw new CustomException(BookmarkErrorCode.COLLECTION_LIMIT_EXCEEDED);
         }
         // 순차 중복은 사전 체크로 깔끔하게 409
-        if (collectionRepository.existsByUserIdAndName(TEMP_USER_ID, name)) {
+        if (collectionRepository.existsByUserIdAndName(userId, name)) {
             throw new CustomException(BookmarkErrorCode.COLLECTION_NAME_DUPLICATE);
         }
 
         try {
             BookmarkCollection saved = collectionRepository.saveAndFlush(BookmarkCollection.builder()
-                    .userId(TEMP_USER_ID)
+                    .userId(userId)
                     .name(name)
                     .color(request.color())
                     .icon(request.icon())
@@ -89,21 +87,21 @@ public class BookmarkCollectionService {
 
     // 체크된 collectionIds 집합으로 이 스팟의 멤버십을 통째 동기화 (추가 + 제거)
     @Transactional
-    public void syncSpotCollections(Long spotId, List<Long> collectionIds) {
+    public void syncSpotCollections(Long userId, Long spotId, List<Long> collectionIds) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
         Set<Long> target = Set.copyOf(collectionIds);
 
         // 대상 컬렉션이 모두 이 유저 소유인지 검증
-        Set<Long> ownedIds = collectionRepository.findByUserId(TEMP_USER_ID).stream()
+        Set<Long> ownedIds = collectionRepository.findByUserId(userId).stream()
                 .map(BookmarkCollection::getId)
                 .collect(Collectors.toSet());
         if (!ownedIds.containsAll(target)) {
             throw new CustomException(BookmarkErrorCode.COLLECTION_NOT_FOUND);
         }
 
-        List<BookmarkCollectionSpot> current = membershipRepository.findByCollection_UserIdAndSpotId(TEMP_USER_ID, spotId);
+        List<BookmarkCollectionSpot> current = membershipRepository.findByCollection_UserIdAndSpotId(userId, spotId);
         Set<Long> currentIds = current.stream().map(m -> m.getCollection().getId()).collect(Collectors.toSet());
 
         // 제거: 현재 있으나 대상에 없는 것

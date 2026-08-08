@@ -27,19 +27,17 @@ import java.util.stream.IntStream;
 @Transactional(readOnly = true)
 public class ChecklistService {
 
-    // ponytail: Spring Security 연동 전까지 하드코딩
-    private static final Long TEMP_USER_ID = 1L;
     private static final int MAX_USER_ITEMS = 10;
 
     private final SpotRepository spotRepository;
     private final ChecklistItemRepository checklistItemRepository;
     private final HiddenChecklistDefaultRepository hiddenChecklistDefaultRepository;
 
-    public ChecklistResponse getChecklist(Long spotId) {
+    public ChecklistResponse getChecklist(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
-        Set<Integer> hiddenIds = hiddenChecklistDefaultRepository.findBySpotIdAndUserId(spotId, TEMP_USER_ID)
+        Set<Integer> hiddenIds = hiddenChecklistDefaultRepository.findBySpotIdAndUserId(spotId, userId)
                 .stream()
                 .map(HiddenChecklistDefault::getDefaultItemId)
                 .collect(Collectors.toSet());
@@ -51,7 +49,7 @@ public class ChecklistService {
                 .toList();
 
         List<ChecklistItemDto> userItems = checklistItemRepository
-                .findBySpotIdAndUserIdOrderByOrderIndex(spotId, TEMP_USER_ID)
+                .findBySpotIdAndUserIdOrderByOrderIndex(spotId, userId)
                 .stream()
                 .map(ChecklistItemDto::from)
                 .toList();
@@ -60,30 +58,31 @@ public class ChecklistService {
     }
 
     @Transactional
-    public void hideDefaultItem(Long spotId, Integer defaultItemId) {
+    public void hideDefaultItem(Long spotId, Integer defaultItemId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
         validateDefaultItemId(spot, defaultItemId);
 
         // ponytail: try-insert-then-catch-constraint-violation을 시도했으나 Hibernate flush 실패 후
-        // 세션이 unusable 상태가 되어 캐치해도 500이 나는 걸 확인함 (동시 중복 요청보다 이 회귀가 더 흔한 케이스).
-        // exists-check-then-insert로 되돌림 — 진짜 동시 요청 레이스는 현재 TEMP_USER_ID 단일 유저 환경에서 실질 위험 없음.
-        if (!hiddenChecklistDefaultRepository.existsBySpotIdAndUserIdAndDefaultItemId(spotId, TEMP_USER_ID, defaultItemId)) {
+        // 세션이 unusable 상태가 되어 캐치해도 500이 나는 걸 확인함.
+        // exists-check-then-insert로 되돌림 — 동시 중복 요청 레이스는 real-user 환경에서도
+        // 요청자 본인 세션 내 중복일 뿐이라 (user_id, spot_id, default_item_id) 유니크 제약이 최종 방어.
+        if (!hiddenChecklistDefaultRepository.existsBySpotIdAndUserIdAndDefaultItemId(spotId, userId, defaultItemId)) {
             hiddenChecklistDefaultRepository.save(HiddenChecklistDefault.builder()
                     .spot(spot)
-                    .userId(TEMP_USER_ID)
+                    .userId(userId)
                     .defaultItemId(defaultItemId)
                     .build());
         }
     }
 
     @Transactional
-    public void restoreDefaultItem(Long spotId, Integer defaultItemId) {
+    public void restoreDefaultItem(Long spotId, Integer defaultItemId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
         validateDefaultItemId(spot, defaultItemId);
 
-        hiddenChecklistDefaultRepository.deleteBySpotIdAndUserIdAndDefaultItemId(spotId, TEMP_USER_ID, defaultItemId);
+        hiddenChecklistDefaultRepository.deleteBySpotIdAndUserIdAndDefaultItemId(spotId, userId, defaultItemId);
     }
 
     private void validateDefaultItemId(Spot spot, Integer defaultItemId) {
@@ -94,11 +93,11 @@ public class ChecklistService {
     }
 
     @Transactional
-    public ChecklistItemDto addItem(Long spotId, ChecklistRequest request) {
+    public ChecklistItemDto addItem(Long spotId, ChecklistRequest request, Long userId) {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
-        List<ChecklistItem> userItems = checklistItemRepository.findBySpotIdAndUserIdOrderByOrderIndex(spotId, TEMP_USER_ID);
+        List<ChecklistItem> userItems = checklistItemRepository.findBySpotIdAndUserIdOrderByOrderIndex(spotId, userId);
         if (userItems.size() >= MAX_USER_ITEMS) {
             throw new CustomException(SpotErrorCode.CHECKLIST_LIMIT_EXCEEDED);
         }
@@ -110,7 +109,7 @@ public class ChecklistService {
 
         ChecklistItem item = ChecklistItem.builder()
                 .spot(spot)
-                .userId(TEMP_USER_ID)
+                .userId(userId)
                 .content(request.content())
                 .orderIndex(nextOrderIndex)
                 .build();
@@ -119,11 +118,11 @@ public class ChecklistService {
     }
 
     @Transactional
-    public void deleteItem(Long spotId, Long itemId) {
+    public void deleteItem(Long spotId, Long itemId, Long userId) {
         ChecklistItem item = checklistItemRepository.findById(itemId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.CHECKLIST_ITEM_NOT_FOUND));
 
-        if (!item.getSpot().getId().equals(spotId) || !TEMP_USER_ID.equals(item.getUserId())) {
+        if (!item.getSpot().getId().equals(spotId) || !userId.equals(item.getUserId())) {
             throw new CustomException(SpotErrorCode.CHECKLIST_ITEM_FORBIDDEN);
         }
 
