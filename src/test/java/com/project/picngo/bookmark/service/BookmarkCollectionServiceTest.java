@@ -4,6 +4,8 @@ import com.project.picngo.bookmark.domain.BookmarkCollection;
 import com.project.picngo.bookmark.dto.CreateCollectionRequest;
 import com.project.picngo.bookmark.repository.BookmarkCollectionRepository;
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
+import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.repository.SpotRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -70,11 +74,11 @@ class BookmarkCollectionServiceTest {
     @DisplayName("syncSpotCollections는 요청한 userId 소유 컬렉션 기준으로 멤버십을 조회한다")
     void syncSpotCollections_looksUpMembershipForRequestedUserId() {
         Long userId = 7L;
-        given(spotRepository.findById(100L)).willReturn(java.util.Optional.of(
-                com.project.picngo.spot.domain.Spot.builder()
+        given(spotRepository.findById(100L)).willReturn(Optional.of(
+                Spot.builder()
                         .name("스팟").address("주소").latitude(37.5).longitude(127.0)
-                        .categories(java.util.Set.of())
-                        .status(com.project.picngo.spot.domain.enums.SpotStatus.APPROVED)
+                        .categories(Set.of())
+                        .status(SpotStatus.APPROVED)
                         .build()));
         given(collectionRepository.findByUserId(userId)).willReturn(List.of());
         given(membershipRepository.findByCollection_UserIdAndSpotId(any(), any())).willReturn(List.of());
