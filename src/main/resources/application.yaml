@@ -68,10 +68,12 @@ weather:
 tour:
   api:
     key: ${PUBLIC_DATA_SERVICE_KEY}
+    base-url: ${TOUR_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
 
 air:
   quality:
     key: ${PUBLIC_DATA_SERVICE_KEY}
+    base-url: ${AIR_QUALITY_BASE_URL:https://apis.data.go.kr/B552584/ArpltnInforInqireSvc}
 
 kakao:
   rest:
@@ -79,6 +81,11 @@ kakao:
       key: ${KAKAO_REST_API_KEY}
   auth:
     user-info-url: https://kapi.kakao.com/v2/user/me
+  local-search:
+    # 부하테스트 시 지연 응답 목업 서버로 바꿔치기할 수 있도록 외부 설정으로 뺀다.
+    base-url: ${KAKAO_LOCAL_SEARCH_BASE_URL:https://dapi.kakao.com/v2/local/search/keyword.json}
+  directions:
+    base-url: ${KAKAO_DIRECTIONS_BASE_URL:https://apis-navi.kakaomobility.com/v1/directions}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -87,7 +94,8 @@ jwt:
 
 firebase:
   config:
-    path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
+    path: ${FIREBASE_CONFIG_PATH:file:secrets/firebase-key.json}
+
 
 websocket:
   allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
@@ -101,3 +109,13 @@ cloud:
     s3:
       bucket: ${AWS_S3_BUCKET}
       presigned-url-expiration-minutes: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
+
+management:
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+

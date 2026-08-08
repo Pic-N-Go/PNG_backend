@@ -1,0 +1,42 @@
+# 운영 프로파일. application.yaml(베이스) 위에 겹쳐진다(대체가 아니라 오버레이).
+# 활성화: SPRING_PROFILES_ACTIVE=prod
+#
+# 여기서 손대는 건 "값"이 아니라 "동작"이다. DB 접속정보·API 키 등은 이미
+# application.yaml에서 환경변수로 빠져 있어 운영에서도 그대로 쓰면 된다.
+
+spring:
+  jpa:
+    hibernate:
+      # validate: 운영 DB 스키마 자동 변경을 막고 기존 스키마 검증만 수행
+      ddl-auto: validate
+
+
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /picngo-team-api-data
+  swagger-ui:
+    enabled: true
+    path: /picngo-team-api-2026.html
+
+
+logging:
+  level:
+    root: WARN
+    com.project.picngo: INFO
+    # SQL 로깅은 show-sql: false로 이미 꺼지지만, 혹시 남아있는 DEBUG 카테고리도 명시적으로 잠근다
+    org.hibernate.SQL: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # actuator를 아직 안 붙였지만, 나중에 추가할 때 이 파일에서
+        # 헬스체크/메트릭만 열도록 미리 자리를 잡아둔다. 전부(*) 노출은 금지.
+        include: health, prometheus
+

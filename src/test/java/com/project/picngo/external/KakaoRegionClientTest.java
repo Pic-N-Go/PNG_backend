@@ -1,5 +1,6 @@
 package com.project.picngo.external;
 
+import com.project.picngo.external.config.ExternalApiCircuitBreakerConfig;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +24,12 @@ class KakaoRegionClientTest {
     void setUp() throws IOException {
         server = new MockWebServer();
         server.start();
-        client = new KakaoRegionClient(WebClient.builder(), "dummy-key", server.url("/").toString());
+        // 서킷 상태가 테스트 간에 새지 않도록 매 테스트마다 새 레지스트리를 만든다.
+        client = new KakaoRegionClient(
+                WebClient.builder(),
+                new ExternalApiCircuitBreakerConfig().externalApiCircuitBreakerRegistry(),
+                "dummy-key",
+                server.url("/").toString());
     }
 
     @AfterEach

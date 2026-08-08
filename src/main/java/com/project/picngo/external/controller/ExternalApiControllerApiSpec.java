@@ -2,6 +2,7 @@ package com.project.picngo.external.controller;
 
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
+import com.project.picngo.external.dto.PlaceSearchResult;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -44,5 +45,12 @@ public interface ExternalApiControllerApiSpec {
     ResponseEntity<GoldenHourResponse> getSpotGoldenHour(
             @Parameter(description = "명소 ID") @PathVariable Long id,
             @Parameter(description = "조회 날짜 (yyyy-MM-dd)") @RequestParam String date
+    );
+
+    @Operation(summary = "카카오 로컬 검색 (부하테스트/서킷브레이커 검증용)", description = "KakaoLocalSearchClient를 인증·코스 생성 없이 직접 호출합니다. 서킷브레이커 동작 확인용 엔드포인트입니다.")
+    ResponseEntity<PlaceSearchResult> searchLocal(
+            @Parameter(description = "검색어") @RequestParam String query,
+            @Parameter(description = "기준 위도") @RequestParam Double lat,
+            @Parameter(description = "기준 경도") @RequestParam Double lng
     );
 }

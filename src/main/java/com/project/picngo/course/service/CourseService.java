@@ -12,7 +12,10 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.course.dto.TravelTimeResult;
+import com.project.picngo.spot.dto.NavigationInfo;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +47,8 @@ public class CourseService {
     @Transactional
     public CourseResponse createCourse(Long userId, CourseCreateRequest request) {
         validateUserExists(userId);
-        
+        validateCourseDates(request.startDate(), request.endDate());
+
         Course course = Course.builder()
                 .userId(userId)
                 .title(request.title())
@@ -58,6 +62,14 @@ public class CourseService {
 
     public List<CourseResponse> getCourses(Long userId) {
         return courseRepository.findAllByUserId(userId).stream()
+                .sorted(java.util.Comparator
+                        // 1순위: 완료 여부 (진행예정/진행중: false -> 상단 배치, 완료: true -> 하단 배치)
+                        .comparing(Course::isCompleted)
+                        // 2순위: 시작 날짜가 빠른 순 (오름차순)
+                        .thenComparing(Course::getStartDate, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+                        // 3순위 (동률 시): 최신 생성 순 (내림차순)
+                        .thenComparing(Course::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
+                )
                 .map(this::toCourseResponse)
                 .toList();
     }
@@ -87,7 +99,8 @@ public class CourseService {
     public CourseResponse updateCourse(Long userId, Long courseId, CourseCreateRequest request) {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
-        
+        validateCourseDates(request.startDate(), request.endDate());
+
         course.update(request.title(), request.startDate(), request.endDate());
         return toCourseResponse(course);
     }
@@ -101,14 +114,13 @@ public class CourseService {
 
     // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
 
-    // ==================== 코스 스팟 관리 (Facade 전용 Internal) ====================
-
     @Transactional
     public void syncCourseSpots(Long userId, Long courseId, CourseSpotSyncRequest request) {
         Course course = findCourseOrThrow(courseId);
         validateCourseOwner(course, userId);
 
-        List<CourseSpotSyncItem> requestSpots = request.spots();
+        List<CourseSpotSyncItem> requestSpots = request.spots() != null ? request.spots() : List.of();
+        validateDaySpotLimits(requestSpots);
 
         // 1. 기존 전체 스팟 조회
         List<CourseSpot> existingSpots = course.getCourseSpots();
@@ -132,6 +144,8 @@ public class CourseService {
         Map<Long, CourseSpot> existingSpotMap = existingSpots.stream()
                 .collect(Collectors.toMap(CourseSpot::getId, cs -> cs));
 
+        validateNewSpotIdsExist(requestSpots, existingSpotMap);
+
         for (CourseSpotSyncItem item : requestSpots) {
             if (item.courseSpotId() != null && existingSpotMap.containsKey(item.courseSpotId())) {
                 // 기존 스팟 업데이트 (dayNumber, sequenceOrder, memo)
@@ -147,10 +161,38 @@ public class CourseService {
                         .memo(item.memo())
                         .travelTimeMinutes(null)
                         .build();
-                
+
                 CourseSpot saved = courseSpotRepository.save(newSpot);
                 course.getCourseSpots().add(saved);
             }
+        }
+    }
+
+    /**
+     * 신규로 추가될 항목의 spotId가 실제 존재하는 스팟인지 확인한다.
+     * course_spot.spot_id는 FK가 아니라 DB가 걸러주지 않는다. 검증 없이 저장하면
+     * 이름/주소/좌표가 전부 null인 유령 행이 조회할 때마다 응답에 섞여 나가고,
+     * 해당 구간 이동시간도 영구히 산출 불가로 남는다. 저장 전에 막는 편이 복구가 쉽다.
+     *
+     * 기존 항목은 dayNumber/순서/메모만 갱신하고 spotId를 건드리지 않으므로 검사 대상이 아니다.
+     */
+    private void validateNewSpotIdsExist(List<CourseSpotSyncItem> requestSpots,
+                                         Map<Long, CourseSpot> existingSpotMap) {
+        List<Long> newSpotIds = requestSpots.stream()
+                .filter(item -> item.courseSpotId() == null
+                        || !existingSpotMap.containsKey(item.courseSpotId()))
+                .map(CourseSpotSyncItem::spotId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (newSpotIds.isEmpty()) {
+            return;
+        }
+
+        // 개수만 비교하면 어떤 id가 없는지는 모르지만, 엔티티를 EAGER로 끌어오지 않아도 된다.
+        if (spotRepository.countByIdIn(newSpotIds) != newSpotIds.size()) {
+            throw new CustomException(SpotErrorCode.SPOT_NOT_FOUND);
         }
     }
 
@@ -164,11 +206,12 @@ public class CourseService {
     }
 
     @Transactional
-    public void updateTravelTimes(Long courseId, Map<Long, Integer> travelTimeUpdates) {
+    public void updateTravelTimes(Long courseId, Map<Long, TravelTimeResult> travelTimeUpdates) {
         Course course = findCourseOrThrow(courseId);
         course.getCourseSpots().forEach(spot -> {
-            if (travelTimeUpdates.containsKey(spot.getId())) {
-                spot.updateTravelTime(travelTimeUpdates.get(spot.getId()));
+            TravelTimeResult result = travelTimeUpdates.get(spot.getId());
+            if (result != null) {
+                spot.updateTravelTime(result.minutes(), result.estimated());
             }
         });
     }
@@ -258,6 +301,32 @@ public class CourseService {
         }
     }
 
+    private void validateCourseDates(java.time.LocalDate startDate, java.time.LocalDate endDate) {
+        if (startDate != null && endDate != null) {
+            if (startDate.isAfter(endDate)) {
+                throw new CustomException(CourseErrorCode.INVALID_COURSE_DATE_RANGE);
+            }
+            long days = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
+            if (days > 15) {
+                throw new CustomException(CourseErrorCode.EXCEEDED_MAX_COURSE_DAYS);
+            }
+        }
+    }
+
+    private void validateDaySpotLimits(List<CourseSpotSyncItem> requestSpots) {
+        if (requestSpots == null || requestSpots.isEmpty()) return;
+
+        Map<Integer, Long> countByDay = requestSpots.stream()
+                .filter(item -> item.dayNumber() != null)
+                .collect(Collectors.groupingBy(CourseSpotSyncItem::dayNumber, Collectors.counting()));
+
+        for (Map.Entry<Integer, Long> entry : countByDay.entrySet()) {
+            if (entry.getValue() > 10) {
+                throw new CustomException(CourseErrorCode.EXCEEDED_MAX_DAY_SPOTS);
+            }
+        }
+    }
+
     // ==================== Entity → DTO 변환 ====================
 
     private CourseResponse toCourseResponse(Course course) {
@@ -294,15 +363,18 @@ public class CourseService {
                 spot.getId(),
                 spot.getSpotId(),
                 actualSpot != null ? actualSpot.getName() : null,
+                actualSpot != null ? actualSpot.getAddress() : null,
                 actualSpot != null ? actualSpot.getLatitude() : null,
                 actualSpot != null ? actualSpot.getLongitude() : null,
+                NavigationInfo.of(actualSpot),
                 actualSpot != null ? actualSpot.getCategoryNames() : null,
                 actualSpot != null ? actualSpot.getThumbnailUrl() : null,
                 actualSpot != null ? actualSpot.getPhotogenicScore() : null,
                 spot.getDayNumber(),
                 spot.getSequenceOrder(),
                 spot.getMemo(),
-                spot.getTravelTimeMinutes()
+                spot.getTravelTimeMinutes(),
+                spot.isTravelTimeEstimated()
         );
     }
 

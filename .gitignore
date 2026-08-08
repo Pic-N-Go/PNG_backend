@@ -38,9 +38,17 @@ out/
 
 # 환경변수 및 민감한 키 파일
 .env
+.env.*
+!*.env.example
+!.env.*.example
 firebase-key.json
+secrets/
+*.pem
+deploy.tar
+
 
 .claude/
+
 CLAUDE.md
 
 # 팀 문서 (git 미추적)

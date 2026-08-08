@@ -50,6 +50,14 @@ public class Course extends BaseTimeEntity {
         this.startDate = startDate;
         this.endDate = endDate;
     }
+
+    /**
+     * 대한민국 시각(KST) 기준 오늘 날짜 이전에 종료된 코스인지 여부 반환 (완료된 코스: true)
+     */
+    public boolean isCompleted() {
+        if (this.endDate == null) return false;
+        return this.endDate.isBefore(LocalDate.now(java.time.ZoneId.of("Asia/Seoul")));
+    }
 }
 
 

@@ -23,8 +23,24 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
-        log.error("CustomException: {}", e.getMessage(), e);
         BaseErrorCode errorCode = e.getErrorCode();
+
+        // CustomException에는 스택트레이스를 남기지 않는다.
+        // 이 예외는 우리가 원인을 알고 직접 던지는 것이라, 스택이 알려주는 "어디서 던졌나"를
+        // 이미 에러코드와 메시지가 말해준다. 실제로 스택 96줄 중 우리 코드는 1~2줄이고
+        // 나머지는 매 요청 동일한 Spring Security 필터 체인이다.
+        // 외부 API 장애처럼 초당 수백 건이 쏟아지면 이 한 줄이 분당 수십 MB를 만든다
+        // (부하테스트 실측: 예외 1건당 96줄·13KB, 50초에 약 59MB).
+        //
+        // 심각도는 상태코드로 구분한다. 5xx는 서버 문제이므로 ERROR,
+        // 4xx는 정상적인 클라이언트 오류라 WARN이다.
+        // 예상 못 한 예외(NPE 등)의 스택은 아래 handleException이 그대로 남긴다.
+        if (errorCode.getStatus().is5xxServerError()) {
+            log.error("CustomException: {}", e.getMessage());
+        } else {
+            log.warn("CustomException: {}", e.getMessage());
+        }
+
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode));

@@ -164,4 +164,6 @@ order by s.photogenicScore desc, s.bookmarkCount desc
     );
 
     List<Spot> findByIdIn(List<Long> ids);
+
+    long countByIdIn(Collection<Long> ids);
 }

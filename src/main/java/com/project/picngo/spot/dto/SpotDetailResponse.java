@@ -13,6 +13,7 @@ public record SpotDetailResponse(
         String imageUrl,
         Double latitude,
         Double longitude,
+        NavigationInfo navigation,
         List<String> categories,
         String overview,
         List<String> tags,
@@ -67,7 +68,7 @@ public record SpotDetailResponse(
             Integer reviewCount,
             Long photoCount,
             Boolean isBookmarked,
-        Long myReviewId
+            Long myReviewId
     ) {
         return new SpotDetailResponse(
                 spot.getId(),
@@ -77,6 +78,7 @@ public record SpotDetailResponse(
                 spot.getImageUrl(),
                 spot.getLatitude(),
                 spot.getLongitude(),
+                NavigationInfo.of(spot),
                 spot.getCategoryNames(),
                 spot.getOverview(),
                 tags.stream().map(SpotTag::getTag).toList(),
