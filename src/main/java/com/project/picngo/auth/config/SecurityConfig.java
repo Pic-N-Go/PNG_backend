@@ -34,9 +34,13 @@ public class SecurityConfig {
             "/spots/**",
             "/bookmark-collections/**", // Spot Detail: TEMP_USER_ID 기반, 실 인증 연동 시 제거 필요
 
+            "/picngo-team-api-2026.html",
+            "/picngo-team-api-2026/**",
+            "/picngo-team-api-data/**",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",
+
 
             "/swagger-resources/**",
             "/ws",
