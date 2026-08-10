@@ -17,6 +17,9 @@ import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
 import com.project.picngo.spot.repository.*;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,11 +39,20 @@ public class SpotService {
 
     private static final int MAX_PAGE_SIZE = 50;
 
+    // 검색 계측 지표 이름. 버킷/SLO 설정은 application.yaml의 management.metrics.distribution에 있다.
+    private static final String SEARCH_TIMER = "spot.search.duration";
+    private static final String SEARCH_RESULT_COUNTER = "spot.search.result";
+    private static final String TYPE_KEYWORD = "keyword";
+    private static final String TYPE_MAP = "map";
+    private static final String PHASE_QUERY = "query";
+    private static final String PHASE_MAPPING = "mapping";
+
     private final SpotRepository spotRepository;
     private final SpotTagRepository spotTagRepository;
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
+    private final MeterRegistry meterRegistry;
 
     public SpotDetailResponse getSpotDetail(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
@@ -154,21 +166,28 @@ public class SpotService {
 
         List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(page, size, "latest");
+        boolean filtered = (spotCategories != null);
 
-        if (spotCategories == null) {
-            return spotRepository.searchSpots(
-                    keyword.trim(),
-                    SpotStatus.APPROVED,
-                    pageable
-            ).map(SpotResponse::from);
-        }
+        Timer.Sample querySample = Timer.start(meterRegistry);
+        Page<Spot> spots = filtered
+                ? spotRepository.searchSpotsByCategories(
+                        keyword.trim(),
+                        spotCategories,
+                        SpotStatus.APPROVED,
+                        pageable)
+                : spotRepository.searchSpots(
+                        keyword.trim(),
+                        SpotStatus.APPROVED,
+                        pageable);
+        querySample.stop(searchTimer(TYPE_KEYWORD, PHASE_QUERY, filtered));
 
-        return spotRepository.searchSpotsByCategories(
-                keyword.trim(),
-                spotCategories,
-                SpotStatus.APPROVED,
-                pageable
-        ).map(SpotResponse::from);
+        recordSearchOutcome(TYPE_KEYWORD, spots.getTotalElements());
+
+        Timer.Sample mappingSample = Timer.start(meterRegistry);
+        Page<SpotResponse> response = spots.map(SpotResponse::from);
+        mappingSample.stop(searchTimer(TYPE_KEYWORD, PHASE_MAPPING, filtered));
+
+        return response;
     }
 
     private Pageable createPageable(int page, int size, String sort) {
@@ -231,27 +250,67 @@ public class SpotService {
 
         List<SpotCategory> spotCategories = parseCategories(request.category());
         Pageable mapPageable = PageRequest.of(0, request.getSizeOrDefault());
+        boolean filtered = (spotCategories != null);
 
-        List<Spot> spots = (spotCategories == null)
-                ? spotRepository.findSpotsInMapBounds(
-                        request.southWestLat(),
-                        request.southWestLng(),
-                        request.northEastLat(),
-                        request.northEastLng(),
-                        SpotStatus.APPROVED,
-                        mapPageable)
-                : spotRepository.findSpotsInMapBoundsByCategories(
+        Timer.Sample querySample = Timer.start(meterRegistry);
+        List<Spot> spots = filtered
+                ? spotRepository.findSpotsInMapBoundsByCategories(
                         request.southWestLat(),
                         request.southWestLng(),
                         request.northEastLat(),
                         request.northEastLng(),
                         spotCategories,
                         SpotStatus.APPROVED,
+                        mapPageable)
+                : spotRepository.findSpotsInMapBounds(
+                        request.southWestLat(),
+                        request.southWestLng(),
+                        request.northEastLat(),
+                        request.northEastLng(),
+                        SpotStatus.APPROVED,
                         mapPageable);
+        querySample.stop(searchTimer(TYPE_MAP, PHASE_QUERY, filtered));
 
-        return spots.stream()
+        recordSearchOutcome(TYPE_MAP, spots.size());
+
+        Timer.Sample mappingSample = Timer.start(meterRegistry);
+        List<SpotMapResponse> response = spots.stream()
                 .map(SpotMapResponse::from)
                 .toList();
+        mappingSample.stop(searchTimer(TYPE_MAP, PHASE_MAPPING, filtered));
+
+        return response;
+    }
+
+    // 검색 지연을 쿼리 구간과 DTO 매핑 구간으로 쪼개서 잰다.
+    // 매핑 구간에도 DB 시간이 섞이는 게 정상이다 - Spot.categories가 LAZY라
+    // SpotResponse.from()의 getCategoryNames()에서 스팟마다 추가 select가 나간다.
+    // 두 구간을 나눠 재야 "검색 SQL 자체가 느린 것"과 "N+1이 느린 것"을 구분할 수 있고,
+    // 이 구분이 없으면 어떤 개선(인덱스 / fetch join / 스토리지 교체)이 유효한지 알 수 없다.
+    //
+    // filtered 태그를 붙이는 이유: 카테고리 필터가 붙으면 컬렉션 상관 서브쿼리가
+    // 추가돼서 실행 계획이 완전히 달라진다. 한 계열로 섞으면 두 분포가 겹쳐 보인다.
+    // 태그는 전부 저카디널리티 값만 쓴다(검색어를 태그로 넣으면 시계열이 폭발한다).
+    private Timer searchTimer(String type, String phase, boolean filtered) {
+        return Timer.builder(SEARCH_TIMER)
+                .description("스팟 검색 처리 시간")
+                .tag("type", type)
+                .tag("phase", phase)
+                .tag("filtered", String.valueOf(filtered))
+                .register(meterRegistry);
+    }
+
+    // 결과가 0건인 검색의 비율.
+    // LIKE '%키워드%' 기반 검색은 오타/동의어/의미 검색을 원리적으로 못 잡는데,
+    // 이건 인덱스를 붙여도 해결되지 않는 한계라 응답 속도와는 별개로 추적해야 한다.
+    // "검색 요청의 N%가 0건 반환"이 검색 방식 자체를 바꿀지 판단하는 근거가 된다.
+    private void recordSearchOutcome(String type, long resultCount) {
+        Counter.builder(SEARCH_RESULT_COUNTER)
+                .description("스팟 검색 결과 유무")
+                .tag("type", type)
+                .tag("outcome", resultCount == 0 ? "zero" : "hit")
+                .register(meterRegistry)
+                .increment();
     }
 
     private void validateMapBounds(

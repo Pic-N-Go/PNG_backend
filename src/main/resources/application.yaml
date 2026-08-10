@@ -120,6 +120,23 @@ management:
   metrics:
     tags:
       application: ${spring.application.name}
+    distribution:
+      # 히스토그램 버킷을 켜야 프로메테우스에서 histogram_quantile()로 p95/p99를 뽑을 수 있다.
+      # 이 설정이 없으면 count/sum/max만 노출돼서 사실상 평균밖에 못 본다
+      # (평균 31ms는 p99가 2초여도 나올 수 있는 값이라 성능 판단 근거가 되지 못한다).
+      percentiles-histogram:
+        http.server.requests: true
+        spot.search.duration: true
+      # SLO 경계값은 별도 버킷으로 잡히므로, 여기 적은 값들이 곧 대시보드에서
+      # "요청의 몇 %가 이 시간 안에 끝났는가"를 오차 없이 뽑을 수 있는 지점이 된다.
+      # 검색 API 목표: p95 < 200ms, p99 < 500ms.
+      slo:
+        http.server.requests: 50ms, 100ms, 200ms, 500ms, 1s, 3s
+        spot.search.duration: 10ms, 50ms, 100ms, 200ms, 500ms, 1s
+      # 상한을 안 정하면 마지막 버킷 위쪽이 전부 +Inf로 뭉쳐서 꼬리 구간 분해능이 사라진다.
+      maximum-expected-value:
+        http.server.requests: 10s
+        spot.search.duration: 5s
   endpoints:
     web:
       exposure:
