@@ -86,13 +86,13 @@ public class SpotAlertService {
 
     @Transactional
     public SpotAlertActiveResponse updateSpotAlertActive(Long userId, Long spotId, SpotAlertActiveUpdateRequest request) {
-        validateUserExists(userId);
         SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
                 .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
 
         spotAlert.updateActive(request.isAlertEnabled());
         return new SpotAlertActiveResponse(spotAlert.getSpotId(), spotAlert.getIsActive());
     }
+
 
 
     @Transactional

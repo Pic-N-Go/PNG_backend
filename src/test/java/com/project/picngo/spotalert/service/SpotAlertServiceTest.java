@@ -67,7 +67,6 @@ class SpotAlertServiceTest {
                 .longitude(127.0371)
                 .build();
 
-        given(userRepository.existsById(userId)).willReturn(true);
         given(spotAlertRepository.findByUserIdAndSpotId(userId, spotId)).willReturn(Optional.of(spotAlert));
 
         SpotAlertActiveUpdateRequest request = new SpotAlertActiveUpdateRequest(false);
@@ -82,7 +81,6 @@ class SpotAlertServiceTest {
         assertThat(spotAlert.getIsActive()).isFalse();
     }
 
-
     @Test
     @DisplayName("존재하지 않는 출사알림의 상태 변경 시 예외가 발생한다")
     void updateSpotAlertActive_notFound_throwsException() {
@@ -90,8 +88,8 @@ class SpotAlertServiceTest {
         Long userId = 1L;
         Long spotId = 999L;
 
-        given(userRepository.existsById(userId)).willReturn(true);
         given(spotAlertRepository.findByUserIdAndSpotId(userId, spotId)).willReturn(Optional.empty());
+
 
         SpotAlertActiveUpdateRequest request = new SpotAlertActiveUpdateRequest(true);
 
