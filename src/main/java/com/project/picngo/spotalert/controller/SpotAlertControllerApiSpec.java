@@ -32,11 +32,12 @@ public interface SpotAlertControllerApiSpec {
     );
 
     @Operation(summary = "개별 출사알림 켜기/끄기 (ON/OFF)", description = "특정 스팟의 출사알림 활성화 여부(isAlertEnabled / isActive)를 켜거나 끕니다.")
-    ResponseEntity<SpotAlertSettingResponse> updateSpotAlertActive(
+    ResponseEntity<SpotAlertActiveResponse> updateSpotAlertActive(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long spotId,
             @RequestBody SpotAlertActiveUpdateRequest request
     );
+
 
     @Operation(summary = "출사알림에서 장소 제거", description = "특정 스팟을 출사알림에서 완전히 삭제합니다.")
     ResponseEntity<Void> deleteSpotAlert(

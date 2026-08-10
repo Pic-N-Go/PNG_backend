@@ -69,20 +69,19 @@ class SpotAlertServiceTest {
 
         given(userRepository.existsById(userId)).willReturn(true);
         given(spotAlertRepository.findByUserIdAndSpotId(userId, spotId)).willReturn(Optional.of(spotAlert));
-        given(spotRepository.findById(spotId)).willReturn(Optional.of(spot));
-        given(spotTagRepository.findBySpotId(spotId)).willReturn(Collections.emptyList());
-        given(weatherCacheService.getCached7DayForecast(anyDouble(), anyDouble(), anyString())).willReturn(Collections.emptyList());
 
         SpotAlertActiveUpdateRequest request = new SpotAlertActiveUpdateRequest(false);
 
         // when
-        SpotAlertSettingResponse response = spotAlertService.updateSpotAlertActive(userId, spotId, request);
+        com.project.picngo.spotalert.dto.SpotAlertActiveResponse response = spotAlertService.updateSpotAlertActive(userId, spotId, request);
 
         // then
         assertThat(response).isNotNull();
+        assertThat(response.spotId()).isEqualTo(spotId);
         assertThat(response.isAlertEnabled()).isFalse();
         assertThat(spotAlert.getIsActive()).isFalse();
     }
+
 
     @Test
     @DisplayName("존재하지 않는 출사알림의 상태 변경 시 예외가 발생한다")

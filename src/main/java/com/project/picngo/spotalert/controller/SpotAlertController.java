@@ -39,12 +39,13 @@ public class SpotAlertController implements SpotAlertControllerApiSpec {
     }
 
     @PatchMapping("/{spotId}/active")
-    public ResponseEntity<SpotAlertSettingResponse> updateSpotAlertActive(
+    public ResponseEntity<SpotAlertActiveResponse> updateSpotAlertActive(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long spotId,
             @Valid @RequestBody SpotAlertActiveUpdateRequest request) {
         return ResponseEntity.ok(spotAlertService.updateSpotAlertActive(userDetails.getId(), spotId, request));
     }
+
 
     @DeleteMapping("/{spotId}")
     public ResponseEntity<Void> deleteSpotAlert(
