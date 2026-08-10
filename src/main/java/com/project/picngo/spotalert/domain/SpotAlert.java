@@ -79,4 +79,10 @@ public class SpotAlert extends BaseTimeEntity {
         this.alertTimingDays = alertTimingDays != null ? alertTimingDays : 0;
         this.isActive = isActive != null ? isActive : true;
     }
+
+    public void updateActive(boolean isActive) {
+        this.isActive = isActive;
+    }
 }
+
+

@@ -50,28 +50,28 @@ public class NotificationScheduler {
     // 해당 시간에 스케줄러가 돌아가며, 조건이 맞는 스팟들에 대해 알림 발송
 
     // 22시에 새벽 알림 발송
-    @Scheduled(cron = "0 0 22 * * *")
+    @Scheduled(cron = "0 0 22 * * *", zone = "Asia/Seoul")
     public void scheduleDawnNotification() {
         log.info("새벽(DAWN) 알림 스케줄러 실행...");
         processFixedTimeNotification(TimeCondition.DAWN);
     }
 
     // 4시에 오전 알림 발송
-    @Scheduled(cron = "0 0 4 * * *")
+    @Scheduled(cron = "0 0 4 * * *", zone = "Asia/Seoul")
     public void scheduleMorningNotification() {
         log.info("오전(MORNING) 알림 스케줄러 실행...");
         processFixedTimeNotification(TimeCondition.MORNING);
     }
 
     // 11시에 오후 알림 발송
-    @Scheduled(cron = "0 0 11 * * *")
+    @Scheduled(cron = "0 0 11 * * *", zone = "Asia/Seoul")
     public void scheduleAfternoonNotification() {
         log.info("오후(AFTERNOON) 알림 스케줄러 실행...");
         processFixedTimeNotification(TimeCondition.AFTERNOON);
     }
 
     // 16시에 야간 알림 발송
-    @Scheduled(cron = "0 0 16 * * *")
+    @Scheduled(cron = "0 0 16 * * *", zone = "Asia/Seoul")
     public void scheduleNightNotification() {
         log.info("야간(NIGHT) 알림 스케줄러 실행...");
         processFixedTimeNotification(TimeCondition.NIGHT);
@@ -80,18 +80,19 @@ public class NotificationScheduler {
     // [B. 동적 시간대(골든아워) 스케줄러]
 
     // 일출 스케줄러 (04:00 ~ 08:00 사이 매 10분마다 실행)
-    @Scheduled(cron = "0 0/10 4-8 * * *")
+    @Scheduled(cron = "0 0/10 4-8 * * *", zone = "Asia/Seoul")
     public void scheduleSunriseNotification() {
         log.info("일출(SUNRISE) 임박 알림 스케줄러 실행...");
         processGoldenHourNotification(TimeCondition.SUNRISE);
     }
 
     // 일몰 스케줄러 (16:00 ~ 20:00 사이 매 10분마다 실행)
-    @Scheduled(cron = "0 0/10 16-20 * * *")
+    @Scheduled(cron = "0 0/10 16-20 * * *", zone = "Asia/Seoul")
     public void scheduleSunsetNotification() {
         log.info("일몰(SUNSET) 임박 알림 스케줄러 실행...");
         processGoldenHourNotification(TimeCondition.SUNSET);
     }
+
 
     // --- 공통 로직 ---
 

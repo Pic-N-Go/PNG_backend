@@ -33,6 +33,9 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
 
+  jackson:
+    time-zone: Asia/Seoul
+
   jpa:
     defer-datasource-initialization: true
     hibernate:
@@ -45,6 +48,9 @@ spring:
         format_sql: true
         # spot.categories 등 @ElementCollection/연관 지연로딩 N+1 방지 (목록 조회 시 IN 절로 일괄 로딩)
         default_batch_fetch_size: 100
+        jdbc:
+          time_zone: Asia/Seoul
+
   data:
     redis:
       host: ${REDIS_HOST:localhost}
