@@ -85,12 +85,23 @@ public class SpotAlertService {
     }
 
     @Transactional
+    public SpotAlertSettingResponse updateSpotAlertActive(Long userId, Long spotId, SpotAlertActiveUpdateRequest request) {
+        validateUserExists(userId);
+        SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
+                .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+
+        spotAlert.updateActive(request.isAlertEnabled());
+        return convertToResponse(spotAlert);
+    }
+
+    @Transactional
     public void deleteSpotAlert(Long userId, Long spotId) {
         validateUserExists(userId);
         SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
                 .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
         spotAlertRepository.delete(spotAlert);
     }
+
 
     private void validateUserExists(Long userId) {
         if (!userRepository.existsById(userId)) {
