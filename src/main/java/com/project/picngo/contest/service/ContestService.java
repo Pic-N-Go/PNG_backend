@@ -64,9 +64,6 @@ public class ContestService {
 
     // 지난 콘테스트 목록 조회
     public ContestPastPageResponse getPastContests(Long userId, Pageable pageable){
-        User user = getUser(userId);
-        LocalDateTime now = LocalDateTime.now();
-
         Page<Contest> contests = contestRepository.findAll(pageable);
 
         Page<ContestPastResponse> responses = contests
