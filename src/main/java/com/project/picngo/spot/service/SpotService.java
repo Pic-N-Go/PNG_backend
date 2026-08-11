@@ -3,7 +3,6 @@ package com.project.picngo.spot.service;
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
-import com.project.picngo.spot.domain.ChecklistMapper;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.domain.enums.ReviewTag;
@@ -52,7 +51,6 @@ public class SpotService {
                 .limit(3)
                 .map(row -> ((ReviewTag) row[0]).name())
                 .toList();
-        List<String> checklist = ChecklistMapper.getChecklist(spot.getCat3());
 
         List<Object[]> rows = reviewRepository.findAvgAndCountBySpotId(spotId);
         Double avgRating = rows.isEmpty() || rows.get(0)[0] == null ? null : (Double) rows.get(0)[0];
@@ -65,7 +63,7 @@ public class SpotService {
                 : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
 
         return SpotDetailResponse.of(
-                spot, tags, reviewTags, checklist,
+                spot, tags, reviewTags,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
                 reviewCount, photoCount, isBookmarked, myReviewId
         );

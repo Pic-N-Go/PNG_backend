@@ -24,7 +24,7 @@
 | 지도 확장형 | GET | /chats/{spotId}/preview | 스팟 채팅 미리보기 (최근 3줄) | 소영재 | 미시작 |
 | 지도 확장형 | GET | /chats/{spotId}/participants/count | 현재 채팅 참여 인원 | 소영재 | 미시작 |
 | 검색 결과 | GET | /spots/search | 통합 검색 (키워드/카테고리) | 이예인 | 미시작 |
-| 스팟 상세 | GET | /spots/{id} | 스팟 상세 정보 조회 (체크리스트 포함) | 박예은 | 완료 |
+| 스팟 상세 | GET | /spots/{id} | 스팟 상세 정보 조회 | 박예은 | 완료 |
 | 스팟 상세 | GET | /spots/{id}/photogenic-score | 포토제닉 지수 계산 (시즌 반영, 날씨/미세먼지 대기) | 박예은 | 진행중 |
 | 스팟 상세 | GET | /spots/{id}/photos | 스팟 사진 목록 | 소영재 | 미시작 |
 | 스팟 상세 | GET | /spots/{id}/reviews | 스팟 리뷰 목록 | 박예은 | 완료 |

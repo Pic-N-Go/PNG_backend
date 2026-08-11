@@ -74,9 +74,8 @@ public class SecurityConfig {
 					.requestMatchers(HttpMethod.POST, "/spots/*/reviews").authenticated()
 					.requestMatchers(HttpMethod.PUT, "/reviews/**").authenticated()
 					.requestMatchers(HttpMethod.DELETE, "/reviews/**").authenticated()
-					// 북마크·체크리스트는 사용자별 데이터라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
+					// 북마크는 사용자별 데이터라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 					.requestMatchers("/spots/*/bookmark-collections").authenticated()
-					.requestMatchers("/spots/*/checklist/**").authenticated()
 					.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll()
 					.requestMatchers("/tour-api/**").permitAll(); // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
