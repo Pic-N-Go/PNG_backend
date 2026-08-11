@@ -381,7 +381,7 @@ public class ContestService {
         Contest contest = getContestById(contestId);
         ContestPhase phase = contest.getPhase(LocalDateTime.now());
 
-        if (!canShowRanking(phase)) {
+        if (!canShowRankingHistory(phase)) {
             throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
         }
 
@@ -560,6 +560,10 @@ public class ContestService {
 
     private boolean canShowRanking(ContestPhase phase) {
         return phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
+    }
+
+    private boolean canShowRankingHistory(ContestPhase phase) {
+        return phase == ContestPhase.VOTING || phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
     }
 
     private Integer calculateRank(Contest contest, ContestEntry targetEntry) {
