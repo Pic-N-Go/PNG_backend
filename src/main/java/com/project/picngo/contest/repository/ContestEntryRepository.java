@@ -24,5 +24,5 @@ public interface ContestEntryRepository extends JpaRepository<ContestEntry, Long
     long countByContest(Contest contest);
 
     // 콘테스트별 참여자 수 조회
-    long countDistinctUsersByContest(Contest contest);
+    long countDistinctUserByContest(Contest contest);
 }
