@@ -48,6 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -88,6 +89,7 @@ public class ContestService {
 
     // 지난 콘테스트 목록 조회
     public ContestPastPageResponse getPastContests(Long userId, Pageable pageable) {
+        User user = getUser(userId);
         Page<Contest> contests = contestRepository.findAllByResultOpenAtBeforeOrderByResultOpenAtDesc(
                 LocalDateTime.now(),
                 pageable
@@ -97,7 +99,8 @@ public class ContestService {
             int entryCount = (int) contestEntryRepository.countByContest(contest);
             long participantCount = contestEntryRepository.countDistinctUserByContest(contest);
             int totalVoteCount = (int) contestVoteRepository.countByContest(contest);
-            ContestEntry winner = findTopEntries(contest).stream().findFirst().orElse(null);
+            List<ContestEntry> rankedEntries = findRankedEntries(contest);
+            ContestEntry winner = rankedEntries.stream().findFirst().orElse(null);
 
             return new ContestPastResponse(
                     contest.getId(),
@@ -106,7 +109,7 @@ public class ContestService {
                     entryCount,
                     participantCount,
                     totalVoteCount,
-                    null,
+                    findMyBestRank(rankedEntries, contest, user),
                     winner != null ? winner.getUser().getNickname() : null
             );
         });
@@ -413,15 +416,12 @@ public class ContestService {
             throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
         }
 
-        List<ContestEntry> rankedEntries = findTopEntries(contest);
-        List<ContestResultResponse.ResultEntry> rankings = rankedEntries.stream()
-                .limit(5)
-                .map(entry -> toResultEntry(contest, entry))
-                .toList();
+        List<ContestEntry> rankedEntries = findRankedEntries(contest);
+        List<ContestResultResponse.ResultEntry> rankings = toResultEntries(contest, rankedEntries, 5);
 
         ContestEntry winner = rankedEntries.stream().findFirst().orElse(null);
         ContestEntry myBestEntry = contestEntryRepository.findAllByContestAndUser(contest, user).stream()
-                .min(Comparator.comparing(entry -> calculateRank(contest, entry)))
+                .min(Comparator.comparing(entry -> rankOf(rankedEntries, entry)))
                 .orElse(null);
 
         return new ContestResultResponse(
@@ -430,8 +430,8 @@ public class ContestService {
                 (int) contestEntryRepository.countByContest(contest),
                 contestEntryRepository.countDistinctUserByContest(contest),
                 (int) contestVoteRepository.countByContest(contest),
-                winner != null ? toResultEntry(contest, winner) : null,
-                myBestEntry != null ? toResultEntry(contest, myBestEntry) : null,
+                winner != null ? toResultEntry(contest, winner, 1) : null,
+                myBestEntry != null ? toResultEntry(contest, myBestEntry, rankOf(rankedEntries, myBestEntry)) : null,
                 rankings
         );
     }
@@ -516,9 +516,9 @@ public class ContestService {
         );
     }
 
-    private ContestResultResponse.ResultEntry toResultEntry(Contest contest, ContestEntry entry) {
+    private ContestResultResponse.ResultEntry toResultEntry(Contest contest, ContestEntry entry, int rank) {
         return new ContestResultResponse.ResultEntry(
-                calculateRank(contest, entry),
+                rank,
                 entry.getId(),
                 imageStorageService.getPresignedUrl(entry.getPhotoUrl()),
                 entry.getUser().getNickname(),
@@ -527,6 +527,20 @@ public class ContestService {
                 entry.getSpotName(),
                 entry.getVoteCount()
         );
+    }
+
+    private List<ContestResultResponse.ResultEntry> toResultEntries(
+            Contest contest,
+            List<ContestEntry> rankedEntries,
+            int limit
+    ) {
+        List<ContestResultResponse.ResultEntry> responses = new ArrayList<>();
+
+        for (int i = 0; i < rankedEntries.size() && i < limit; i++) {
+            responses.add(toResultEntry(contest, rankedEntries.get(i), i + 1));
+        }
+
+        return responses;
     }
 
     private Sort resolveEntrySort(String sort) {
@@ -543,18 +557,21 @@ public class ContestService {
     }
 
     private Integer calculateRank(Contest contest, ContestEntry targetEntry) {
-        List<ContestEntry> entries = findTopEntries(contest);
+        int rank = rankOf(findRankedEntries(contest), targetEntry);
+        return rank == Integer.MAX_VALUE ? null : rank;
+    }
 
+    private int rankOf(List<ContestEntry> entries, ContestEntry targetEntry) {
         for (int i = 0; i < entries.size(); i++) {
             if (entries.get(i).getId().equals(targetEntry.getId())) {
                 return i + 1;
             }
         }
 
-        return null;
+        return Integer.MAX_VALUE;
     }
 
-    private List<ContestEntry> findTopEntries(Contest contest) {
+    private List<ContestEntry> findRankedEntries(Contest contest) {
         return contestEntryRepository.findAllByContest(contest, Pageable.unpaged())
                 .getContent()
                 .stream()
@@ -563,6 +580,14 @@ public class ContestService {
                                 .thenComparing(ContestEntry::getCreatedAt)
                 )
                 .toList();
+    }
+
+    private Integer findMyBestRank(List<ContestEntry> rankedEntries, Contest contest, User user) {
+        return contestEntryRepository.findAllByContestAndUser(contest, user).stream()
+                .map(entry -> rankOf(rankedEntries, entry))
+                .filter(rank -> rank != Integer.MAX_VALUE)
+                .min(Integer::compareTo)
+                .orElse(null);
     }
 
     private Contest getContestById(Long contestId) {
