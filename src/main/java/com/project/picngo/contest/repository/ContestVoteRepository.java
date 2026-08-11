@@ -23,6 +23,12 @@ public interface ContestVoteRepository extends JpaRepository<ContestVote, Long> 
     // 내가 투표한 출품작 목록 조회
     List<ContestVote> findAllByContestAndUser(Contest contest, User user);
 
+    // 콘테스트 전체 투표 내역 조회
+    List<ContestVote> findAllByContest(Contest contest);
+
+    // 콘테스트 전체 투표 수 조회
+    long countByContest(Contest contest);
+
     // 출품작의 투표 내역 삭제
     void deleteAllByEntry(ContestEntry entry);
 }
