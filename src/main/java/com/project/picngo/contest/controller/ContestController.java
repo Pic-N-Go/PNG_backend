@@ -4,6 +4,7 @@ import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.contest.dto.ContestCreateEntryRequest;
 import com.project.picngo.contest.dto.ContestEntryDetailResponse;
 import com.project.picngo.contest.dto.ContestEntryPageResponse;
+import com.project.picngo.contest.dto.ContestEntryResponse;
 import com.project.picngo.contest.dto.ContestMyEntryResponse;
 import com.project.picngo.contest.dto.ContestMyHistoryResponse;
 import com.project.picngo.contest.dto.ContestMyVoteResponse;
@@ -26,7 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
-public class ContestController {
+public class ContestController implements ContestControllerApiSpec {
 
     private final ContestService contestService;
 
@@ -75,7 +76,7 @@ public class ContestController {
 
     // 출품작 등록
     @PostMapping(value = "/contests/{contestId}/entries", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> createEntry(
+    public ResponseEntity<ContestEntryResponse> createEntry(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long contestId,
             @Valid @RequestPart("request") ContestCreateEntryRequest request,
