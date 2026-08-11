@@ -135,13 +135,13 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
         ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        boolean showRanking = canShowRanking(phase);
 
         Page<ContestEntry> entries = contestEntryRepository.findAllByContest(
                 contest,
-                PageRequest.of(page, size, resolveEntrySort(sort))
+                PageRequest.of(page, size, resolveEntrySort(sort, showRanking))
         );
 
-        boolean showRanking = canShowRanking(phase);
         List<ContestEntryResponse> responses = entries.getContent().stream()
                 .map(entry -> toEntryResponse(contest, entry, user, showRanking))
                 .toList();
@@ -367,7 +367,9 @@ public class ContestService {
                 .min(Integer::compareTo)
                 .orElse(null);
 
+        LocalDateTime now = LocalDateTime.now();
         long totalVoteCount = entries.stream()
+                .filter(entry -> canShowRanking(entry.getContest().getPhase(now)))
                 .mapToLong(ContestEntry::getVoteCount)
                 .sum();
 
@@ -378,6 +380,10 @@ public class ContestService {
     public ContestRankingHistoryResponse getRankingHistory(Long contestId) {
         Contest contest = getContestById(contestId);
         ContestPhase phase = contest.getPhase(LocalDateTime.now());
+
+        if (!canShowRanking(phase)) {
+            throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
+        }
 
         List<ContestRankingSnapshot> snapshots = rankingSnapshotRepository
                 .findAllByContestOrderBySnapshotDateAscRankAsc(contest);
@@ -543,8 +549,8 @@ public class ContestService {
         return responses;
     }
 
-    private Sort resolveEntrySort(String sort) {
-        if ("votes".equalsIgnoreCase(sort)) {
+    private Sort resolveEntrySort(String sort, boolean showRanking) {
+        if (showRanking && "votes".equalsIgnoreCase(sort)) {
             return Sort.by(Sort.Direction.DESC, "voteCount")
                     .and(Sort.by(Sort.Direction.ASC, "createdAt"));
         }
