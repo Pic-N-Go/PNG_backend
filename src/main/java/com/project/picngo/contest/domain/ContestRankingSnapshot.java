@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
                 )
         }
 )
-// 매일 자정에 집계된 순위 기록하는 도메인
 public class ContestRankingSnapshot {
 
     @Id

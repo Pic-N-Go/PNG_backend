@@ -49,6 +49,12 @@ public class Contest {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
     public ContestPhase getPhase(LocalDateTime now) {
         if (now.isBefore(submitEndAt)) {
             return ContestPhase.SUBMITTING;
@@ -63,5 +69,16 @@ public class Contest {
         }
 
         return ContestPhase.ENDED;
+    }
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

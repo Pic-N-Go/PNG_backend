@@ -26,6 +26,7 @@ public class ContestEntry {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    // S3 object key 저장
     @Column(nullable = false, length = 500)
     private String photoUrl;
 
