@@ -1,7 +1,10 @@
 package com.project.picngo.auth.service;
 
+import com.project.picngo.auth.domain.AccessTokenValidationResult;
 import com.project.picngo.user.domain.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,24 +65,42 @@ public class JwtTokenProvider {
     }
 
     public boolean validateAccessToken(String token) {
-        return validateTokenType(token, ACCESS);
+        return validateAccessTokenResult(token) == AccessTokenValidationResult.VALID;
     }
 
     public boolean validateRefreshToken(String token) {
         return validateTokenType(token, REFRESH);
     }
 
-	private boolean validateTokenType(String token, String expectedType) {
+    public AccessTokenValidationResult validateAccessTokenResult(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            String tokenType = claims.get(TOKEN_TYPE, String.class);
 
-		try {
-			Claims claims = parseClaims(token);
+            if (!ACCESS.equals(tokenType)) {
+                return AccessTokenValidationResult.INVALID;
+            }
+
+            return AccessTokenValidationResult.VALID;
+        } catch (ExpiredJwtException ex) {
+            String tokenType = ex.getClaims().get(TOKEN_TYPE, String.class);
+
+            return ACCESS.equals(tokenType) ? AccessTokenValidationResult.EXPIRED : AccessTokenValidationResult.INVALID;
+        } catch (JwtException | IllegalArgumentException ex) {
+            return AccessTokenValidationResult.INVALID;
+        }
+    }
+
+    private boolean validateTokenType(String token, String expectedType) {
+        try {
+            Claims claims = parseClaims(token);
             String actualType = claims.get(TOKEN_TYPE, String.class);
 
             return expectedType.equals(actualType);
-		} catch (RuntimeException ex) {
-			return false;
-		}
-	}
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
 
 	public long getAccessTokenExpirationSeconds() {
 		return accessTokenExpirationSeconds;
