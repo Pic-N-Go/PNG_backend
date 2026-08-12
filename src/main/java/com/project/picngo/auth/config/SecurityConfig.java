@@ -1,6 +1,7 @@
 package com.project.picngo.auth.config;
 
 import com.project.picngo.auth.service.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -91,6 +92,20 @@ public class SecurityConfig {
 
 				auth.anyRequest().authenticated();
 			})
+			.exceptionHandling(exception -> exception
+				.authenticationEntryPoint(
+					(request, response, authException) ->
+						response.sendError(
+							HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다."
+						)
+				)
+				.accessDeniedHandler(
+					(request, response, accessDeniedException) ->
+						response.sendError(
+							HttpServletResponse.SC_FORBIDDEN, "접근 권한이 없습니다."
+						)
+				)
+			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 			.build();
 	}
