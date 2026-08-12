@@ -88,6 +88,33 @@ class ChatSocketControllerTest {
     }
 
     @Test
+    @DisplayName("퇴장 요청 채팅방이 세션 채팅방과 다르면 요청을 거부한다")
+    void leaveRejectsMismatchedSessionSpotId() {
+        CustomUserDetails userDetails = mock(CustomUserDetails.class);
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(userDetails);
+        SimpMessageHeaderAccessor accessor = mock(SimpMessageHeaderAccessor.class);
+        Map<String, Object> sessionAttributes = new HashMap<>();
+        sessionAttributes.put("spotId", 7L);
+        when(accessor.getSessionAttributes()).thenReturn(sessionAttributes);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> controller.leave(8L, authentication, accessor)
+        );
+
+        verify(chatParticipantService, never()).leave(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong()
+        );
+        verify(chatParticipantService, never()).getParticipantCount(
+                org.mockito.ArgumentMatchers.anyLong()
+        );
+        org.mockito.Mockito.verifyNoInteractions(messagingTemplate);
+        org.junit.jupiter.api.Assertions.assertEquals(7L, sessionAttributes.get("spotId"));
+    }
+
+    @Test
     @DisplayName("인증되지 않은 사용자는 메시지를 보낼 수 없다")
     void sendMessageRejectsUnauthenticatedPrincipal() {
         ChatMessageSendRequest request = new ChatMessageSendRequest("안녕하세요");
