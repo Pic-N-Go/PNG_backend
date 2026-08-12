@@ -69,24 +69,24 @@ public class ApiSecurityTest {
     // ========== 1. 인증 없이 API 호출 시 엄격하게 차단되는지 검증 ==========
 
     @Test
-    @DisplayName("알림 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    @DisplayName("알림 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 알림_API_토큰_없이_호출시_차단() throws Exception {
         mockMvc.perform(get("/notifications"))
-                .andExpect(status().isForbidden()); // 엄격하게 401(Unauthorized)만 허용
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("출사알림 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    @DisplayName("출사알림 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 출사알림_API_토큰_없이_호출시_차단() throws Exception {
         mockMvc.perform(get("/spot-alerts")) // 오타가 났다면 404가 떠서 이 테스트는 실패함
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("코스 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    @DisplayName("코스 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 코스_API_토큰_없이_호출시_차단() throws Exception {
         mockMvc.perform(get("/courses"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     // ========== 2. 유효한 인증 정보로 API 호출 시 정상 통과되는지 검증 ==========
@@ -157,36 +157,36 @@ public class ApiSecurityTest {
         );
 
         mockMvc.perform(multipart("/posts").file(request).file(image))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("북마크 컬렉션 목록 조회 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    @DisplayName("북마크 컬렉션 목록 조회 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 북마크_컬렉션_목록_조회_API_토큰_없이_호출시_차단() throws Exception {
         mockMvc.perform(get("/bookmark-collections"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("스팟 북마크 컬렉션 동기화 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    @DisplayName("스팟 북마크 컬렉션 동기화 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 스팟_북마크_컬렉션_동기화_API_토큰_없이_호출시_차단() throws Exception {
         mockMvc.perform(put("/spots/1/bookmark-collections")
                         .contentType(APPLICATION_JSON)
                         .content("{\"collectionIds\":[]}"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("스팟 체크리스트 조회 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    @DisplayName("스팟 체크리스트 조회 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 스팟_체크리스트_조회_API_토큰_없이_호출시_차단() throws Exception {
         // /spots/*/checklist/** 는 뒤에 추가 세그먼트가 없는 /spots/1/checklist 도 매치해야 한다.
         // 매처를 잘못 좁히면(예: /spots/*/checklist/*) 이 요청은 인증 필터를 통과해 404가 떠서 이 테스트는 실패함
         mockMvc.perform(get("/spots/1/checklist"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
-    // 위의 403(토큰 없음) 테스트들의 짝꿍: 유효한 인증 정보로 호출하면 실제로 통과되는지 검증
-    // (라우트 매처를 너무 넓게 잡아 항상 403만 나던 회귀나, 주소 오타로 인한 404 은폐를 막는다)
+    // 위의 401(토큰 없음) 테스트들의 짝꿍: 유효한 인증 정보로 호출하면 실제로 통과되는지 검증
+    // (라우트 매처를 너무 넓게 잡아 항상 401만 나던 회귀나, 주소 오타로 인한 404 은폐를 막는다)
 
     @Test
     @DisplayName("북마크 컬렉션 목록 조회 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
