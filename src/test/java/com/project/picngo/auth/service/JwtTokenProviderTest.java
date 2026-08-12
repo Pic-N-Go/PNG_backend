@@ -1,5 +1,6 @@
 package com.project.picngo.auth.service;
 
+import com.project.picngo.auth.domain.AccessTokenValidationResult;
 import com.project.picngo.user.domain.Role;
 import com.project.picngo.user.domain.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,10 +41,31 @@ class JwtTokenProviderTest {
         String refreshToken = jwtTokenProvider.createRefreshToken(user);
 
         assertThat(jwtTokenProvider.validateAccessToken(accessToken)).isTrue();
+        assertThat(jwtTokenProvider.validateAccessTokenResult(accessToken))
+                .isEqualTo(AccessTokenValidationResult.VALID);
         assertThat(jwtTokenProvider.validateRefreshToken(accessToken)).isFalse();
         assertThat(jwtTokenProvider.validateRefreshToken(refreshToken)).isTrue();
         assertThat(jwtTokenProvider.validateAccessToken(refreshToken)).isFalse();
+        assertThat(jwtTokenProvider.validateAccessTokenResult(refreshToken))
+                .isEqualTo(AccessTokenValidationResult.INVALID);
         assertThat(jwtTokenProvider.getUserId(refreshToken)).isEqualTo(1L);
         assertThat(jwtTokenProvider.getTokenId(refreshToken)).isNotBlank();
+    }
+
+    @Test
+    @DisplayName("만료된 액세스 토큰을 구분한다")
+    void identifiesExpiredAccessToken() {
+        ReflectionTestUtils.setField(jwtTokenProvider, "accessTokenExpirationSeconds", -1L);
+        String expiredToken = jwtTokenProvider.createAccessToken(user);
+
+        assertThat(jwtTokenProvider.validateAccessTokenResult(expiredToken))
+                .isEqualTo(AccessTokenValidationResult.EXPIRED);
+    }
+
+    @Test
+    @DisplayName("위조되거나 형식이 잘못된 액세스 토큰을 구분한다")
+    void identifiesInvalidAccessToken() {
+        assertThat(jwtTokenProvider.validateAccessTokenResult("invalid-token"))
+                .isEqualTo(AccessTokenValidationResult.INVALID);
     }
 }

@@ -12,12 +12,16 @@ import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.SpotSource;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.repository.SpotRepository;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
@@ -25,13 +29,18 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -42,6 +51,9 @@ public class ApiSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Value("${jwt.secret}")
+    private String jwtSecret;
 
     // Firebase 설정
     @MockitoBean
@@ -72,7 +84,43 @@ public class ApiSecurityTest {
     @DisplayName("알림 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
     void 알림_API_토큰_없이_호출시_차단() throws Exception {
         mockMvc.perform(get("/notifications"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_REQUIRED"))
+                .andExpect(jsonPath("$.message").value("액세스 토큰이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("알림 API - 만료된 액세스 토큰이면 만료 에러 코드를 반환한다")
+    void 알림_API_만료된_액세스_토큰으로_호출시_만료_코드_반환() throws Exception {
+        String expiredAccessToken = createToken("ACCESS", Instant.now().minusSeconds(1));
+
+        mockMvc.perform(get("/notifications")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + expiredAccessToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_EXPIRED"))
+                .andExpect(jsonPath("$.message").value("액세스 토큰이 만료되었습니다."));
+    }
+
+    @Test
+    @DisplayName("알림 API - 위조된 액세스 토큰이면 유효하지 않은 토큰 코드를 반환한다")
+    void 알림_API_위조된_액세스_토큰으로_호출시_유효하지_않은_토큰_코드_반환() throws Exception {
+        mockMvc.perform(get("/notifications")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_INVALID"))
+                .andExpect(jsonPath("$.message").value("유효하지 않은 액세스 토큰입니다."));
+    }
+
+    @Test
+    @DisplayName("알림 API - 리프레시 토큰을 인증에 사용하면 유효하지 않은 토큰 코드를 반환한다")
+    void 알림_API_리프레시_토큰으로_호출시_유효하지_않은_토큰_코드_반환() throws Exception {
+        String refreshToken = createToken("REFRESH", Instant.now().plusSeconds(60));
+
+        mockMvc.perform(get("/notifications")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + refreshToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("ACCESS_TOKEN_INVALID"))
+                .andExpect(jsonPath("$.message").value("유효하지 않은 액세스 토큰입니다."));
     }
 
     @Test
@@ -219,5 +267,20 @@ public class ApiSecurityTest {
     void 스팟_상세_조회_API_토큰_없이_호출시_차단되지_않음() throws Exception {
         mockMvc.perform(get("/spots/1"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
+    }
+
+    private String createToken(String tokenType, Instant expiration) {
+        Instant now = Instant.now();
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject("test@example.com")
+                .claim("userId", 1L)
+                .claim("role", "USER")
+                .claim("tokenType", tokenType)
+                .issuedAt(Date.from(now.minusSeconds(10)))
+                .expiration(Date.from(expiration))
+                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .compact();
     }
 }
