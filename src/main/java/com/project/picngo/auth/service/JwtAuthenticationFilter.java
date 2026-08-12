@@ -1,5 +1,7 @@
 package com.project.picngo.auth.service;
 
+import com.project.picngo.auth.domain.AccessTokenValidationResult;
+import com.project.picngo.common.exception.code.AuthErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +20,7 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private static final String BEARER_PREFIX = "Bearer ";
+	public static final String AUTH_ERROR_CODE_ATTRIBUTE = "AUTH_ERROR_CODE";
 
 	private final JwtTokenProvider jwtTokenProvider;
 	private final CustomUserDetailsService userDetailsService;
@@ -30,19 +33,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	) throws ServletException, IOException {
 		String token = resolveToken(request);
 
-		if (token != null && jwtTokenProvider.validateAccessToken(token)) {
-			Long userId = jwtTokenProvider.getUserId(token);
-			CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserById(userId);
-			UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+		if (token == null) {
+			request.setAttribute(AUTH_ERROR_CODE_ATTRIBUTE, AuthErrorCode.ACCESS_TOKEN_REQUIRED);
+
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+		AccessTokenValidationResult result = jwtTokenProvider.validateAccessTokenResult(token);
+
+		switch (result) {
+			case VALID -> setAuthentication(token);
+
+			case EXPIRED -> request.setAttribute(
+				AUTH_ERROR_CODE_ATTRIBUTE,
+				AuthErrorCode.ACCESS_TOKEN_EXPIRED
+			);
+
+			case INVALID -> request.setAttribute(
+				AUTH_ERROR_CODE_ATTRIBUTE,
+				AuthErrorCode.ACCESS_TOKEN_INVALID
+			);
+		}
+
+		filterChain.doFilter(request, response);
+	}
+
+	private void setAuthentication(String token) {
+		Long userId = jwtTokenProvider.getUserId(token);
+
+		CustomUserDetails userDetails = (CustomUserDetails) userDetailsService.loadUserById(userId);
+
+		UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
 				userDetails,
 				null,
 				userDetails.getAuthorities()
 			);
 
-			SecurityContextHolder.getContext().setAuthentication(authentication);
-		}
-
-		filterChain.doFilter(request, response);
+		SecurityContextHolder.getContext().setAuthentication(authentication);
 	}
 
 	private String resolveToken(HttpServletRequest request) {

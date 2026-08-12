@@ -1,6 +1,7 @@
 package com.project.picngo.auth.config;
 
 import com.project.picngo.auth.service.JwtAuthenticationFilter;
+import com.project.picngo.auth.service.JwtAuthenticationEntryPoint;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,9 +53,8 @@ public class SecurityConfig {
             "/actuator/prometheus"
     };
 
-
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
 	// loadtest 프로파일에서만 존재하는 빈. 운영에서는 비어 있어 아무 엔드포인트도 열리지 않는다.
 	private final ObjectProvider<LoadTestPublicEndpoints> loadTestPublicEndpoints;
@@ -93,12 +93,7 @@ public class SecurityConfig {
 				auth.anyRequest().authenticated();
 			})
 			.exceptionHandling(exception -> exception
-				.authenticationEntryPoint(
-					(request, response, authException) ->
-						response.sendError(
-							HttpServletResponse.SC_UNAUTHORIZED, "인증이 필요합니다."
-						)
-				)
+				.authenticationEntryPoint(jwtAuthenticationEntryPoint)
 				.accessDeniedHandler(
 					(request, response, accessDeniedException) ->
 						response.sendError(
