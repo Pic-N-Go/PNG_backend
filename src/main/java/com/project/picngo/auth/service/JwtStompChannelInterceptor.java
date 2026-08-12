@@ -59,7 +59,7 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
 
         String token = authorization.substring(BEARER_PREFIX.length());
 
-        if (!jwtTokenProvider.validateToken(token)) {
+        if (!jwtTokenProvider.validateAccessToken(token)) {
             throw new AccessDeniedException("유효하지 않은 WebSocket 인증 토큰입니다.");
         }
 
