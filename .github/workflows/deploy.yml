@@ -50,14 +50,31 @@ jobs:
           target: "/home/ubuntu"
 
       - name: 6. EC2 서버에서 .env.prod 생성 및 도커 배포 재실행 (SSH)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          set -e
+
             cd /home/ubuntu
+
+            # 이전 배포에서 남은 소스 제거
+            # .env.prod와 secrets 디렉터리는 보존
+            rm -rf \
+              /home/ubuntu/src \
+              /home/ubuntu/gradle \
+              /home/ubuntu/monitoring \
+              /home/ubuntu/build
+
             tar -xvf deploy.tar
+
             echo "${{ secrets.ENV_PROD }}" > .env.prod
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+            docker compose \
+              -f docker-compose.prod.yml \
+              --env-file .env.prod \
+              up -d --build
+
             docker image prune -f
