@@ -73,7 +73,7 @@ public class Spot extends BaseTimeEntity {
     @Column(name = "category", length = 50)
     private Set<SpotCategory> categories = new HashSet<>();
 
-    @Comment("TourAPI cat3 소분류 코드. 체크리스트 매핑에 사용 (예: A0201=해수욕장)")
+    @Comment("TourAPI cat3 소분류 코드. 카테고리 태깅·시즌 보너스 매핑에 사용 (예: A01011200=해변)")
     @Column(length = 10)
     private String cat3;
 

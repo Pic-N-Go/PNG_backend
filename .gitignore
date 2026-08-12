@@ -58,3 +58,4 @@ docs/spot-category-set-progress.md
 .DS_Store
 picngo_spots.sql
 docs/superpowers/
+.superpowers/

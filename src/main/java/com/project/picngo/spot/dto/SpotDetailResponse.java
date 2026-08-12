@@ -20,7 +20,6 @@ public record SpotDetailResponse(
         List<String> reviewTags,
         ConvenienceInfo convenience,
         StatsInfo stats,
-        List<String> checklist,
         Boolean isBookmarked,
         Long myReviewId
 ) {
@@ -63,7 +62,6 @@ public record SpotDetailResponse(
             Spot spot,
             List<SpotTag> tags,
             List<String> reviewTags,
-            List<String> checklist,
             Double avgRating,
             Integer reviewCount,
             Long photoCount,
@@ -85,7 +83,6 @@ public record SpotDetailResponse(
                 reviewTags,
                 ConvenienceInfo.from(spot),
                 new StatsInfo(avgRating, reviewCount, photoCount),
-                checklist,
                 isBookmarked,
                 myReviewId
         );

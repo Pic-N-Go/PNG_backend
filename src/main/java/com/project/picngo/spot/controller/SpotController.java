@@ -2,7 +2,6 @@ package com.project.picngo.spot.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.*;
-import com.project.picngo.spot.service.ChecklistService;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
@@ -30,7 +29,6 @@ public class SpotController implements SpotControllerApiSpec {
     private final SpotService spotService;
     private final ReviewService reviewService;
     private final PhotogenicService photogenicService;
-    private final ChecklistService checklistService;
 
     @GetMapping
     public ResponseEntity<Page<SpotResponse>> getSpots(
@@ -121,37 +119,6 @@ public class SpotController implements SpotControllerApiSpec {
     @GetMapping("/{id}/photos")
     public ResponseEntity<SpotPhotoResponse> getSpotPhotos(@PathVariable Long id) {
         return ResponseEntity.ok(spotService.getSpotPhotos(id));
-    }
-
-    @GetMapping("/{id}/checklist")
-    public ResponseEntity<ChecklistResponse> getChecklist(@PathVariable Long id) {
-        return ResponseEntity.ok(checklistService.getChecklist(id));
-    }
-
-    @PostMapping("/{id}/checklist")
-    public ResponseEntity<ChecklistResponse.ChecklistItemDto> addChecklistItem(
-            @PathVariable Long id,
-            @Valid @RequestBody ChecklistRequest request
-    ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(checklistService.addItem(id, request));
-    }
-
-    @DeleteMapping("/{id}/checklist/{itemId}")
-    public ResponseEntity<Void> deleteChecklistItem(@PathVariable Long id, @PathVariable Long itemId) {
-        checklistService.deleteItem(id, itemId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @DeleteMapping("/{id}/checklist/default/{defaultItemId}")
-    public ResponseEntity<Void> hideDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
-        checklistService.hideDefaultItem(id, defaultItemId);
-        return ResponseEntity.noContent().build();
-    }
-
-    @PostMapping("/{id}/checklist/default/{defaultItemId}/restore")
-    public ResponseEntity<Void> restoreDefaultChecklistItem(@PathVariable Long id, @PathVariable Integer defaultItemId) {
-        checklistService.restoreDefaultItem(id, defaultItemId);
-        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value ="/{id}/reviews", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

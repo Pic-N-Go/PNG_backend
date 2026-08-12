@@ -1,5 +1,6 @@
 package com.project.picngo.spot.service;
 
+import com.project.picngo.common.event.SpotCreatedEvent;
 import com.project.picngo.external.dto.TourApiImageResponse.ImageItem;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse.Item;
@@ -12,6 +13,7 @@ import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.repository.SpotPhotoRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class SpotUpsertService {
 
     private final SpotRepository spotRepository;
     private final SpotPhotoRepository spotPhotoRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void upsertSpot(Item item, Item detail, IntroItem intro, List<ImageItem> images) {
@@ -44,32 +47,35 @@ public class SpotUpsertService {
                     );
                     existing.updateCategories(categories);
                     return existing;
-                }).orElseGet(
-                () -> spotRepository.save(Spot.builder()
-                        .name(item.title())
-                        .address(trim(item.addr1()) + (item.addr2() != null ? " " + item.addr2().trim() : ""))
-                        .zipcode(item.zipcode())
-                        .overview(overview)
-                        .latitude(parseDouble(item.mapy()))
-                        .longitude(parseDouble(item.mapx()))
-                        .categories(categories)
-                        .cat3(item.cat3())
-                        .source(SpotSource.TOUR_API)
-                        .badge(true)
-                        .tourContentId(item.contentid())
-                        .imageUrl(item.firstimage())
-                        .thumbnailUrl(item.firstimage2())
-                        .status(SpotStatus.APPROVED)
-                        .parking(intro != null ? intro.parking() : null)
-                        .usetime(intro != null ? intro.usetime() : null)
-                        .restdate(intro != null ? intro.restdate() : null)
-                        .infocenter(intro != null ? intro.infocenter() : null)
-                        .strollerAccess(intro != null ? intro.chkbabycarriage() : null)
-                        .petFriendly(intro != null ? intro.chkpet() : null)
-                        .wheelchairAccess(intro != null ? intro.chkhandicap() : null)
-                        .build())
-        );
+                }).orElseGet(() -> {
+            Spot createdSpot = spotRepository.save(Spot.builder()
+                    .name(item.title())
+                    .address(trim(item.addr1()) + (item.addr2() != null ? " " + item.addr2().trim() : ""))
+                    .zipcode(item.zipcode())
+                    .overview(overview)
+                    .latitude(parseDouble(item.mapy()))
+                    .longitude(parseDouble(item.mapx()))
+                    .categories(categories)
+                    .cat3(item.cat3())
+                    .source(SpotSource.TOUR_API)
+                    .badge(true)
+                    .tourContentId(item.contentid())
+                    .imageUrl(item.firstimage())
+                    .thumbnailUrl(item.firstimage2())
+                    .status(SpotStatus.APPROVED)
+                    .parking(intro != null ? intro.parking() : null)
+                    .usetime(intro != null ? intro.usetime() : null)
+                    .restdate(intro != null ? intro.restdate() : null)
+                    .infocenter(intro != null ? intro.infocenter() : null)
+                    .strollerAccess(intro != null ? intro.chkbabycarriage() : null)
+                    .petFriendly(intro != null ? intro.chkpet() : null)
+                    .wheelchairAccess(intro != null ? intro.chkhandicap() : null)
+                    .build());
 
+            eventPublisher.publishEvent(new SpotCreatedEvent(createdSpot.getId()));
+
+            return createdSpot;
+        });
         syncTourPhotos(spot, images);
     }
 

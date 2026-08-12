@@ -14,3 +14,5 @@ public class PicngoApplication {
 		SpringApplication.run(PicngoApplication.class, args);
 	}
 }
+
+

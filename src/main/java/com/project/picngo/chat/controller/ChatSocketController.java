@@ -83,11 +83,11 @@ public class ChatSocketController {
     ) {
         CustomUserDetails userDetails = getUserDetails(principal);
 
+        Map<String, Object> sessionAttributes = validateSessionAttributes(spotId, headerAccessor);
+
         chatParticipantService.leave(spotId, userDetails.getId());
 
-        if (headerAccessor.getSessionAttributes() != null) {
-            headerAccessor.getSessionAttributes().remove("spotId");
-        }
+       sessionAttributes.remove("spotId");
 
         long participantCount = chatParticipantService.getParticipantCount(spotId);
 
@@ -100,5 +100,18 @@ public class ChatSocketController {
             throw new AccessDeniedException("인증된 사용자만 채팅을 사용할 수 있습니다.");
         }
         return userDetails;
+    }
+
+    private Map<String, Object> validateSessionAttributes(Long requestSpotId, SimpMessageHeaderAccessor headerAccessor) {
+        Map<String, Object> sessionAttributes = headerAccessor.getSessionAttributes();
+
+        if (sessionAttributes == null || !(sessionAttributes.get("spotId") instanceof Long sessionSpotId)) {
+            throw new AccessDeniedException("채팅 세션 정보를 찾을 수 없습니다.");
+        }
+
+        if (!sessionSpotId.equals(requestSpotId)) {
+            throw new AccessDeniedException("현재 참여 중인 채팅방과 퇴장 요청 채팅방이 일치하지 않습니다.");
+        }
+        return sessionAttributes;
     }
 }

@@ -23,6 +23,7 @@ import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Collections;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -149,5 +150,39 @@ public class ApiSecurityTest {
 
         mockMvc.perform(multipart("/posts").file(request).file(image))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("북마크 컬렉션 목록 조회 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    void 북마크_컬렉션_목록_조회_API_토큰_없이_호출시_차단() throws Exception {
+        mockMvc.perform(get("/bookmark-collections"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("스팟 북마크 컬렉션 동기화 API - 토큰 없이 호출하면 403 권한 없음 에러가 발생한다")
+    void 스팟_북마크_컬렉션_동기화_API_토큰_없이_호출시_차단() throws Exception {
+        mockMvc.perform(put("/spots/1/bookmark-collections")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"collectionIds\":[]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    // 위의 403(토큰 없음) 테스트들의 짝꿍: 유효한 인증 정보로 호출하면 실제로 통과되는지 검증
+    // (라우트 매처를 너무 넓게 잡아 항상 403만 나던 회귀나, 주소 오타로 인한 404 은폐를 막는다)
+
+    @Test
+    @DisplayName("북마크 컬렉션 목록 조회 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
+    void 북마크_컬렉션_목록_조회_API_유효한_인증으로_호출시_정상_응답() throws Exception {
+        mockMvc.perform(get("/bookmark-collections")
+                        .with(authentication(createMockAuthToken())))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("스팟 상세 조회 API - 토큰 없이 호출해도 403으로 차단되지 않는다 (공개 API)")
+    void 스팟_상세_조회_API_토큰_없이_호출시_차단되지_않음() throws Exception {
+        mockMvc.perform(get("/spots/1"))
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
     }
 }

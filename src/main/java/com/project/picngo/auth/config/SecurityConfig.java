@@ -32,7 +32,6 @@ public class SecurityConfig {
             "/version/check",
             "/categories",
             "/spots/**",
-            "/bookmark-collections/**", // Spot Detail: TEMP_USER_ID 기반, 실 인증 연동 시 제거 필요
 
             "/picngo-team-api-2026.html",
             "/picngo-team-api-2026/**",
@@ -75,6 +74,8 @@ public class SecurityConfig {
 					.requestMatchers(HttpMethod.POST, "/spots/*/reviews").authenticated()
 					.requestMatchers(HttpMethod.PUT, "/reviews/**").authenticated()
 					.requestMatchers(HttpMethod.DELETE, "/reviews/**").authenticated()
+					// 북마크는 사용자별 데이터라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
+					.requestMatchers("/spots/*/bookmark-collections").authenticated()
 					.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
 					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll()
 					.requestMatchers("/tour-api/**").permitAll(); // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
