@@ -3,6 +3,10 @@ package com.project.picngo.spot.service;
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
+import com.project.picngo.spot.config.SearchEngine;
+import com.project.picngo.spot.config.SearchProperties;
+import com.project.picngo.spot.config.SqlCountingStatementInspector;
+import com.project.picngo.spot.domain.FullTextKeyword;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.domain.enums.ReviewTag;
@@ -17,6 +21,7 @@ import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
 import com.project.picngo.spot.repository.*;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +46,13 @@ public class SpotService {
     // 검색 계측 지표 이름. 버킷/SLO 설정은 application.yaml의 management.metrics.distribution에 있다.
     private static final String SEARCH_TIMER = "spot.search.duration";
     private static final String SEARCH_RESULT_COUNTER = "spot.search.result";
+    private static final String SEARCH_SQL_COUNT = "spot.search.sql.count";
+    private static final String SEARCH_RESULT_SIZE = "spot.search.result.size";
+    private static final String SEARCH_STAGE_COUNTER = "spot.search.stage";
+    private static final String STAGE_PRIMARY = "primary";
+    private static final String STAGE_NORMALIZED = "normalized";
+    private static final String STAGE_SIMILAR = "similar";
+    private static final String STAGE_NONE = "none";
     private static final String TYPE_KEYWORD = "keyword";
     private static final String TYPE_MAP = "map";
     private static final String PHASE_QUERY = "query";
@@ -52,6 +64,7 @@ public class SpotService {
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
     private final MeterRegistry meterRegistry;
+    private final SearchProperties searchProperties;
 
     public SpotDetailResponse getSpotDetail(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
@@ -163,29 +176,134 @@ public class SpotService {
         }
 
         List<SpotCategory> spotCategories = parseCategories(category);
-        Pageable pageable = createPageable(page, size, "latest");
         boolean filtered = (spotCategories != null);
 
-        Timer.Sample querySample = Timer.start(meterRegistry);
-        Page<Spot> spots = filtered
-                ? spotRepository.searchSpotsByCategories(
-                        keyword.trim(),
-                        spotCategories,
-                        SpotStatus.APPROVED,
-                        pageable)
-                : spotRepository.searchSpots(
-                        keyword.trim(),
-                        SpotStatus.APPROVED,
-                        pageable);
-        querySample.stop(searchTimer(TYPE_KEYWORD, PHASE_QUERY, filtered));
+        SqlCountingStatementInspector.start();
+        try {
+            Timer.Sample querySample = Timer.start(meterRegistry);
+            Page<Spot> spots = searchInStages(keyword.trim(), spotCategories, page, size);
+            querySample.stop(searchTimer(TYPE_KEYWORD, PHASE_QUERY, filtered));
 
-        recordSearchOutcome(TYPE_KEYWORD, spots.getTotalElements());
+            recordSearchOutcome(TYPE_KEYWORD, spots.getTotalElements());
 
-        Timer.Sample mappingSample = Timer.start(meterRegistry);
-        Page<SpotResponse> response = spots.map(SpotResponse::from);
-        mappingSample.stop(searchTimer(TYPE_KEYWORD, PHASE_MAPPING, filtered));
+            Timer.Sample mappingSample = Timer.start(meterRegistry);
+            Page<SpotResponse> response = spots.map(SpotResponse::from);
+            mappingSample.stop(searchTimer(TYPE_KEYWORD, PHASE_MAPPING, filtered));
 
-        return response;
+            recordResultSize(TYPE_KEYWORD, response.getNumberOfElements(), filtered);
+            return response;
+        } finally {
+            // 예외가 나도 ThreadLocal은 반드시 정리해야 한다. 남겨두면 요청 스레드가
+            // 재사용될 때 다음 요청의 카운트가 이어서 올라간다.
+            recordSqlCount(TYPE_KEYWORD, filtered);
+        }
+    }
+
+    // 검색을 단계로 나눈다. 앞 단계가 0건일 때만 다음 단계로 물러난다.
+    //
+    //   primary     현재 방식(LIKE 또는 FULLTEXT) 그대로
+    //   normalized  띄어쓰기와 문장부호를 무시하고 재시도
+    //   similar     정확히 일치하는 게 없으니 가장 비슷한 것 (오타 흡수)
+    //
+    // 단계별로 나눠두면 층을 하나씩 얹으면서 골든셋으로 유형별 개선폭을 따로 잴 수 있다.
+    // 그리고 어느 단계에서 결과가 나왔는지 세어두면 "이 층이 실제로 쓰이긴 하나"에 답할 수 있다.
+    // 폴백은 앞 단계가 빈 결과일 때만 도는 추가 쿼리라, 정상 검색의 비용은 그대로다.
+    private Page<Spot> searchInStages(String keyword, List<SpotCategory> categories, int page, int size) {
+        Page<Spot> primary = (searchProperties.getEngine() == SearchEngine.FULLTEXT)
+                ? searchByFullText(keyword, categories, page, size)
+                : searchByLike(keyword, categories, page, size);
+
+        if (!primary.isEmpty()) {
+            recordSearchStage(STAGE_PRIMARY);
+            return primary;
+        }
+
+        if (searchProperties.isNormalizeFallback()) {
+            Page<Spot> normalized = searchByNormalized(keyword, categories, page, size);
+            if (!normalized.isEmpty()) {
+                recordSearchStage(STAGE_NORMALIZED);
+                return normalized;
+            }
+        }
+
+        if (searchProperties.isSimilarFallback()) {
+            Page<Spot> similar = searchBySimilarity(keyword, categories, page, size);
+            if (!similar.isEmpty()) {
+                recordSearchStage(STAGE_SIMILAR);
+                return similar;
+            }
+        }
+
+        recordSearchStage(STAGE_NONE);
+        return primary;
+    }
+
+    // 마지막 수단. 정확히 일치하는 게 없을 때 가장 비슷한 것을 돌려준다.
+    // 앞 단계들과 달리 "포함하는가"가 아니라 "얼마나 겹치는가"로 찾으므로
+    // 오타가 섞여도 원본을 잡아낼 수 있다. 대신 엉뚱한 결과도 섞인다.
+    private Page<Spot> searchBySimilarity(String keyword, List<SpotCategory> categories, int page, int size) {
+        String terms = FullTextKeyword.toSimilarityTerms(keyword);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
+        if (terms == null) {
+            return Page.empty(pageable);
+        }
+
+        if (categories == null) {
+            return spotRepository.searchSpotsSimilar(terms, SpotStatus.APPROVED.name(), pageable);
+        }
+
+        List<String> categoryNames = categories.stream().map(SpotCategory::name).toList();
+        return spotRepository.searchSpotsSimilarByCategories(
+                terms, categoryNames, SpotStatus.APPROVED.name(), pageable);
+    }
+
+    // 띄어쓰기 무시 검색. 대상 컬럼(search_norm)이 공백을 뺀 값이라 검색어에서도 뺀다.
+    private Page<Spot> searchByNormalized(String keyword, List<SpotCategory> categories, int page, int size) {
+        String phrase = FullTextKeyword.toSpacelessPhrase(keyword);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
+        if (phrase == null) {
+            return Page.empty(pageable);
+        }
+
+        if (categories == null) {
+            return spotRepository.searchSpotsNormalized(phrase, SpotStatus.APPROVED.name(), pageable);
+        }
+
+        List<String> categoryNames = categories.stream().map(SpotCategory::name).toList();
+        return spotRepository.searchSpotsNormalizedByCategories(
+                phrase, categoryNames, SpotStatus.APPROVED.name(), pageable);
+    }
+
+    private Page<Spot> searchByLike(String keyword, List<SpotCategory> categories, int page, int size) {
+        Pageable pageable = createPageable(page, size, "latest");
+
+        return (categories == null)
+                ? spotRepository.searchSpots(keyword, SpotStatus.APPROVED, pageable)
+                : spotRepository.searchSpotsByCategories(keyword, categories, SpotStatus.APPROVED, pageable);
+    }
+
+    // 네이티브 쿼리라 정렬은 쿼리 안에 박혀 있다. 여기서 Sort를 얹으면 ORDER BY가
+    // 두 번 붙으므로 정렬 없는 Pageable을 넘긴다(SpotRepository 주석 참고).
+    private Page<Spot> searchByFullText(String keyword, List<SpotCategory> categories, int page, int size) {
+        String phrase = FullTextKeyword.toPhrase(keyword);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
+        // 연산자만으로 이뤄진 검색어는 전문검색식으로 만들 수 없다. 억지로 검색하면
+        // 엉뚱한 결과가 나오므로 결과 없음으로 처리한다.
+        if (phrase == null) {
+            log.debug("전문검색식으로 변환할 수 없는 검색어라 빈 결과 반환: {}", keyword);
+            return Page.empty(pageable);
+        }
+
+        if (categories == null) {
+            return spotRepository.searchSpotsFullText(phrase, SpotStatus.APPROVED.name(), pageable);
+        }
+
+        List<String> categoryNames = categories.stream().map(SpotCategory::name).toList();
+        return spotRepository.searchSpotsFullTextByCategories(
+                phrase, categoryNames, SpotStatus.APPROVED.name(), pageable);
     }
 
     private Pageable createPageable(int page, int size, String sort) {
@@ -250,34 +368,40 @@ public class SpotService {
         Pageable mapPageable = PageRequest.of(0, request.getSizeOrDefault());
         boolean filtered = (spotCategories != null);
 
-        Timer.Sample querySample = Timer.start(meterRegistry);
-        List<Spot> spots = filtered
-                ? spotRepository.findSpotsInMapBoundsByCategories(
-                        request.southWestLat(),
-                        request.southWestLng(),
-                        request.northEastLat(),
-                        request.northEastLng(),
-                        spotCategories,
-                        SpotStatus.APPROVED,
-                        mapPageable)
-                : spotRepository.findSpotsInMapBounds(
-                        request.southWestLat(),
-                        request.southWestLng(),
-                        request.northEastLat(),
-                        request.northEastLng(),
-                        SpotStatus.APPROVED,
-                        mapPageable);
-        querySample.stop(searchTimer(TYPE_MAP, PHASE_QUERY, filtered));
+        SqlCountingStatementInspector.start();
+        try {
+            Timer.Sample querySample = Timer.start(meterRegistry);
+            List<Spot> spots = filtered
+                    ? spotRepository.findSpotsInMapBoundsByCategories(
+                            request.southWestLat(),
+                            request.southWestLng(),
+                            request.northEastLat(),
+                            request.northEastLng(),
+                            spotCategories,
+                            SpotStatus.APPROVED,
+                            mapPageable)
+                    : spotRepository.findSpotsInMapBounds(
+                            request.southWestLat(),
+                            request.southWestLng(),
+                            request.northEastLat(),
+                            request.northEastLng(),
+                            SpotStatus.APPROVED,
+                            mapPageable);
+            querySample.stop(searchTimer(TYPE_MAP, PHASE_QUERY, filtered));
 
-        recordSearchOutcome(TYPE_MAP, spots.size());
+            recordSearchOutcome(TYPE_MAP, spots.size());
 
-        Timer.Sample mappingSample = Timer.start(meterRegistry);
-        List<SpotMapResponse> response = spots.stream()
-                .map(SpotMapResponse::from)
-                .toList();
-        mappingSample.stop(searchTimer(TYPE_MAP, PHASE_MAPPING, filtered));
+            Timer.Sample mappingSample = Timer.start(meterRegistry);
+            List<SpotMapResponse> response = spots.stream()
+                    .map(SpotMapResponse::from)
+                    .toList();
+            mappingSample.stop(searchTimer(TYPE_MAP, PHASE_MAPPING, filtered));
 
-        return response;
+            recordResultSize(TYPE_MAP, response.size(), filtered);
+            return response;
+        } finally {
+            recordSqlCount(TYPE_MAP, filtered);
+        }
     }
 
     // 검색 지연을 쿼리 구간과 DTO 매핑 구간으로 쪼개서 잰다.
@@ -289,13 +413,69 @@ public class SpotService {
     // filtered 태그를 붙이는 이유: 카테고리 필터가 붙으면 컬렉션 상관 서브쿼리가
     // 추가돼서 실행 계획이 완전히 달라진다. 한 계열로 섞으면 두 분포가 겹쳐 보인다.
     // 태그는 전부 저카디널리티 값만 쓴다(검색어를 태그로 넣으면 시계열이 폭발한다).
+    //
+    // engine 태그는 LIKE/FULLTEXT 두 번의 측정을 한 대시보드에서 나란히 보기 위한 것이다.
+    // 지도 검색에도 같은 태그를 붙이는데, 지도 쿼리는 엔진 설정과 무관하므로
+    // 두 측정에서 값이 같아야 정상이다 - 대조군 역할을 해서, 지도까지 달라졌다면
+    // 차이의 원인이 인덱스가 아니라 측정 환경에 있다는 신호가 된다.
     private Timer searchTimer(String type, String phase, boolean filtered) {
         return Timer.builder(SEARCH_TIMER)
                 .description("스팟 검색 처리 시간")
                 .tag("type", type)
                 .tag("phase", phase)
                 .tag("filtered", String.valueOf(filtered))
+                .tag("engine", engineTag())
                 .register(meterRegistry);
+    }
+
+    // application.yaml의 공통 태그(management.metrics.tags.engine)와 대소문자가 같아야 한다.
+    // 다르면 hikaricp는 engine="FULLTEXT", 검색 지표는 engine="fulltext"가 되어
+    // 그라파나에서 engine으로 필터할 때 한쪽만 걸린다. enum 이름을 그대로 쓴다.
+    private String engineTag() {
+        return searchProperties.getEngine().name();
+    }
+
+    // 요청 하나가 실행한 SQL 개수. 지연시간만으로는 "무거운 쿼리 1개"와
+    // "가벼운 쿼리 100개"를 구별할 수 없는데, 둘은 해법이 완전히 다르다.
+    // 전자는 인덱스 문제고 후자는 N+1이라 페치 전략이나 DTO 프로젝션으로 풀어야 한다.
+    //
+    // 결과 건수와 같이 기록하는 이유: 지도는 한 번에 0~100건을 돌려주므로
+    // SQL 수도 같이 오르내린다. 두 값이 있어야 "건당 SQL 몇 개"를 계산할 수 있고,
+    // 그 비율이 1에 가까울수록 N+1이 없다는 뜻이다.
+    private void recordSqlCount(String type, boolean filtered) {
+        int executed = SqlCountingStatementInspector.stopAndGet();
+
+        DistributionSummary.builder(SEARCH_SQL_COUNT)
+                .description("요청 하나가 실행한 SQL 개수")
+                .baseUnit("queries")
+                .tag("type", type)
+                .tag("filtered", String.valueOf(filtered))
+                .tag("engine", engineTag())
+                .register(meterRegistry)
+                .record(executed);
+    }
+
+    // 어느 단계에서 결과가 나왔는지. 폴백 층을 추가할 때마다 그 층이 실제로
+    // 얼마나 쓰이는지 알아야 유지할 값어치를 판단할 수 있다.
+    // normalized 비중이 0에 가깝다면 그 층은 비용만 쓰고 있는 것이다.
+    private void recordSearchStage(String stage) {
+        Counter.builder(SEARCH_STAGE_COUNTER)
+                .description("검색 결과가 나온 단계")
+                .tag("stage", stage)
+                .tag("engine", engineTag())
+                .register(meterRegistry)
+                .increment();
+    }
+
+    private void recordResultSize(String type, int size, boolean filtered) {
+        DistributionSummary.builder(SEARCH_RESULT_SIZE)
+                .description("응답에 담긴 스팟 수")
+                .baseUnit("spots")
+                .tag("type", type)
+                .tag("filtered", String.valueOf(filtered))
+                .tag("engine", engineTag())
+                .register(meterRegistry)
+                .record(size);
     }
 
     // 결과가 0건인 검색의 비율.
@@ -307,6 +487,7 @@ public class SpotService {
                 .description("스팟 검색 결과 유무")
                 .tag("type", type)
                 .tag("outcome", resultCount == 0 ? "zero" : "hit")
+                .tag("engine", engineTag())
                 .register(meterRegistry)
                 .increment();
     }

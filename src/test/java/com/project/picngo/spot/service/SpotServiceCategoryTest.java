@@ -7,6 +7,8 @@ import com.project.picngo.spot.repository.SpotRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.project.picngo.spot.config.SearchEngine;
+import com.project.picngo.spot.config.SearchProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.mockito.ArgumentCaptor;
@@ -37,6 +39,9 @@ class SpotServiceCategoryTest {
     // Timer.Sample.stop(null)에서 NPE가 난다 - 실제 동작하는 인메모리 구현을 주입한다.
     @Spy
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+    @Spy
+    private SearchProperties searchProperties = new SearchProperties(SearchEngine.LIKE, false, false);
 
     @InjectMocks
     private SpotService spotService;

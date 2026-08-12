@@ -59,3 +59,10 @@ docs/spot-category-set-progress.md
 picngo_spots.sql
 docs/superpowers/
 .superpowers/
+
+# 검색 실험 산출물 (생성물이라 추적하지 않는다. 스크립트만 커밋하면 재생성된다)
+search-eval/out/
+load-test/results/
+search-eval/node_modules/
+search-eval/.model-cache/
+search-eval/out/embeddings.partial.json

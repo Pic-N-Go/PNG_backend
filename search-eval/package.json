@@ -1,0 +1,14 @@
+{
+  "name": "picngo-search-eval",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "검색 성능·품질 실험 도구. 외부 패키지 없이 Node 기본 기능만으로 돌아간다. 임베딩을 내 컴퓨터에서 돌리고 싶을 때만 @huggingface/transformers를 따로 설치하면 된다(embed-corpus.js --provider local).",
+  "scripts": {
+    "goldenset": "node generate-goldenset.js",
+    "seed": "node generate-seed.js",
+    "embed": "node embed-corpus.js",
+    "eval:quality": "node evaluate-quality.js",
+    "eval:vector": "node evaluate-vector.js"
+  }
+}

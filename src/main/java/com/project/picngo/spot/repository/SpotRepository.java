@@ -118,6 +118,183 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
             Pageable pageable
     );
 
+    // ── FULLTEXT(ngram) 방식. 위 LIKE 방식과 대조하기 위한 것으로, 둘 중 무엇을 쓸지는
+    //    picngo.search.engine 설정이 정한다. 인덱스는 ddl-auto가 만들지 않으므로
+    //    docs/search-fulltext-index-migration.sql을 먼저 적용해야 한다.
+    //
+    //    JPQL에는 MATCH ... AGAINST가 없어 네이티브 쿼리로 쓴다. 그래서:
+    //      - status를 enum이 아니라 String으로 받는다. 네이티브 쿼리에서 enum 바인딩은
+    //        문자열/서수 중 무엇으로 나갈지 명확하지 않아, 호출부에서 name()을 넘기게 했다.
+    //      - ORDER BY를 쿼리에 직접 박고 정렬 없는 Pageable을 받는다. 네이티브 쿼리에
+    //        Sort가 붙으면 Spring이 ORDER BY를 덧붙여 절이 두 번 생긴다.
+    //        정렬 기준을 LIKE 방식(createdAt DESC)과 똑같이 맞춰야 두 방식의 차이가
+    //        인덱스 때문이라고 말할 수 있다. 관련도 정렬로 바꾸면 변수가 둘이 된다.
+    //      - MATCH()의 컬럼 목록은 FULLTEXT 인덱스 정의와 순서까지 같아야 한다.
+    //        다르면 ERROR 1191로 인덱스를 못 찾는다.
+    @Query(value = """
+            select s.* from spot s
+            where s.status = :status
+            and s.is_active = true
+            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
+            order by s.created_at desc
+            """,
+            countQuery = """
+            select count(*) from spot s
+            where s.status = :status
+            and s.is_active = true
+            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
+            """,
+            nativeQuery = true)
+    Page<Spot> searchSpotsFullText(
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @Query(value = """
+            select s.* from spot s
+            where s.status = :status
+            and s.is_active = true
+            and exists (
+                select 1 from spot_categories sc
+                where sc.spot_id = s.id and sc.category in (:categories)
+            )
+            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
+            order by s.created_at desc
+            """,
+            countQuery = """
+            select count(*) from spot s
+            where s.status = :status
+            and s.is_active = true
+            and exists (
+                select 1 from spot_categories sc
+                where sc.spot_id = s.id and sc.category in (:categories)
+            )
+            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
+            """,
+            nativeQuery = true)
+    Page<Spot> searchSpotsFullTextByCategories(
+            @Param("keyword") String keyword,
+            @Param("categories") Collection<String> categories,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    // ── 띄어쓰기 무시 폴백. spot.search_norm은 이름/주소에서 공백을 뺀 생성 컬럼이다
+    //    (docs/search-normalized-column-migration.sql). 위 전문검색이 0건일 때만 탄다.
+    //
+    //    엔티티에 매핑하지 않은 컬럼이라 JPQL로는 접근할 수 없어 네이티브 쿼리로 쓴다.
+    //    나머지 제약(String status, 정렬 없는 Pageable)은 위 FULLTEXT 쿼리와 같은 이유다.
+    @Query(value = """
+            select s.* from spot s
+            where s.status = :status
+            and s.is_active = true
+            and match(s.search_norm) against (:keyword in boolean mode)
+            order by s.created_at desc
+            """,
+            countQuery = """
+            select count(*) from spot s
+            where s.status = :status
+            and s.is_active = true
+            and match(s.search_norm) against (:keyword in boolean mode)
+            """,
+            nativeQuery = true)
+    Page<Spot> searchSpotsNormalized(
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @Query(value = """
+            select s.* from spot s
+            where s.status = :status
+            and s.is_active = true
+            and exists (
+                select 1 from spot_categories sc
+                where sc.spot_id = s.id and sc.category in (:categories)
+            )
+            and match(s.search_norm) against (:keyword in boolean mode)
+            order by s.created_at desc
+            """,
+            countQuery = """
+            select count(*) from spot s
+            where s.status = :status
+            and s.is_active = true
+            and exists (
+                select 1 from spot_categories sc
+                where sc.spot_id = s.id and sc.category in (:categories)
+            )
+            and match(s.search_norm) against (:keyword in boolean mode)
+            """,
+            nativeQuery = true)
+    Page<Spot> searchSpotsNormalizedByCategories(
+            @Param("keyword") String keyword,
+            @Param("categories") Collection<String> categories,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    // ── 유사도 검색. 앞의 두 단계가 모두 0건일 때만 타는 마지막 수단이다.
+    //
+    //    위 폴백과 같은 색인(ft_spot_search_norm)을 쓰지만 조회 방식이 다르다.
+    //    구문 검색은 조각들이 그 순서로 붙어 있어야 하는데, 오타가 난 검색어는
+    //    원본과 정확히 일치할 수 없어 영원히 못 찾는다. 여기서는 조건을 풀고
+    //    "두 글자 조각이 몇 개나 겹치는지"로 점수를 매겨 비슷한 것을 찾는다.
+    //
+    //    정렬이 created_at이 아니라 관련도순인 것이 앞 단계들과 다른 점이다.
+    //    조각 하나만 겹쳐도 후보에 들어오므로, 최신순으로 정렬하면 엉뚱한 스팟이
+    //    위로 올라와 쓸모가 없어진다. 점수순이어야 비슷한 것이 먼저 나온다.
+    //
+    //    MATCH를 WHERE와 ORDER BY에 두 번 쓰지만 MySQL이 한 번만 계산한다.
+    @Query(value = """
+            select s.* from spot s
+            where s.status = :status
+            and s.is_active = true
+            and match(s.search_norm) against (:keyword)
+            order by match(s.search_norm) against (:keyword) desc
+            """,
+            countQuery = """
+            select count(*) from spot s
+            where s.status = :status
+            and s.is_active = true
+            and match(s.search_norm) against (:keyword)
+            """,
+            nativeQuery = true)
+    Page<Spot> searchSpotsSimilar(
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
+    @Query(value = """
+            select s.* from spot s
+            where s.status = :status
+            and s.is_active = true
+            and exists (
+                select 1 from spot_categories sc
+                where sc.spot_id = s.id and sc.category in (:categories)
+            )
+            and match(s.search_norm) against (:keyword)
+            order by match(s.search_norm) against (:keyword) desc
+            """,
+            countQuery = """
+            select count(*) from spot s
+            where s.status = :status
+            and s.is_active = true
+            and exists (
+                select 1 from spot_categories sc
+                where sc.spot_id = s.id and sc.category in (:categories)
+            )
+            and match(s.search_norm) against (:keyword)
+            """,
+            nativeQuery = true)
+    Page<Spot> searchSpotsSimilarByCategories(
+            @Param("keyword") String keyword,
+            @Param("categories") Collection<String> categories,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
     // 지도 화면의 현재 영역 안에 있는 스팟 조회 (카테고리 필터 없음)
     @Query("""
 select s

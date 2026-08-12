@@ -1,6 +1,9 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.domain.SpotCategory;
+import com.project.picngo.spot.config.SearchEngine;
+import com.project.picngo.spot.config.SearchProperties;
+import com.project.picngo.spot.config.SqlCountingStatementInspector;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.dto.MapBoundsRequest;
@@ -38,6 +41,9 @@ class SpotServiceSearchMetricsTest {
     @Spy
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
+    @Spy
+    private SearchProperties searchProperties = new SearchProperties(SearchEngine.LIKE, false, false);
+
     @InjectMocks
     private SpotService spotService;
 
@@ -65,6 +71,7 @@ class SpotServiceSearchMetricsTest {
                 .tag("type", type)
                 .tag("phase", phase)
                 .tag("filtered", filtered)
+                .tag("engine", "LIKE")
                 .timer();
         return t == null ? 0L : t.count();
     }
@@ -104,6 +111,51 @@ class SpotServiceSearchMetricsTest {
 
         assertThat(timerCount("keyword", "query", "true")).isEqualTo(1L);
         assertThat(timerCount("keyword", "query", "false")).isEqualTo(0L);
+    }
+
+    @Test
+    @DisplayName("요청당 SQL 개수와 결과 건수를 분포로 기록한다")
+    void recordsSqlCountAndResultSize() {
+        given(spotRepository.searchSpots(eq("한라산"), eq(SpotStatus.APPROVED), any()))
+                .willReturn(new PageImpl<>(List.of(spot(), spot())));
+
+        spotService.searchSpots("한라산", null, 0, 20);
+
+        // 단위 테스트에는 Hibernate가 없어 SQL 개수는 0이지만, 지표가 올바른 이름/태그로
+        // 등록되는지는 여기서 고정한다. 이름이 어긋나면 대시보드만 조용히 비어버린다.
+        var sqlCount = meterRegistry.find("spot.search.sql.count")
+                .tag("type", "keyword").tag("engine", "LIKE").summary();
+        assertThat(sqlCount).isNotNull();
+        assertThat(sqlCount.count()).isEqualTo(1L);
+
+        var resultSize = meterRegistry.find("spot.search.result.size")
+                .tag("type", "keyword").tag("engine", "LIKE").summary();
+        assertThat(resultSize).isNotNull();
+        assertThat(resultSize.totalAmount()).isEqualTo(2.0);
+    }
+
+    @Test
+    @DisplayName("검색이 예외로 끝나도 SQL 카운터를 정리한다")
+    void cleansUpCounterOnFailure() {
+        // 정리하지 않으면 요청 스레드가 재사용될 때 다음 요청 수치가 오염된다.
+        SqlCountingStatementInspector.start();
+        try {
+            spotService.searchSpots("  ", null, 0, 20);
+        } catch (RuntimeException expected) {
+            // 검색어 검증 실패는 SqlCounter.start() 이전이라 여기선 그대로 남는다.
+        }
+        SqlCountingStatementInspector.stopAndGet();
+
+        given(spotRepository.searchSpots(any(), any(), any()))
+                .willThrow(new IllegalStateException("DB 실패"));
+
+        try {
+            spotService.searchSpots("한라산", null, 0, 20);
+        } catch (IllegalStateException expected) {
+            // 기대한 예외
+        }
+
+        assertThat(SqlCountingStatementInspector.stopAndGet()).isZero();
     }
 
     @Test
