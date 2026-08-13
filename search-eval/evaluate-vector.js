@@ -18,13 +18,17 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { summarize, buildReport } from './lib/report.js';
+import { decodeVector, readEmbeddingsOutput } from './lib/embedding-io.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(HERE, '..');
 
 function parseArgs(argv) {
     const args = {
-        embeddings: join(HERE, 'out', 'embeddings.json'),
+        // embeddings.meta.json / embeddings.queries.json / embeddings.spots.jsonl
+        // 세 파일이 들어있는 디렉터리. 하나로 합친 embeddings.json이 아니다 -
+        // 스팟이 10만 건대라 파일 하나로 뭉치면 안 되는 이유는 embed-corpus.js 참고.
+        embeddings: join(HERE, 'out'),
         goldenset: join(HERE, 'out', 'goldenset.json'),
         out: join(HERE, 'out'),
         k: 20,
@@ -63,12 +67,6 @@ function limitFiller(spots, limit) {
     const real = spots.filter((s) => s.id < FILLER_START_ID);
     const filler = spots.filter((s) => s.id >= FILLER_START_ID).slice(0, limit);
     return [...real, ...filler];
-}
-
-// 벡터는 float32 이진값을 base64로 담아둔 것이다(embed-corpus.js 참고).
-function decodeVector(encoded) {
-    const buffer = Buffer.from(encoded, 'base64');
-    return new Float32Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / 4);
 }
 
 /**
@@ -126,12 +124,12 @@ function topK(queryVector, { ids, matrix, dim, count }, k) {
     return Array.from({ length: filled }, (_, i) => ({ id: topIds[i], score: topScores[i] }));
 }
 
-function main() {
+async function main() {
     const args = parseArgs(process.argv);
     if (args.help) {
         console.log(`사용법: node search-eval/evaluate-vector.js [옵션]
 
-  --embeddings  벡터 캐시 경로 (기본 search-eval/out/embeddings.json)
+  --embeddings  embeddings.meta.json 등이 들어있는 디렉터리 (기본 search-eval/out)
   --goldenset   골든셋 JSON (변형 유형 설명과 한계를 가져온다)
   --out         리포트 출력 디렉터리
   --k           상위 몇 건까지 볼지 (기본 20)
@@ -143,7 +141,7 @@ function main() {
 
     let embeddings;
     try {
-        embeddings = JSON.parse(readFileSync(args.embeddings, 'utf8'));
+        embeddings = await readEmbeddingsOutput(args.embeddings);
     } catch {
         console.error(`벡터 캐시를 읽지 못했다: ${args.embeddings}`);
         console.error('먼저 실행: node search-eval/embed-corpus.js');
@@ -254,4 +252,7 @@ function main() {
     console.log(`원자료: ${rawPath.replace(PROJECT_ROOT, '.').replace(/\\/g, '/')}`);
 }
 
-main();
+main().catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+});

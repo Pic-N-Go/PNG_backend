@@ -21,16 +21,13 @@
 // 크게 오른다. 하지만 그 카테고리가 바로 정답 판정 기준이다. 정답을 입력에 넣고
 // 맞히는 셈이라 측정이 무의미해진다.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadCorpus, loadFillerSpots } from './lib/corpus.js';
 import { embedCorpus, DEFAULT_MODELS } from './lib/embedding.js';
-
-// 벡터는 실수 384~1536개짜리라 JSON 숫자로 적으면 파일이 금방 수백 MB가 된다.
-// float32 이진값을 base64로 담으면 정확도를 잃지 않으면서 크기가 크게 준다.
-const encodeVector = (v) => Buffer.from(Float32Array.from(v).buffer).toString('base64');
+import { writeEmbeddingsOutput, loadCheckpoint, appendCheckpoint, clearCheckpoint } from './lib/embedding-io.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = join(HERE, '..');
@@ -123,7 +120,9 @@ async function main() {
   --with-overview  앱에서 설명문을 가져와 함께 임베딩 (앱이 떠 있어야 함)
   --base-url       --with-overview 용 앱 주소
 
-결과는 out/embeddings.json에 저장된다. 평가는 evaluate-vector.js로 한다.`);
+결과는 out/embeddings.meta.json + embeddings.queries.json + embeddings.spots.jsonl 세 파일로
+저장된다(스팟이 많아지면 파일 하나로 뭉치면 안 되는 이유는 코드 상단 주석 참고).
+평가는 evaluate-vector.js로 한다.`);
         return;
     }
 
@@ -193,42 +192,40 @@ async function main() {
         + `(정답 후보 ${spots.length} + 필러 ${filler.length}) + 검색어 ${queryTexts.length}건`);
     console.log(`제공자: ${args.provider}${args.provider === 'local' ? ' (첫 실행은 모델 내려받느라 몇 분 걸린다)' : ''}`);
 
-    // 중간 저장 파일. 무료 한도에 걸려 멈춰도 여기까지는 남으므로,
+    // 중간 저장 파일. 무료 한도나 결제 문제로 멈춰도 여기까지는 남으므로,
     // 다시 실행하면 이어서 한다. 한도가 하루 단위로 풀리는 API를 쓸 때 특히 중요하다.
     //
     // 입력이 바뀌면(스팟이나 검색어가 달라지면) 이어서 하면 안 된다. 순서가 어긋나
     // 엉뚱한 스팟에 엉뚱한 벡터가 붙는데, 에러 없이 점수만 이상해진다.
     // 그래서 입력 목록의 지문(해시)을 같이 저장해두고 다를 때는 버린다.
+    //
+    // 저장 형식은 한 줄에 벡터 하나씩(JSONL)이다. 처음엔 배열 하나를 통째로
+    // JSON.stringify() 했는데, OpenAI 1536차원 벡터가 2만 개쯤 쌓이자
+    // "Invalid string length"로 죽었다 - 문자열 하나가 너무 커진 것이다.
+    // 한 줄씩 이어 쓰면 아무리 개수가 늘어도 문자열 하나의 크기는 벡터
+    // 한 개 분량으로 고정된다. 자세한 설명은 lib/embedding-io.js 참고.
     mkdirSync(args.out, { recursive: true });
-    const checkpointPath = join(args.out, 'embeddings.partial.json');
     const fingerprint = createHash('sha256')
         .update(`${args.provider}|${args.model ?? 'default'}|${spotTexts.length}|${queryTexts.length}`)
         .update(spotTexts.join(' '))
         .update(queryTexts.join(' '))
         .digest('hex');
 
-    let resumeVectors = [];
-    if (existsSync(checkpointPath)) {
-        try {
-            const saved = JSON.parse(readFileSync(checkpointPath, 'utf8'));
-            if (saved.fingerprint === fingerprint) {
-                resumeVectors = saved.vectors;
-                console.log(`이어서 시작한다: 이미 만들어둔 ${resumeVectors.length.toLocaleString()}건은 건너뛴다.`);
-            } else {
-                console.log('중간 저장 파일이 있지만 입력이 달라졌다. 처음부터 다시 만든다.');
-            }
-        } catch {
-            console.log('중간 저장 파일을 읽지 못했다. 처음부터 다시 만든다.');
-        }
+    const resumeVectors = await loadCheckpoint(args.out, fingerprint);
+    if (resumeVectors.length > 0) {
+        console.log(`이어서 시작한다: 이미 만들어둔 ${resumeVectors.length.toLocaleString()}건은 건너뛴다.`);
     }
 
     // 0으로 시작해야 첫 묶음이 끝나자마자 한 번 저장된다.
     // Date.now()로 시작하면 처음 10초 안에 실패했을 때 아무것도 안 남는다.
     let lastSaved = 0;
     let latestVectors = resumeVectors;
+    // 체크포인트 파일에 이미 쓴 개수. 다음에 저장할 때 이 지점 뒤부터만 이어 붙인다.
+    let writtenCount = resumeVectors.length;
 
-    const saveCheckpoint = (vectors) => {
-        writeFileSync(checkpointPath, JSON.stringify({ fingerprint, vectors }), 'utf8');
+    const flushCheckpoint = (vectors) => {
+        appendCheckpoint(args.out, fingerprint, vectors.slice(writtenCount));
+        writtenCount = vectors.length;
         lastSaved = Date.now();
     };
 
@@ -244,15 +241,15 @@ async function main() {
             onProgress: (done, total) => process.stdout.write(`\r  진행 ${done}/${total}`),
             onBatch: (vectors) => {
                 latestVectors = vectors;
-                // 매번 쓰면 수백 MB를 반복해서 쓰게 된다. 10초에 한 번으로 제한한다.
+                // 매번 쓰면 디스크에 너무 자주 접근한다. 10초에 한 번으로 제한한다.
                 if (Date.now() - lastSaved < 10_000) return;
-                saveCheckpoint(vectors);
+                flushCheckpoint(vectors);
             },
         });
     } catch (e) {
         // 실패해도 여기까지 만든 건 남긴다. 다시 실행하면 이어서 한다.
-        if (latestVectors.length > 0) {
-            saveCheckpoint(latestVectors);
+        if (latestVectors.length > writtenCount) {
+            flushCheckpoint(latestVectors);
             process.stdout.write('\n');
             console.error(`중간까지 만든 ${latestVectors.length.toLocaleString()}건을 저장했다. `
                 + '같은 명령을 다시 실행하면 이어서 한다.');
@@ -272,47 +269,45 @@ async function main() {
         console.log('사용량: API가 알려주지 않는다. 무료 한도 안에서 쓴 것으로 본다.');
     }
 
-    const payload = {
-        meta: {
-            generatedAt: new Date().toISOString(),
-            provider: args.provider,
-            model,
-            dimensions,
-            withOverview: args.withOverview,
-            overviewCount: overviews.size,
-            spotCount: candidates.length,
-            realSpotCount: spots.length,
-            fillerCount: filler.length,
-            queryCount: queryTexts.length,
-            excludedSpotIds: excludeIds,
-            goldensetSeed: goldenset.meta.seed,
-            promptTokens: usage.promptTokens,
-            estimatedCostUsd: Number(usage.estimatedCostUsd.toFixed(6)),
-        },
-        // 후보가 10만 건이 되면 텍스트까지 담을 이유가 없다. id와 벡터만 남긴다.
+    const meta = {
+        generatedAt: new Date().toISOString(),
+        provider: args.provider,
+        model,
+        dimensions,
+        withOverview: args.withOverview,
+        overviewCount: overviews.size,
+        spotCount: candidates.length,
+        realSpotCount: spots.length,
+        fillerCount: filler.length,
+        queryCount: queryTexts.length,
+        excludedSpotIds: excludeIds,
+        goldensetSeed: goldenset.meta.seed,
+        promptTokens: usage.promptTokens,
+        estimatedCostUsd: Number(usage.estimatedCostUsd.toFixed(6)),
+    };
+
+    // 텍스트까지 담을 이유가 없다. id와 벡터만 남긴다(스팟이 10만 건대라 용량이 커진다).
+    writeEmbeddingsOutput(args.out, {
+        meta,
         spots: candidates.map((c, i) => ({
             id: c.id,
             name: c.real ? c.name : undefined,
-            vector: encodeVector(passageVectors[i]),
+            vector: passageVectors[i],
         })),
         queries: goldenset.queries.map((q, i) => ({
             id: q.id,
             type: q.type,
             keyword: q.keyword,
             relevantSpotIds: q.relevantSpotIds,
-            vector: encodeVector(queryVectors[i]),
+            vector: queryVectors[i],
         })),
-    };
+    });
 
-    const outPath = join(args.out, 'embeddings.json');
-    writeFileSync(outPath, JSON.stringify(payload), 'utf8');
-
-    // 다 끝났으니 중간 저장 파일은 지운다. 남겨두면 다음에 입력을 바꿨을 때
-    // 헷갈릴 뿐이고, 용량도 본 파일만큼 차지한다.
-    if (existsSync(checkpointPath)) rmSync(checkpointPath);
+    // 다 끝났으니 중간 저장 파일은 지운다. 남겨두면 다음에 입력을 바꿨을 때 헷갈릴 뿐이다.
+    clearCheckpoint(args.out);
 
     console.log('');
-    console.log(`저장: ${outPath.replace(PROJECT_ROOT, '.').replace(/\\/g, '/')}`);
+    console.log(`저장: ${args.out.replace(PROJECT_ROOT, '.').replace(/\\/g, '/')}/embeddings.{meta.json,queries.json,spots.jsonl}`);
     console.log('다음: node search-eval/evaluate-vector.js');
 }
 

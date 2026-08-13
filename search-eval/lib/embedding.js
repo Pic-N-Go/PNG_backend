@@ -12,9 +12,10 @@
 
 import { fileURLToPath } from 'node:url';
 
-const OPENAI_ENDPOINT = 'https://api.openai.com/v1/embeddings';
 // 주소를 환경변수로 바꿔 끼울 수 있게 해둔다. 이어하기 같은 동작을 확인할 때
-// 진짜 API를 부르지 않고 가짜 서버로 시험하기 위해서다.
+// 진짜 API를 부르지 않고(돈이 들거나 키가 필요하니) 가짜 서버로 시험하기 위해서다.
+const OPENAI_ENDPOINT = process.env.OPENAI_ENDPOINT_OVERRIDE
+    ?? 'https://api.openai.com/v1/embeddings';
 const GEMINI_ENDPOINT = process.env.GEMINI_ENDPOINT_OVERRIDE
     ?? 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENAI_BATCH = 256;

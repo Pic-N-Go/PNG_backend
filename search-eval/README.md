@@ -214,7 +214,7 @@ ngram 파서는 '한라산'을 '한라', '라산' 두 토큰으로 쪼갠다. �
 DB도 서버도 필요 없다. 스팟과 검색어를 벡터로 바꿔 유사도만 계산한다.
 
 ```bash
-node search-eval/embed-corpus.js
+node search-eval/embed-corpus.js --provider openai --filler 100000
 ```
 
 ```bash
@@ -223,8 +223,26 @@ node search-eval/evaluate-vector.js --label "임베딩 / 이름+주소"
 
 PowerShell에서 키 넣기: `$env:OPENAI_API_KEY="sk-..."`
 
-임베딩은 한 번 만들어 `out/embeddings.json`에 캐시한다. 평가는 몇 번이든 공짜로 다시 돌린다.
+`--provider`는 `gemini`(무료, 한도 낮음) `openai`(유료, 선불 크레딧 필요) `local`(무료,
+`cd search-eval && npm install @huggingface/transformers` 먼저 필요) 중 고른다.
+
+`--filler`는 후보 스팟 수를 문자열 검색과 맞추는 옵션이다. 정답 후보 130건만으로 재면
+상위 20건이 후보 전체의 15%가 되어 아무렇게나 골라도 자주 맞는다 — 필러를 섞어
+문자열 검색과 같은 규모(10만 건)로 맞춰야 공정한 비교가 된다. 먼저
+`node search-eval/generate-seed.js --count 100000`로 필러 시드를 만들어둬야 한다(DB에
+적재할 필요는 없다 — 이름·주소·설명문 텍스트만 읽어서 쓴다).
+
+임베딩은 한 번 만들어 `out/embeddings.meta.json` + `embeddings.queries.json` +
+`embeddings.spots.jsonl` 세 파일에 캐시한다. 평가는 몇 번이든 공짜로 다시 돌린다.
 골든셋을 다시 만들었다면 임베딩도 다시 만들어야 하며, 개수가 안 맞으면 평가가 막아준다.
+
+스팟 파일을 하나가 아니라 두 개(작은 것 하나 + 한 줄씩 쓰는 것 하나)로 나눈 이유가 있다.
+후보가 10만 건대가 되면 벡터를 한 객체에 다 담아 `JSON.stringify()` 한 번으로 저장하다가
+"Invalid string length"로 죽는다 — 실제로 겪은 문제다. 자세한 설명은
+`search-eval/lib/embedding-io.js` 상단 주석 참고.
+
+중간에 API 한도나 결제 문제로 멈춰도 지금까지 만든 벡터는 남는다. **같은 명령을 그대로
+다시 실행하면 이어서 만든다.** 스팟·검색어 목록이 바뀌었으면 자동으로 처음부터 다시 만든다.
 
 #### 무엇을 임베딩하는지가 결과를 좌우한다
 
