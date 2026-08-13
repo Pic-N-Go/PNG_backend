@@ -7,8 +7,16 @@
 // 파서를 쓰는 이유: DB에 접속하지 않아도 골든셋을 만들 수 있어야 한다.
 // (평가 러너만 실행 중인 서버가 필요하고, 생성 단계는 오프라인으로 돈다.)
 
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const PROJECT_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const OVERVIEW_SQL = join(PROJECT_ROOT, 'docs', 'spot-overview-backfill-migration.sql');
+
+function readIfExists(path) {
+    return existsSync(path) ? readFileSync(path, 'utf8') : '';
+}
 
 const SPOT_ROW = /^\s*\((\d+),\s*'((?:[^']|'')*)',\s*'((?:[^']|'')*)',\s*(-?[\d.]+),\s*(-?[\d.]+),/;
 const CATEGORY_PAIR = /\((\d+),\s*'([A-Z_]+)'\)/g;
@@ -54,11 +62,17 @@ export function loadCorpus(sqlPath) {
         }
     }
 
+    // overview는 시드(spot_data.sql)가 아니라 별도 마이그레이션 파일에 있다.
+    // 시드는 앱이 뜰 때마다 실행되므로 UPDATE를 거기 두면 매번 덮어쓰기 때문이다.
+    // 두 곳 다 훑어서, 어느 쪽에 있든 읽히게 한다(파일이 없으면 그냥 건너뛴다).
     const OVERVIEW_UPDATE = /^UPDATE spot SET overview = '((?:[^']|'')*)' WHERE id = (\d+);/gm;
-    for (const m of sql.matchAll(OVERVIEW_UPDATE)) {
-        const spot = spots.get(Number(m[2]));
-        if (spot) {
-            spot.overview = unquote(m[1]);
+    const overviewSources = [sql, readIfExists(OVERVIEW_SQL)];
+    for (const source of overviewSources) {
+        for (const m of source.matchAll(OVERVIEW_UPDATE)) {
+            const spot = spots.get(Number(m[2]));
+            if (spot) {
+                spot.overview = unquote(m[1]);
+            }
         }
     }
 

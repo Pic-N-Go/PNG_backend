@@ -66,3 +66,8 @@ load-test/results/
 search-eval/node_modules/
 search-eval/.model-cache/
 search-eval/out/embeddings.partial.json
+
+# JVM 크래시 덤프. 코드와 무관한 생성물인데 프로젝트 루트에 떨어져서
+# 실수로 커밋되기 쉽다(실제로 두 개가 커밋된 적 있다).
+hs_err_pid*.log
+replay_pid*.log
