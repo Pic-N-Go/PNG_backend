@@ -433,6 +433,19 @@ order by s.id
         String getOverview();
     }
 
+    // 관리자 화면에서 "얼마나 채워졌나"를 보여주기 위한 집계. 검색 대상이 되는
+    // 스팟(승인·활성)만 센다 - 그 밖의 스팟은 어차피 의미 검색에 안 걸린다.
+    @Query("select count(s) from Spot s where s.status = :status and s.isActive = true")
+    long countSearchable(@Param("status") SpotStatus status);
+
+    @Query("""
+select count(s) from Spot s
+where s.status = :status
+and s.isActive = true
+and s.embedding is not null
+""")
+    long countWithEmbedding(@Param("status") SpotStatus status);
+
     // 벌크 업데이트로 저장한다. 엔티티를 다시 불러와 저장하면 EAGER 연관까지
     // 딸려온다 - 필드 하나만 바꾸는데 그럴 이유가 없다.
     @Modifying

@@ -68,6 +68,9 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> {
 				auth
+					// 관리자 전용. PUBLIC_ENDPOINTS의 /spots/** 와 겹치지 않도록 경로를
+					// /admin 아래로 뺐다 - /spots/... 밑에 뒀다면 전부 공개돼버린다.
+					.requestMatchers("/admin/**").hasRole("ADMIN")
 					.requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
 					// 관심테마 기반 개인화 추천이라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 					.requestMatchers(HttpMethod.GET, "/spots/recommended").authenticated()
