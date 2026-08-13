@@ -48,7 +48,8 @@ class SpotServiceNormalizeFallbackTest {
         return new SpotService(
                 spotRepository, null, null, null, null,
                 meterRegistry,
-                new SearchProperties(SearchEngine.FULLTEXT, enabled, false)
+                new SearchProperties(SearchEngine.FULLTEXT, enabled, false, false),
+                null
         );
     }
 

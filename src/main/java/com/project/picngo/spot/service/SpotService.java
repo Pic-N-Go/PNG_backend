@@ -3,9 +3,11 @@ package com.project.picngo.spot.service;
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
+import com.project.picngo.external.EmbeddingClient;
 import com.project.picngo.spot.config.SearchEngine;
 import com.project.picngo.spot.config.SearchProperties;
 import com.project.picngo.spot.config.SqlCountingStatementInspector;
+import com.project.picngo.spot.domain.EmbeddingVector;
 import com.project.picngo.spot.domain.FullTextKeyword;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotTag;
@@ -27,6 +29,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -34,6 +37,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -52,6 +59,7 @@ public class SpotService {
     private static final String STAGE_PRIMARY = "primary";
     private static final String STAGE_NORMALIZED = "normalized";
     private static final String STAGE_SIMILAR = "similar";
+    private static final String STAGE_SEMANTIC = "semantic";
     private static final String STAGE_NONE = "none";
     private static final String TYPE_KEYWORD = "keyword";
     private static final String TYPE_MAP = "map";
@@ -65,6 +73,7 @@ public class SpotService {
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
     private final MeterRegistry meterRegistry;
     private final SearchProperties searchProperties;
+    private final EmbeddingClient embeddingClient;
 
     public SpotDetailResponse getSpotDetail(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
@@ -234,8 +243,71 @@ public class SpotService {
             }
         }
 
+        if (searchProperties.isSemanticFallback()) {
+            Page<Spot> semantic = searchBySemantic(keyword, categories, page, size);
+            if (!semantic.isEmpty()) {
+                recordSearchStage(STAGE_SEMANTIC);
+                return semantic;
+            }
+        }
+
         recordSearchStage(STAGE_NONE);
         return primary;
+    }
+
+    // 마지막 4단계. 앞의 세 단계는 전부 "글자가 얼마나 겹치는가"로 찾는데, 이 단계는
+    // 검색어를 임베딩으로 바꿔서 뜻이 가까운 스팟을 찾는다. "해질녘 걷기 좋은 곳"처럼
+    // 검색어와 스팟 설명에 겹치는 글자가 하나도 없어도 잡아낼 수 있는 유일한 단계다.
+    //
+    // 인덱스 없이 후보 전부를 코사인 유사도로 훑는 브루트포스다. 스팟 수가 수천 건
+    // 규모라 이 정도로 충분하고(search-eval/evaluate-vector.js로 확인), pgvector 같은
+    // 별도 ANN 인덱스/DB를 새로 들일 이유가 없다.
+    private Page<Spot> searchBySemantic(String keyword, List<SpotCategory> categories, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
+        Optional<float[]> queryVector = embeddingClient.embed(keyword);
+        if (queryVector.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        List<SpotRepository.EmbeddingCandidate> candidates = (categories == null)
+                ? spotRepository.findEmbeddingCandidates(SpotStatus.APPROVED)
+                : spotRepository.findEmbeddingCandidatesByCategories(categories, SpotStatus.APPROVED);
+
+        if (candidates.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        float[] query = queryVector.get();
+        Map<Long, Float> scoreById = candidates.stream()
+                .collect(Collectors.toMap(
+                        SpotRepository.EmbeddingCandidate::getId,
+                        c -> EmbeddingVector.cosineSimilarity(query, EmbeddingVector.decode(c.getEmbedding()))
+                ));
+
+        List<Long> rankedIds = scoreById.entrySet().stream()
+                .sorted(Map.Entry.<Long, Float>comparingByValue().reversed())
+                .map(Map.Entry::getKey)
+                .toList();
+
+        long total = rankedIds.size();
+        List<Long> pageIds = rankedIds.stream()
+                .skip(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .toList();
+
+        if (pageIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        Map<Long, Spot> spotsById = spotRepository.findByIdIn(pageIds).stream()
+                .collect(Collectors.toMap(Spot::getId, spot -> spot));
+        List<Spot> ordered = pageIds.stream()
+                .map(spotsById::get)
+                .filter(Objects::nonNull)
+                .toList();
+
+        return new PageImpl<>(ordered, pageable, total);
     }
 
     // 마지막 수단. 정확히 일치하는 게 없을 때 가장 비슷한 것을 돌려준다.
@@ -339,7 +411,7 @@ public class SpotService {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(this::parseCategoryOrNull)
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
 

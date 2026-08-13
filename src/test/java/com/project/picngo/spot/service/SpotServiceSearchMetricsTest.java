@@ -42,7 +42,7 @@ class SpotServiceSearchMetricsTest {
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @Spy
-    private SearchProperties searchProperties = new SearchProperties(SearchEngine.LIKE, false, false);
+    private SearchProperties searchProperties = new SearchProperties(SearchEngine.LIKE, false, false, false);
 
     @InjectMocks
     private SpotService spotService;

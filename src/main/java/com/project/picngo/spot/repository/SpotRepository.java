@@ -6,6 +6,7 @@ import com.project.picngo.spot.domain.enums.SpotStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -343,4 +344,63 @@ order by s.photogenicScore desc, s.bookmarkCount desc
     List<Spot> findByIdIn(List<Long> ids);
 
     long countByIdIn(Collection<Long> ids);
+
+    // ── 4층 검색(의미 검색) 전용 ──────────────────────────────────────────
+    //
+    // id·embedding만 골라 읽는 이유: 이 조회는 요청마다 활성 스팟 전체를 한 번에
+    // 훑는 완전탐색이다(4,500건 규모라 이 방식으로도 충분하다는 게 오늘 실측으로
+    // 확인됐다). Spot 엔티티 전체를 로딩하면 accessPoints가 EAGER라 스팟마다
+    // 추가 SELECT가 딸려 나가는데, 유사도 계산에는 벡터만 있으면 되므로
+    // 프로젝션으로 그 비용을 아예 없앤다.
+    @Query("""
+select s.id as id, s.embedding as embedding
+from Spot s
+where s.status = :status
+and s.isActive = true
+and s.embedding is not null
+""")
+    List<EmbeddingCandidate> findEmbeddingCandidates(@Param("status") SpotStatus status);
+
+    @Query("""
+select s.id as id, s.embedding as embedding
+from Spot s
+where s.status = :status
+and s.isActive = true
+and s.embedding is not null
+and exists (select c from s.categories c where c in :categories)
+""")
+    List<EmbeddingCandidate> findEmbeddingCandidatesByCategories(
+            @Param("categories") Collection<SpotCategory> categories,
+            @Param("status") SpotStatus status
+    );
+
+    interface EmbeddingCandidate {
+        Long getId();
+        byte[] getEmbedding();
+    }
+
+    // 임베딩이 아직 없는 스팟을 배치로 뽑는다(백필 대상). 이름·주소·설명문만
+    // 있으면 되므로 여기도 프로젝션으로 EAGER 연관을 피한다.
+    @Query("""
+select s.id as id, s.name as name, s.address as address, s.overview as overview
+from Spot s
+where s.status = :status
+and s.isActive = true
+and s.embedding is null
+order by s.id
+""")
+    List<EmbeddingSource> findMissingEmbeddings(@Param("status") SpotStatus status, Pageable pageable);
+
+    interface EmbeddingSource {
+        Long getId();
+        String getName();
+        String getAddress();
+        String getOverview();
+    }
+
+    // 벌크 업데이트로 저장한다. 엔티티를 다시 불러와 저장하면 EAGER 연관까지
+    // 딸려온다 - 필드 하나만 바꾸는데 그럴 이유가 없다.
+    @Modifying
+    @Query("update Spot s set s.embedding = :embedding where s.id = :id")
+    void updateEmbedding(@Param("id") Long id, @Param("embedding") byte[] embedding);
 }
