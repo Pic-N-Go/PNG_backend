@@ -54,6 +54,14 @@ export function loadCorpus(sqlPath) {
         }
     }
 
+    const OVERVIEW_UPDATE = /^UPDATE spot SET overview = '((?:[^']|'')*)' WHERE id = (\d+);/gm;
+    for (const m of sql.matchAll(OVERVIEW_UPDATE)) {
+        const spot = spots.get(Number(m[2]));
+        if (spot) {
+            spot.overview = unquote(m[1]);
+        }
+    }
+
     if (spots.size === 0) {
         throw new Error(`스팟을 한 건도 파싱하지 못했다: ${sqlPath}`);
     }
