@@ -46,7 +46,7 @@ class SpotServiceFullTextTest {
     private MeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @Spy
-    private SearchProperties searchProperties = new SearchProperties(SearchEngine.FULLTEXT, false, false, false);
+    private SearchProperties searchProperties = new SearchProperties(SearchEngine.FULLTEXT, false, false, false, false);
 
     @InjectMocks
     private SpotService spotService;

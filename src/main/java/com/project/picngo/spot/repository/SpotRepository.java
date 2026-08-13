@@ -345,6 +345,41 @@ order by s.photogenicScore desc, s.bookmarkCount desc
 
     long countByIdIn(Collection<Long> ids);
 
+    // ── 오타 교정(편집거리) 폴백 전용 ──────────────────────────────────────
+    //
+    // 이름과 주소만 읽는다. 편집거리는 자바에서 계산하므로 DB는 비교할 원문만
+    // 넘겨주면 된다. 위 임베딩 조회와 같은 이유로 프로젝션을 쓴다 - Spot 전체를
+    // 로딩하면 EAGER 연관 때문에 스팟마다 추가 SELECT가 붙는다.
+    //
+    // 설명문(overview)은 일부러 뺐다. 오타 교정의 대상은 사용자가 치려던 '이름'이지
+    // 본문이 아니다. 긴 본문까지 넣으면 우연히 비슷한 구간이 어디선가 걸려서
+    // 엉뚱한 스팟이 상위로 올라온다.
+    @Query("""
+select s.id as id, s.name as name, s.address as address
+from Spot s
+where s.status = :status
+and s.isActive = true
+""")
+    List<FuzzyCandidate> findFuzzyCandidates(@Param("status") SpotStatus status);
+
+    @Query("""
+select s.id as id, s.name as name, s.address as address
+from Spot s
+where s.status = :status
+and s.isActive = true
+and exists (select c from s.categories c where c in :categories)
+""")
+    List<FuzzyCandidate> findFuzzyCandidatesByCategories(
+            @Param("categories") Collection<SpotCategory> categories,
+            @Param("status") SpotStatus status
+    );
+
+    interface FuzzyCandidate {
+        Long getId();
+        String getName();
+        String getAddress();
+    }
+
     // ── 4층 검색(의미 검색) 전용 ──────────────────────────────────────────
     //
     // id·embedding만 골라 읽는 이유: 이 조회는 요청마다 활성 스팟 전체를 한 번에

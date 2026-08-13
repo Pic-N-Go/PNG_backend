@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * <p>@ConfigurationProperties 대신 생성자 @Value를 쓴 이유: 이 프로젝트에는 아직
  * @ConfigurationProperties 사용처가 없어 @ConfigurationPropertiesScan 설정이 없다.
  * 값 하나 때문에 스캔 설정을 새로 도입하는 것보다 생성자 주입이 가볍고,
- * 테스트에서 {@code new SearchProperties(SearchEngine.LIKE, false, false, false)}로
+ * 테스트에서 {@code new SearchProperties(SearchEngine.LIKE, false, false, false, false)}로
  * 바로 만들 수 있다.
  */
 @Getter
@@ -20,6 +20,7 @@ public class SearchProperties {
     private final SearchEngine engine;
     private final boolean normalizeFallback;
     private final boolean similarFallback;
+    private final boolean fuzzyFallback;
     private final boolean semanticFallback;
 
     // 생성자는 하나만 둔다. 편의 생성자를 추가하면 Spring이 어느 쪽으로 주입할지
@@ -28,6 +29,9 @@ public class SearchProperties {
             @Value("${picngo.search.engine:LIKE}") SearchEngine engine,
             @Value("${picngo.search.normalize-fallback:false}") boolean normalizeFallback,
             @Value("${picngo.search.similar-fallback:false}") boolean similarFallback,
+            // 위 유사도 검색이 ngram 조각으로는 못 잡는 짧은 검색어의 오타를 받아낸다.
+            // 색인을 못 쓰고 후보 전부를 훑으므로, 앞 단계가 모두 0건일 때만 돈다.
+            @Value("${picngo.search.fuzzy-fallback:false}") boolean fuzzyFallback,
             // 앞의 세 단계가 전부 0건일 때만 도는 마지막 폴백. 켜기 전에 두 가지가
             // 준비돼 있어야 한다: picngo.embedding.api-key, 그리고 스팟들의 embedding
             // 컬럼이 채워져 있을 것(SpotEmbeddingBackfillService가 채운다).
@@ -37,6 +41,7 @@ public class SearchProperties {
         this.engine = engine;
         this.normalizeFallback = normalizeFallback;
         this.similarFallback = similarFallback;
+        this.fuzzyFallback = fuzzyFallback;
         this.semanticFallback = semanticFallback;
     }
 }

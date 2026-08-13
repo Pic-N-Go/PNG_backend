@@ -7,6 +7,7 @@ import com.project.picngo.external.EmbeddingClient;
 import com.project.picngo.spot.config.SearchEngine;
 import com.project.picngo.spot.config.SearchProperties;
 import com.project.picngo.spot.config.SqlCountingStatementInspector;
+import com.project.picngo.spot.domain.EditDistance;
 import com.project.picngo.spot.domain.EmbeddingVector;
 import com.project.picngo.spot.domain.FullTextKeyword;
 import com.project.picngo.spot.domain.Spot;
@@ -36,6 +37,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +62,7 @@ public class SpotService {
     private static final String STAGE_PRIMARY = "primary";
     private static final String STAGE_NORMALIZED = "normalized";
     private static final String STAGE_SIMILAR = "similar";
+    private static final String STAGE_FUZZY = "fuzzy";
     private static final String STAGE_SEMANTIC = "semantic";
     private static final String STAGE_NONE = "none";
     private static final String TYPE_KEYWORD = "keyword";
@@ -212,7 +216,9 @@ public class SpotService {
     //
     //   primary     현재 방식(LIKE 또는 FULLTEXT) 그대로
     //   normalized  띄어쓰기와 문장부호를 무시하고 재시도
-    //   similar     정확히 일치하는 게 없으니 가장 비슷한 것 (오타 흡수)
+    //   similar     ngram 조각이 얼마나 겹치는지로 가장 비슷한 것 (긴 검색어의 오타)
+    //   fuzzy       글자를 직접 맞대어 몇 글자 다른지로 (짧은 검색어의 오타)
+    //   semantic    글자가 아니라 뜻이 가까운 것 (동의어·자연어)
     //
     // 단계별로 나눠두면 층을 하나씩 얹으면서 골든셋으로 유형별 개선폭을 따로 잴 수 있다.
     // 그리고 어느 단계에서 결과가 나왔는지 세어두면 "이 층이 실제로 쓰이긴 하나"에 답할 수 있다.
@@ -240,6 +246,14 @@ public class SpotService {
             if (!similar.isEmpty()) {
                 recordSearchStage(STAGE_SIMILAR);
                 return similar;
+            }
+        }
+
+        if (searchProperties.isFuzzyFallback()) {
+            Page<Spot> fuzzy = searchByFuzzy(keyword, categories, page, size);
+            if (!fuzzy.isEmpty()) {
+                recordSearchStage(STAGE_FUZZY);
+                return fuzzy;
             }
         }
 
@@ -290,7 +304,75 @@ public class SpotService {
                 .map(Map.Entry::getKey)
                 .toList();
 
-        long total = rankedIds.size();
+        return pageOfRankedIds(rankedIds, pageable);
+    }
+
+    // 마지막 오타 교정 단계. 위 유사도 검색과 목적은 같지만 방식이 다르다.
+    //
+    // 유사도 검색은 두 글자짜리 조각(ngram)이 겹치는지로 찾는데, 검색어가 짧으면
+    // 조각 수가 적어 오타 하나에 전멸한다 - '헙재'는 조각이 하나뿐이라 그게 틀리면
+    // 남는 게 없고, '오셜록'은 가운데를 틀리면 조각 둘이 모두 깨진다. 색인을 어떻게
+    // 손봐도 이 한계는 남는다.
+    //
+    // 여기서는 색인을 포기하고 후보 전부를 자바에서 글자 단위로 비교한다.
+    // 대신 조각이 깨지든 말든 상관이 없어 짧은 검색어의 오타에 강하다.
+    // 완전탐색이라 비싸지만, 앞 단계가 모두 0건일 때만 도는 마지막 폴백이고
+    // 스팟이 수천 건 규모라 감당할 수 있다(의미 검색 단계와 같은 판단).
+    private Page<Spot> searchByFuzzy(String keyword, List<SpotCategory> categories, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
+        // 색인과 같은 규칙으로 정규화한다 - 공백/문장부호를 뺀 글자만 남긴다.
+        String normalized = FullTextKeyword.toSimilarityTerms(keyword);
+        if (normalized == null || normalized.length() < EditDistance.MIN_KEYWORD_LENGTH) {
+            return Page.empty(pageable);
+        }
+
+        int allowed = EditDistance.allowedDistance(normalized.length());
+
+        List<SpotRepository.FuzzyCandidate> candidates = (categories == null)
+                ? spotRepository.findFuzzyCandidates(SpotStatus.APPROVED)
+                : spotRepository.findFuzzyCandidatesByCategories(categories, SpotStatus.APPROVED);
+
+        List<ScoredSpot> scored = new ArrayList<>();
+        for (SpotRepository.FuzzyCandidate candidate : candidates) {
+            String target = FullTextKeyword.toSimilarityTerms(
+                    (candidate.getName() == null ? "" : candidate.getName())
+                            + (candidate.getAddress() == null ? "" : candidate.getAddress()));
+            if (target == null) {
+                continue;
+            }
+
+            int distance = EditDistance.bestSubstringDistance(normalized, target);
+            if (distance <= allowed) {
+                scored.add(new ScoredSpot(candidate.getId(), distance, target.length()));
+            }
+        }
+
+        if (scored.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        // 덜 틀린 것부터. 거리가 같으면 짧은 이름을 앞에 둔다 - 같은 오차라면
+        // 긴 이름 어딘가에 우연히 걸린 것보다 이름 전체가 비슷한 쪽이 사용자가 찾던 것에
+        // 가깝다. 마지막 id 정렬은 순서를 매 요청 똑같이 만들기 위한 것이다
+        // (같은 검색어인데 페이지마다 순서가 달라지면 중복/누락이 생긴다).
+        List<Long> rankedIds = scored.stream()
+                .sorted(Comparator.comparingInt(ScoredSpot::distance)
+                        .thenComparingInt(ScoredSpot::targetLength)
+                        .thenComparing(ScoredSpot::id))
+                .map(ScoredSpot::id)
+                .toList();
+
+        return pageOfRankedIds(rankedIds, pageable);
+    }
+
+    private record ScoredSpot(Long id, int distance, int targetLength) {
+    }
+
+    // 점수순으로 줄 세운 id 목록에서 요청한 페이지만 잘라 엔티티로 되돌린다.
+    // 완전탐색 단계(fuzzy/semantic)가 공유한다 - 점수를 매기는 방식만 다르고
+    // 그 뒤 처리는 같다.
+    private Page<Spot> pageOfRankedIds(List<Long> rankedIds, Pageable pageable) {
         List<Long> pageIds = rankedIds.stream()
                 .skip(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -300,6 +382,7 @@ public class SpotService {
             return Page.empty(pageable);
         }
 
+        // 페이지에 들어갈 것만 엔티티로 읽는다. 여기서만 EAGER 연관 비용을 치른다.
         Map<Long, Spot> spotsById = spotRepository.findByIdIn(pageIds).stream()
                 .collect(Collectors.toMap(Spot::getId, spot -> spot));
         List<Spot> ordered = pageIds.stream()
@@ -307,7 +390,7 @@ public class SpotService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        return new PageImpl<>(ordered, pageable, total);
+        return new PageImpl<>(ordered, pageable, rankedIds.size());
     }
 
     // 마지막 수단. 정확히 일치하는 게 없을 때 가장 비슷한 것을 돌려준다.

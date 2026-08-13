@@ -43,7 +43,7 @@ class SpotServiceSimilarFallbackTest {
         return new SpotService(
                 spotRepository, null, null, null, null,
                 meterRegistry,
-                new SearchProperties(SearchEngine.FULLTEXT, normalize, similar, false),
+                new SearchProperties(SearchEngine.FULLTEXT, normalize, similar, false, false),
                 null
         );
     }
