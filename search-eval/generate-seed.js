@@ -281,9 +281,12 @@ function main() {
     }
 
     // 되돌리기용. 실험 조건을 바꿀 때마다 필러만 지우고 다시 넣는다.
+    // chat_room도 지우는 이유: SpotCreatedEvent 리스너(ChatRoomEventListener)가 스팟마다
+    // 채팅방을 만드는데, spot.id를 FK로 참조하므로 먼저 지우지 않으면 스팟 삭제가 막힌다.
     writeFileSync(join(outDir, 'cleanup.sql'), [
         '-- 필러 스팟만 삭제한다. 실제 스팟 135건(id 1~135)은 건드리지 않는다.',
         'SET NAMES utf8mb4;',
+        `DELETE FROM chat_room WHERE spot_id >= ${FILLER_START_ID};`,
         `DELETE FROM spot_categories WHERE spot_id >= ${FILLER_START_ID};`,
         `DELETE FROM spot WHERE id >= ${FILLER_START_ID};`,
         '',
