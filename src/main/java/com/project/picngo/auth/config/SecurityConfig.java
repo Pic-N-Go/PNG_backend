@@ -70,6 +70,10 @@ public class SecurityConfig {
 					// 관리자 전용. PUBLIC_ENDPOINTS의 /spots/** 와 겹치지 않도록 경로를
 					// /admin 아래로 뺐다 - /spots/... 밑에 뒀다면 전부 공개돼버린다.
 					.requestMatchers("/admin/**").hasRole("ADMIN")
+					// 관광공사 데이터 동기화(POST /tour-api/sync, /sync/all).
+					// 외부 API 일일 호출 한도를 소모하고 spot 테이블에 쓰는 작업이라
+					// 공개해두면 누구나 그날 할당량을 태울 수 있다.
+					.requestMatchers("/tour-api/**").hasRole("ADMIN")
 					.requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
 					// 관심테마 기반 개인화 추천이라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 					.requestMatchers(HttpMethod.GET, "/spots/recommended").authenticated()
@@ -79,8 +83,7 @@ public class SecurityConfig {
 					// 북마크는 사용자별 데이터라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 					.requestMatchers("/spots/*/bookmark-collections").authenticated()
 					.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll()
-					.requestMatchers("/tour-api/**").permitAll(); // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
+					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll();
 
 				// loadtest 프로파일일 때만 부하테스트/관리자용 엔드포인트를 추가로 연다.
 				LoadTestPublicEndpoints extra = loadTestPublicEndpoints.getIfAvailable();
