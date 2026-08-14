@@ -71,3 +71,6 @@ search-eval/out/embeddings.partial.json
 # 실수로 커밋되기 쉽다(실제로 두 개가 커밋된 적 있다).
 hs_err_pid*.log
 replay_pid*.log
+
+load-test/
+search-eval/
