@@ -41,9 +41,13 @@ public interface SpotControllerApiSpec {
 
     @Operation(
             summary = "스팟 목록 조회",
-            description = "승인된 스팟 목록을 카테고리, 정렬, 페이지 조건에 따라 조회합니다."
+            description = "승인된 스팟 목록을 카테고리, 정렬, 페이지 조건에 따라 조회합니다. "
+                    + "로그인 없이도 호출 가능하며, 이 경우 isBookmarked는 항상 false로 반환됩니다. "
+                    + "만료·무효 토큰으로 호출하면 401이 아니라 비로그인과 동일하게 처리됩니다(isBookmarked 전부 false).",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     ResponseEntity<Page<SpotResponse>> getSpots(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(
                     description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 "
                             + "(하나라도 해당하는 스팟이 조회됨). 예: category=BEACH&category=CAFE 또는 category=BEACH,CAFE",
@@ -56,9 +60,13 @@ public interface SpotControllerApiSpec {
 
     @Operation(
             summary = "인기 스팟 조회",
-            description = "북마크 수와 리뷰 수를 기준으로 인기 스팟 목록을 조회합니다."
+            description = "북마크 수와 리뷰 수를 기준으로 인기 스팟 목록을 조회합니다. "
+                    + "로그인 없이도 호출 가능하며, 이 경우 isBookmarked는 항상 false로 반환됩니다. "
+                    + "만료·무효 토큰으로 호출하면 401이 아니라 비로그인과 동일하게 처리됩니다(isBookmarked 전부 false).",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     ResponseEntity<List<SpotResponse>> getPopularSpots(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(
                     description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 "
                             + "(하나라도 해당하는 스팟이 조회됨). 예: category=BEACH&category=CAFE 또는 category=BEACH,CAFE",
@@ -69,9 +77,13 @@ public interface SpotControllerApiSpec {
 
     @Operation(
             summary = "스팟 검색",
-            description = "검색어를 기준으로 스팟 이름, 주소, 개요를 검색합니다."
+            description = "검색어를 기준으로 스팟 이름, 주소, 개요를 검색합니다. "
+                    + "로그인 없이도 호출 가능하며, 이 경우 isBookmarked는 항상 false로 반환됩니다. "
+                    + "만료·무효 토큰으로 호출하면 401이 아니라 비로그인과 동일하게 처리됩니다(isBookmarked 전부 false).",
+            security = @SecurityRequirement(name = "bearerAuth")
     )
     ResponseEntity<Page<SpotResponse>> searchSpots(
+            @Parameter(hidden = true) CustomUserDetails userDetails,
             @Parameter(description = "검색어") @RequestParam String keyword,
             @Parameter(
                     description = "스팟 카테고리. 여러 개 지정 가능하며 OR 조합으로 동작한다 "

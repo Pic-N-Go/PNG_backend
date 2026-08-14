@@ -185,4 +185,30 @@ public class ApiSecurityTest {
         mockMvc.perform(get("/spots/1"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403));
     }
+
+    /*
+     * 목록 3종은 isBookmarked를 채우려고 @AuthenticationPrincipal을 받는다. 이 경로들은 permitAll이라
+     * 비로그인 요청이 정상 트래픽이고, principal 해석이 null로 떨어져야 200이 난다.
+     * 파라미터 타입이 바뀌어 resolver가 매칭에 실패하면 공개 엔드포인트가 500으로 죽으므로 200을 못 박는다.
+     */
+    @Test
+    @DisplayName("스팟 목록 API - 토큰 없이 호출해도 200이다 (공개 API, isBookmarked는 false)")
+    void 스팟_목록_API_토큰_없이_호출시_200() throws Exception {
+        mockMvc.perform(get("/spots").param("size", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("인기 스팟 API - 토큰 없이 호출해도 200이다 (공개 API, isBookmarked는 false)")
+    void 인기_스팟_API_토큰_없이_호출시_200() throws Exception {
+        mockMvc.perform(get("/spots/popular").param("size", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("스팟 검색 API - 토큰 없이 호출해도 200이다 (공개 API, isBookmarked는 false)")
+    void 스팟_검색_API_토큰_없이_호출시_200() throws Exception {
+        mockMvc.perform(get("/spots/search").param("keyword", "공원").param("size", "1"))
+                .andExpect(status().isOk());
+    }
 }

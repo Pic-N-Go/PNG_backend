@@ -25,7 +25,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -103,49 +106,35 @@ public class SpotService {
         return SpotPhotoResponse.of(spotId, spotPhotoRepository.findBySpotIdAndUserIdIsNullOrderByIdAsc(spotId));
     }
 
-    public Page<SpotResponse> getSpots(List<String> category, String sort, int page, int size) {
+    public Page<SpotResponse> getSpots(List<String> category, String sort, int page, int size, Long userId) {
         List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(page, size, sort);
 
-        if (spotCategories == null) {
-            return spotRepository.findAllByStatusAndIsActiveTrue(
-                    SpotStatus.APPROVED,
-                    pageable
-            ).map(SpotResponse::from);
-        }
+        Page<Spot> spots = spotCategories == null
+                ? spotRepository.findAllByStatusAndIsActiveTrue(SpotStatus.APPROVED, pageable)
+                : spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(spotCategories, SpotStatus.APPROVED, pageable);
 
-        return spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(
-                spotCategories,
-                SpotStatus.APPROVED,
-                pageable
-        ).map(SpotResponse::from);
+        Set<Long> bookmarked = bookmarkedSpotIds(userId, spots.getContent());
+        return spots.map(spot -> SpotResponse.from(spot, isBookmarked(bookmarked, spot)));
     }
 
     // 북마크 수와 리뷰 수를 기준으로 인기스팟 조회
-    public List<SpotResponse> getPopularSpots(List<String> category, int size){
+    public List<SpotResponse> getPopularSpots(List<String> category, int size, Long userId){
         List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(0, size, "popular");
 
-        if (spotCategories == null) {
-            return spotRepository.findListByStatusAndIsActiveTrue(
-                    SpotStatus.APPROVED,
-                    pageable
-            ).stream()
-                    .map(SpotResponse::from)
-                    .toList();
-        }
+        List<Spot> spots = spotCategories == null
+                ? spotRepository.findListByStatusAndIsActiveTrue(SpotStatus.APPROVED, pageable)
+                : spotRepository.findListByCategoriesAndStatusAndIsActiveTrue(spotCategories, SpotStatus.APPROVED, pageable);
 
-        return spotRepository.findListByCategoriesAndStatusAndIsActiveTrue(
-                spotCategories,
-                SpotStatus.APPROVED,
-                pageable
-        ).stream()
-                .map(SpotResponse::from)
+        Set<Long> bookmarked = bookmarkedSpotIds(userId, spots);
+        return spots.stream()
+                .map(spot -> SpotResponse.from(spot, isBookmarked(bookmarked, spot)))
                 .toList();
     }
 
     // 키워드로 스팟 검색하기
-    public Page<SpotResponse> searchSpots(String keyword, List<String> category, int page, int size) {
+    public Page<SpotResponse> searchSpots(String keyword, List<String> category, int page, int size, Long userId) {
         if (keyword == null || keyword.isBlank()) {
             throw new CustomException(SpotErrorCode.SEARCH_KEYWORD_REQUIRED);
         }
@@ -153,20 +142,34 @@ public class SpotService {
         List<SpotCategory> spotCategories = parseCategories(category);
         Pageable pageable = createPageable(page, size, "latest");
 
-        if (spotCategories == null) {
-            return spotRepository.searchSpots(
-                    keyword.trim(),
-                    SpotStatus.APPROVED,
-                    pageable
-            ).map(SpotResponse::from);
-        }
+        Page<Spot> spots = spotCategories == null
+                ? spotRepository.searchSpots(keyword.trim(), SpotStatus.APPROVED, pageable)
+                : spotRepository.searchSpotsByCategories(keyword.trim(), spotCategories, SpotStatus.APPROVED, pageable);
 
-        return spotRepository.searchSpotsByCategories(
-                keyword.trim(),
-                spotCategories,
-                SpotStatus.APPROVED,
-                pageable
-        ).map(SpotResponse::from);
+        Set<Long> bookmarked = bookmarkedSpotIds(userId, spots.getContent());
+        return spots.map(spot -> SpotResponse.from(spot, isBookmarked(bookmarked, spot)));
+    }
+
+    /**
+     * 목록에 실린 스팟 중 이 유저가 북마크한 것들의 ID.
+     * 비로그인이거나 목록이 비면 쿼리를 아예 날리지 않는다(빈 IN 절 방지).
+     */
+    private Set<Long> bookmarkedSpotIds(Long userId, List<Spot> spots) {
+        if (userId == null || spots.isEmpty()) {
+            return Collections.emptySet();
+        }
+        List<Long> spotIds = spots.stream().map(Spot::getId).filter(Objects::nonNull).toList();
+        if (spotIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return Set.copyOf(bookmarkCollectionSpotRepository.findBookmarkedSpotIds(userId, spotIds));
+    }
+
+    // Set.copyOf()는 contains(null)에서 NPE를 던지므로 id를 여기서 확인한다. 세 목록 메서드가 같은
+    // 판정을 쓰므로 한 곳에 둔다 — 호출부에 복사되면 한쪽만 틀려도 드러나지 않는다.
+    private static boolean isBookmarked(Set<Long> bookmarkedSpotIds, Spot spot) {
+        Long id = spot.getId();
+        return id != null && bookmarkedSpotIds.contains(id);
     }
 
     private Pageable createPageable(int page, int size, String sort) {
