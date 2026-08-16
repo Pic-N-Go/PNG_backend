@@ -119,6 +119,45 @@ services:
     networks:
       - picngo-net
 
+  # MySQL 내부 상태를 프로메테우스로 노출한다. 앱 지표(http_server_requests)만으로는
+  # "느리다"까지만 알 수 있고 "왜 느린가"를 못 본다. 검색 쿼리가 LIKE '%키워드%'라
+  # 인덱스를 못 타는데, 그 증거(스캔한 행 수 / 버퍼풀 히트율 / 임시테이블)는 DB 쪽에만 있다.
+  #
+  # 인증: 지금은 root로 붙는다. mysql-data 볼륨이 이미 초기화된 상태라
+  # /docker-entrypoint-initdb.d 스크립트가 실행되지 않아서, 전용 계정을 쓰려면
+  # 아래를 수동으로 실행한 뒤 --mysqld.username과 비밀번호를 바꿔주면 된다:
+  #   CREATE USER 'exporter'@'%' IDENTIFIED BY '...' WITH MAX_USER_CONNECTIONS 3;
+  #   GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'%';
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: picngo-mysqld-exporter
+    restart: always
+    logging: *default-logging
+    command:
+      - "--mysqld.address=mysql:3306"
+      - "--mysqld.username=root"
+      # 기본 수집기(global_status/global_variables)에서 나오는 핵심 지표:
+      #   handler_read_rnd_next      - 풀스캔으로 읽은 행 수. 검색 1회당 증가량이 곧 스캔 비용
+      #   innodb_buffer_pool_reads   - 버퍼풀 미스. 풀스캔이 캐시를 밀어내는 순간이 보인다
+      #   created_tmp_disk_tables    - filesort/임시테이블이 디스크로 내려간 횟수
+      #   threads_running            - 동시 실행 스레드. 코어 수를 넘으면 지연이 급격히 꺾인다
+      - "--collect.info_schema.innodb_metrics"
+      # 쿼리 다이제스트별 통계. rows_examined / rows_sent 비율(= 선택도)과
+      # no_index_used 카운터가 여기서 나온다. "1건 반환하려고 N행을 읽는다"를
+      # 한 숫자로 보여주는 지표라 이번 계측의 핵심이다.
+      - "--collect.perf_schema.eventsstatements"
+      # 다이제스트는 종류만큼 시계열이 생긴다. 상위 50개로 잘라 카디널리티를 묶어둔다.
+      - "--collect.perf_schema.eventsstatements.limit=50"
+      - "--collect.perf_schema.eventsstatements.digest_text_limit=120"
+      - "--collect.perf_schema.tablelocks"
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - picngo-net
+
   prometheus:
     image: prom/prometheus:latest
     container_name: picngo-prometheus

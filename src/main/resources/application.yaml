@@ -116,10 +116,106 @@ cloud:
       bucket: ${AWS_S3_BUCKET}
       presigned-url-expiration-minutes: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
 
+picngo:
+  search:
+    # 키워드 검색 구현 방식. LIKE | FULLTEXT
+    #
+    # FULLTEXT로 바꾸기 전에 docs/search-fulltext-index-migration.sql을 먼저 적용해야 한다.
+    # 인덱스 없이 FULLTEXT로 두면 MATCH()가 인덱스를 못 찾아 ERROR 1191로 검색이 전부 실패한다.
+    #
+    # 두 방식을 비교 측정하는 중이라 설정으로 남겨뒀다. 비교가 끝나고 한쪽으로 확정되면
+    # 나머지 구현과 이 설정을 함께 제거하는 게 맞다.
+    engine: ${SEARCH_ENGINE:LIKE}
+
+    # 위 검색이 0건일 때 띄어쓰기를 무시하고 한 번 더 찾을지.
+    #
+    # 켜기 전에 docs/search-normalized-column-migration.sql을 먼저 적용해야 한다.
+    # search_norm 컬럼과 색인이 없으면 폴백 쿼리가 전부 실패한다.
+    #
+    # 결과가 있는 검색에는 추가 쿼리가 나가지 않는다. 0건일 때만 한 번 더 도는 구조라
+    # 정상 검색의 비용은 그대로다.
+    normalize-fallback: ${SEARCH_NORMALIZE_FALLBACK:false}
+
+    # 위 두 단계가 모두 0건일 때 "가장 비슷한 것"을 찾을지. 오타 흡수용이다.
+    #
+    # normalize-fallback과 같은 색인을 쓰므로 추가 마이그레이션은 없다.
+    # 다만 이 단계만 정렬이 최신순이 아니라 관련도순이다. 정확히 일치하는 게
+    # 없어서 부른 단계라, 비슷한 순으로 보여주는 게 맞다.
+    #
+    # 조각 하나만 겹쳐도 후보에 들어오므로 엉뚱한 결과가 섞일 수 있다.
+    # 골든셋의 MRR(정답이 몇 번째로 나오는지)로 그 정도를 확인할 것.
+    similar-fallback: ${SEARCH_SIMILAR_FALLBACK:false}
+
+    # 위 유사도 검색까지 0건일 때, 글자를 직접 맞대어 "몇 글자 다른지"로 찾을지.
+    #
+    # 위 단계와 목적은 같지만(오타 흡수) 잘하는 영역이 다르다. 위 단계는 두 글자
+    # 조각이 겹치는지로 찾아서 짧은 검색어에 약하다 - '헙재'는 조각이 하나뿐이라
+    # 그게 틀리면 남는 게 없고, '오셜록'은 가운데를 틀리면 조각 둘이 다 깨진다.
+    # 이 단계는 조각으로 쪼개지 않아 그 한계가 없다.
+    #
+    # 대신 색인을 못 쓰고 후보 전부를 훑는다(추가 마이그레이션은 없다).
+    # 앞 단계가 모두 0건일 때만 도는 데다 스팟이 수천 건 규모라 감당 가능하지만,
+    # 켠 뒤에는 stage=fuzzy 비중과 이 단계의 지연시간을 같이 봐야 한다.
+    fuzzy-fallback: ${SEARCH_FUZZY_FALLBACK:false}
+
+    # 앞 네 단계가 모두 0건일 때 임베딩 코사인 유사도로 찾을지. 오타/포함 관계가 아니라
+    # 뜻이 가까운 것을 찾는 마지막 단계다.
+    #
+    # 켜기 전에 두 가지가 준비돼 있어야 한다: picngo.embedding.api-key,
+    # 그리고 스팟들의 embedding 컬럼(SpotEmbeddingBackfillService가 채운다).
+    # 둘 다 없는 채로 켜도 장애는 안 나고 그냥 항상 0건으로 끝난다.
+    semantic-fallback: ${SEARCH_SEMANTIC_FALLBACK:false}
+
+  embedding:
+    # 비워두면 OpenAiEmbeddingClient가 항상 Optional.empty()를 돌려주고,
+    # semantic-fallback은 켜져 있어도 항상 0건으로 끝난다(장애는 안 남).
+    api-key: ${OPENAI_API_KEY:}
+    model: ${EMBEDDING_MODEL:text-embedding-3-small}
+    base-url: ${EMBEDDING_BASE_URL:https://api.openai.com/v1/embeddings}
+
 management:
   metrics:
     tags:
       application: ${spring.application.name}
+      # 실행 중인 검색 방식을 모든 지표에 공통 태그로 붙인다. LIKE/FULLTEXT 두 번의
+      # 측정을 한 대시보드에서 나란히 볼 수 있게 하는 것이 목적이다.
+      #
+      # SpotService도 검색 지표에 engine 태그를 직접 붙인다. 역할이 다르다 -
+      # 이쪽은 서비스 코드가 만들지 않는 지표(http_server_requests, hikaricp 등)까지
+      # 덮고, 저쪽은 실제 SearchProperties 값에서 나오는 authoritative 값이다.
+      # 태그 키가 겹치면 Micrometer는 명시 태그를 우선하므로 충돌하지 않는다.
+      #
+      # ⚠️ picngo.search.engine과 반드시 같은 환경변수를 참조해야 한다. 따로 놀면
+      #    지표에는 LIKE라고 찍히는데 실제로는 FULLTEXT로 도는 상황이 생긴다.
+      engine: ${SEARCH_ENGINE:LIKE}
+    distribution:
+      # 히스토그램 버킷을 켜야 프로메테우스에서 histogram_quantile()로 p95/p99를 뽑을 수 있다.
+      # 이 설정이 없으면 count/sum/max만 노출돼서 사실상 평균밖에 못 본다
+      # (평균 31ms는 p99가 2초여도 나올 수 있는 값이라 성능 판단 근거가 되지 못한다).
+      percentiles-histogram:
+        http.server.requests: true
+        spot.search.duration: true
+        # 요청당 SQL 개수는 평균이 아니라 분포로 봐야 한다. 평균 3개여도
+        # 지도처럼 결과가 많은 요청만 300개면 그 요청을 쓰는 사용자는 못 견딘다.
+        spot.search.sql.count: true
+      # SLO 경계값은 별도 버킷으로 잡히므로, 여기 적은 값들이 곧 대시보드에서
+      # "요청의 몇 %가 이 시간 안에 끝났는가"를 오차 없이 뽑을 수 있는 지점이 된다.
+      # 검색 API 목표: p95 < 200ms, p99 < 500ms.
+      # 꼬리 쪽(5s, 10s, 30s)도 경계로 넣어둔다. 부하 상태에서 실제 분포가
+      # 그 구간에 들어와서, 없으면 1s~60s 사이가 버킷 하나로 뭉개진다.
+      slo:
+        http.server.requests: 50ms, 100ms, 200ms, 500ms, 1s, 3s, 5s, 10s, 30s
+        spot.search.duration: 10ms, 50ms, 100ms, 200ms, 500ms, 1s, 3s, 5s, 10s, 30s
+      # 상한을 안 정하면 마지막 버킷 위쪽이 전부 +Inf로 뭉쳐서 꼬리 구간 분해능이 사라진다.
+      #
+      # 처음엔 10s/5s로 잡았는데, 부하 상태에서 p95가 정확히 10.0s에 붙어 평평해졌다.
+      # 그건 실제 응답시간이 아니라 최상단 버킷 경계값이다 - histogram_quantile은
+      # 상한을 넘은 요청을 전부 마지막 버킷으로 보고 그 경계값을 돌려주기 때문에,
+      # 실제 p95가 10초인지 40초인지 구별할 수 없었다. 한계를 측정하는 게 목적인
+      # 실험에서 꼬리가 잘리면 측정 자체가 성립하지 않아 상한을 올린다.
+      maximum-expected-value:
+        http.server.requests: 60s
+        spot.search.duration: 60s
   endpoints:
     web:
       exposure:
