@@ -1,0 +1,22 @@
+# 로컬 개발/테스트용 프로메테우스 설정.
+# 호스트에서 구동 중인 Spring Boot(localhost:8080) 및 MySQL 지표를 수집한다.
+
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 호스트(로컬 IDE / Gradle)에서 구동 중인 Spring Boot 지표 수집
+  - job_name: 'picngo-app-local'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+
+  # 로컬 MySQL 전용 감시 로봇(mysqld_exporter) 지표 수집
+  - job_name: 'picngo-mysql-local'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['png-mysqld-exporter:9104']

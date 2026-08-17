@@ -2,15 +2,20 @@ package com.project.picngo.spot.service;
 
 import com.project.picngo.bookmark.repository.BookmarkCollectionSpotRepository;
 import com.project.picngo.common.domain.SpotCategory;
+import com.project.picngo.spot.config.SearchEngine;
+import com.project.picngo.spot.config.SearchProperties;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.SpotStatus;
 import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.repository.SpotRepository;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -42,6 +47,14 @@ class SpotServiceBookmarkFlagTest {
 
     @Mock
     private BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
+
+    // searchSpots가 계측(SqlCounting·Timer)과 검색 단계 설정을 타므로 이 둘이 없으면 NPE가 난다.
+    // 폴백은 전부 끈다 — 여기서 고정하는 건 북마크 플래그지 검색 단계가 아니다.
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+    @Spy
+    private SearchProperties searchProperties = new SearchProperties(SearchEngine.LIKE, false, false, false, false);
 
     @InjectMocks
     private SpotService spotService;

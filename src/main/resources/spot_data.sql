@@ -298,3 +298,15 @@ VALUES
 (134, 'PARK'),
 (135, 'PARK'), (135, 'FOREST')
 ON DUPLICATE KEY UPDATE spot_id=spot_id;
+
+-- ============================================================
+-- overview 텍스트는 여기에 두지 않는다.
+--
+-- 이 파일은 spring.sql.init.mode=always 라서 앱이 뜰 때마다 실행된다.
+-- UPDATE 문을 여기에 두면 재시작할 때마다 overview를 덮어쓴다. 관광데이터포털에서
+-- 받아온 실제 설명문이 있어도 매번 생성 텍스트로 되돌아가고, SQL로 직접 바꾸는
+-- 것이라 임베딩 무효화(Spot.updateFromTourApi)도 건너뛰어 낡은 임베딩이 남는다.
+--
+-- 필요할 때 아래 파일을 한 번만 직접 실행할 것:
+--   docs/spot-overview-backfill-migration.sql
+-- ============================================================

@@ -1,0 +1,526 @@
+{
+  "title": "PicNGo 검색 성능 분석",
+  "description": "MySQL LIKE 기반 검색의 한계를 정량화하기 위한 대시보드. 앱 지표(응답시간/커넥션풀)와 MySQL 내부 지표(스캔 행 수/선택도/버퍼풀)를 같은 시간축에 놓고 본다.",
+  "uid": "picngo-search-perf",
+  "tags": ["picngo", "search", "mysql"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "editable": true,
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "DS",
+        "label": "데이터소스",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "options": [],
+        "refresh": 1,
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "skipUrlSync": false
+      },
+      {
+        "name": "type",
+        "label": "검색 종류",
+        "type": "custom",
+        "query": "keyword,map",
+        "current": { "text": "keyword", "value": "keyword" },
+        "options": [
+          { "text": "keyword", "value": "keyword", "selected": true },
+          { "text": "map", "value": "map", "selected": false }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "engine",
+        "label": "검색 엔진",
+        "type": "custom",
+        "query": "LIKE,FULLTEXT",
+        "current": { "text": "All", "value": "$__all" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "LIKE", "value": "LIKE", "selected": false },
+          { "text": "FULLTEXT", "value": "FULLTEXT", "selected": false }
+        ],
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "hide": 0,
+        "skipUrlSync": false
+      },
+      {
+        "name": "filtered",
+        "label": "카테고리 필터",
+        "type": "custom",
+        "query": "true,false",
+        "current": { "text": "All", "value": "$__all" },
+        "options": [
+          { "text": "All", "value": "$__all", "selected": true },
+          { "text": "true", "value": "true", "selected": false },
+          { "text": "false", "value": "false", "selected": false }
+        ],
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "앱 - 얼마나 느린가",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "처리량 (RPS)",
+      "description": "응답시간 그래프는 반드시 부하량과 짝으로 봐야 한다. 부하가 없어서 빨랐던 것과 실제로 빠른 것을 구별할 수 없기 때문이다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "sum by (uri) (rate(http_server_requests_seconds_count{uri=~\"/spots.*\"}[$__rate_interval]))",
+          "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "API 전체 응답시간 p95 / p99",
+      "description": "직렬화와 네트워크까지 포함한 사용자 체감 시간. 아래 '내부 구간' 패널과의 차이가 곧 DB 밖에서 쓰는 시간이다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.2 },
+              { "color": "red", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket{uri=~\"/spots.*\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{uri}}"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "histogram_quantile(0.99, sum by (le, uri) (rate(http_server_requests_seconds_bucket{uri=~\"/spots.*\"}[$__rate_interval])))",
+          "legendFormat": "p99 {{uri}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "검색 내부 구간 p95 — 쿼리 vs 매핑 ($type)",
+      "description": "query = 검색 SQL + EAGER 연관 로딩. mapping = DTO 변환 중 LAZY 카테고리 지연 로딩(N+1). 둘을 나눠 봐야 인덱스를 고칠 일인지 fetch join을 할 일인지 알 수 있다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "histogram_quantile(0.95, sum by (le, phase, engine) (rate(spot_search_duration_seconds_bucket{type=\"$type\", filtered=~\"$filtered\", engine=~\"$engine\"}[$__rate_interval])))",
+          "legendFormat": "{{engine}} / {{phase}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "SLO 준수율 (검색 200ms 이내)",
+      "description": "application.yaml의 SLO 버킷(200ms)을 그대로 읽는다. 보간 오차 없는 정확한 비율.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.9 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "sum(rate(http_server_requests_seconds_bucket{uri=~\"/spots/search.*\", le=\"0.2\"}[$__rate_interval])) / sum(rate(http_server_requests_seconds_count{uri=~\"/spots/search.*\"}[$__rate_interval]))",
+          "legendFormat": "200ms 이내"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "검색 무결과 비율 ($type)",
+      "description": "결과 0건으로 끝난 검색의 비율. 운영 모니터링 지표다. 기술 선택의 근거로 삼으려면 실사용 트래픽이 충분해야 하고, 그 전까지는 search-eval의 골든셋 평가를 쓴다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 9 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 0.1 },
+              { "color": "red", "value": 0.25 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "sum by (engine) (rate(spot_search_result_total{type=\"$type\", outcome=\"zero\", engine=~\"$engine\"}[$__rate_interval])) / clamp_min(sum by (engine) (rate(spot_search_result_total{type=\"$type\", engine=~\"$engine\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": "{{engine}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "연쇄 효과 - 검색 부하가 다른 API까지 끌어내리는가",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "HikariCP — 커넥션 대기",
+      "description": "풀스캔이 커넥션을 오래 점유하면 pending이 쌓이고, 검색과 무관한 API까지 같이 느려진다. 검색 하나가 서비스 전체를 끌어내리는 지점이 여기서 보인다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "fieldConfig": {
+        "defaults": { "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "평균 획득 대기시간" },
+            "properties": [
+              { "id": "unit", "value": "s" },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "hikaricp_connections_pending",
+          "legendFormat": "대기 중인 요청"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "사용 중 커넥션"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum[$__rate_interval]) / clamp_min(rate(hikaricp_connections_acquire_seconds_count[$__rate_interval]), 0.0001)",
+          "legendFormat": "평균 획득 대기시간"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "읽기 증폭 — 지도 요청 / 검색 요청",
+      "description": "디바운싱을 넣어도 지도 팬 한 번에 요청이 하나씩 나간다. 이 배수가 '지도 쿼리가 많이 나간다'는 체감을 숫자로 바꾼 값이다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "sum(rate(http_server_requests_seconds_count{uri=~\"/spots/map.*\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_requests_seconds_count{uri=~\"/spots/search.*\"}[$__rate_interval])), 0.0001)",
+          "legendFormat": "지도 : 검색 배수"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "row",
+      "title": "MySQL - 왜 느린가",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "풀스캔으로 읽은 행 수 (handler_read_rnd_next)",
+      "description": "인덱스 없이 순차로 읽은 행 수. LIKE '%키워드%'는 선행 와일드카드라 인덱스를 못 타므로 이 값이 검색 부하에 비례해 오른다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 27 },
+      "fieldConfig": {
+        "defaults": { "unit": "rowsps", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "rate(mysql_global_status_handler_read_rnd_next[$__rate_interval])",
+          "legendFormat": "초당 순차 읽기 행"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "선택도 — 읽은 행 / 반환한 행 (상위 5)",
+      "description": "1건 반환하려고 몇 행을 읽는지. 이 비율이 검색 쿼리의 비효율을 한 숫자로 요약한다. FULLTEXT 인덱스 적용 전후를 비교할 때 가장 명확하게 움직이는 값이다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 27 },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 0, "lineWidth": 2 } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_rows_examined_total[$__rate_interval]) / clamp_min(rate(mysql_perf_schema_events_statements_rows_sent_total[$__rate_interval]), 1))",
+          "legendFormat": "{{digest_text}}"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "인덱스 미사용 실행 (no_index_used)",
+      "description": "인덱스를 전혀 타지 못한 쿼리 실행 횟수. 인덱스 개선이 실제로 먹혔는지 확인하는 가장 직접적인 지표 - 개선이 성공하면 0으로 떨어진다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 27 },
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "topk(5, rate(mysql_perf_schema_events_statements_no_index_used_total[$__rate_interval]))",
+          "legendFormat": "{{digest_text}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "InnoDB 버퍼풀 히트율",
+      "description": "데이터가 커지면서 풀스캔이 캐시를 밀어내는 순간 이 값이 꺾인다. 응답시간이 급격히 나빠지는 지점과 대개 일치한다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.9 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "calcs": [] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "1 - (rate(mysql_global_status_innodb_buffer_pool_reads[$__rate_interval]) / clamp_min(rate(mysql_global_status_innodb_buffer_pool_read_requests[$__rate_interval]), 1))",
+          "legendFormat": "버퍼풀 히트율"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "동시 실행 스레드 / 디스크 임시테이블",
+      "description": "threads_running이 코어 수를 넘어서면 지연이 급격히 꺾인다(knee). 디스크 임시테이블은 filesort가 메모리를 넘쳐 디스크로 내려간 횟수로, 정렬 비용이 터지는 신호다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "fieldConfig": {
+        "defaults": { "min": 0, "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2 } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "디스크 임시테이블/초" },
+            "properties": [{ "id": "custom.axisPlacement", "value": "right" }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "mysql_global_status_threads_running",
+          "legendFormat": "동시 실행 스레드"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "rate(mysql_global_status_created_tmp_disk_tables[$__rate_interval])",
+          "legendFormat": "디스크 임시테이블/초"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "검색 단계 - 어느 층이 결과를 냈나",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "단계별 결과 비율",
+      "description": "primary = 기본 검색이 바로 찾음. normalized = 띄어쓰기를 무시하고 재시도해서 찾음. none = 끝내 못 찾음.\n\nnormalized 비중이 0에 가깝다면 그 층은 비용만 쓰고 있는 것이다. none이 줄어드는 것이 폴백을 추가한 목적이다.",
+      "datasource": { "type": "prometheus", "uid": "${DS}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 35, "lineWidth": 1, "stacking": { "mode": "normal" } }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "none" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
+          { "matcher": { "id": "byName", "options": "normalized" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byName", "options": "primary" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${DS}" },
+          "expr": "sum by (stage) (rate(spot_search_stage_total{engine=~\"$engine\"}[$__rate_interval])) / scalar(sum(rate(spot_search_stage_total{engine=~\"$engine\"}[$__rate_interval])))",
+          "legendFormat": "{{stage}}"
+        }
+      ]
+    }
+  ]
+}
