@@ -2,11 +2,13 @@ package com.project.picngo.user.service;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.UserEquipmentErrorCode;
+import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.user.domain.UserEquipment;
 import com.project.picngo.user.dto.UserEquipmentCreateRequest;
 import com.project.picngo.user.dto.UserEquipmentResponse;
 import com.project.picngo.user.dto.UserEquipmentUpdateRequest;
 import com.project.picngo.user.repository.UserEquipmentRepository;
+import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ public class UserEquipmentService {
     private static final int MAX_EQUIPMENT_COUNT = 20;
 
     private final UserEquipmentRepository userEquipmentRepository;
+    private final UserRepository userRepository;
 
     public List<UserEquipmentResponse> getMyEquipments(Long userId){
         return userEquipmentRepository.findAllByUserIdOrderByCreatedAtAsc(userId)
@@ -31,6 +34,10 @@ public class UserEquipmentService {
 
     @Transactional
     public UserEquipmentResponse createUserEquipment(Long userId, UserEquipmentCreateRequest request){
+
+        //같은 사용자의 장비 등록 요청을 직렬화
+        userRepository.findByIdForUpdate(userId).orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
         String equipmentName = request.equipmentName().trim();
 
         validateDuplicate(userId, request, equipmentName);
