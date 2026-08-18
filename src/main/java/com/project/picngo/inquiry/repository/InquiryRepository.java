@@ -29,4 +29,9 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
             @Param("keyword") String keyword,
             Pageable pageable
     );
+
+    java.util.List<Inquiry> findByStatusAndIsResolvedFalseAndAnsweredAtBefore(
+            InquiryStatus status,
+            java.time.LocalDateTime threshold
+    );
 }
