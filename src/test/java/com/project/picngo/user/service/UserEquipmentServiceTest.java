@@ -3,11 +3,13 @@ package com.project.picngo.user.service;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.UserEquipmentErrorCode;
 import com.project.picngo.user.domain.EquipmentType;
+import com.project.picngo.user.domain.User;
 import com.project.picngo.user.domain.UserEquipment;
 import com.project.picngo.user.dto.UserEquipmentCreateRequest;
 import com.project.picngo.user.dto.UserEquipmentResponse;
 import com.project.picngo.user.dto.UserEquipmentUpdateRequest;
 import com.project.picngo.user.repository.UserEquipmentRepository;
+import com.project.picngo.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +35,9 @@ class UserEquipmentServiceTest {
 
     @Mock
     private UserEquipmentRepository userEquipmentRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private UserEquipmentService userEquipmentService;
@@ -57,6 +63,7 @@ class UserEquipmentServiceTest {
     void createsEquipmentForCurrentUserWithTrimmedName() {
         UserEquipmentCreateRequest request =
                 new UserEquipmentCreateRequest(EquipmentType.CAMERA, "  Sony A7IV  ");
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mock(User.class)));
         when(userEquipmentRepository.existsByUserIdAndEquipmentTypeAndEquipmentName(
                 1L, EquipmentType.CAMERA, "Sony A7IV"
         )).thenReturn(false);
@@ -78,6 +85,7 @@ class UserEquipmentServiceTest {
     void rejectsDuplicateEquipment() {
         UserEquipmentCreateRequest request =
                 new UserEquipmentCreateRequest(EquipmentType.CAMERA, "Sony A7IV");
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mock(User.class)));
         when(userEquipmentRepository.existsByUserIdAndEquipmentTypeAndEquipmentName(
                 1L, EquipmentType.CAMERA, "Sony A7IV"
         )).thenReturn(true);
@@ -96,6 +104,7 @@ class UserEquipmentServiceTest {
     void rejectsEquipmentOverLimit() {
         UserEquipmentCreateRequest request =
                 new UserEquipmentCreateRequest(EquipmentType.LENS, "새 렌즈");
+        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mock(User.class)));
         when(userEquipmentRepository.existsByUserIdAndEquipmentTypeAndEquipmentName(
                 1L, EquipmentType.LENS, "새 렌즈"
         )).thenReturn(false);
