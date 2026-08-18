@@ -55,6 +55,19 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             """)
     void decrementCommentCount(@Param("postId") Long postId);
 
+    /**
+     * 댓글 수를 임의 폭으로 줄인다. 답글이 달린 댓글을 지우면 한 번에 여러 개가 사라져
+     * decrementCommentCount(-1 고정)로는 맞출 수 없다. 음수로 떨어지지 않게 0에서 멈춘다.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Post p
+            set p.commentCount =
+                case when p.commentCount + :delta > 0 then p.commentCount + :delta else 0 end
+            where p.id = :postId
+            """)
+    void changeCommentCount(@Param("postId") Long postId, @Param("delta") long delta);
+
     @EntityGraph(attributePaths = {"author", "spot"})
     @Query("""
         select p

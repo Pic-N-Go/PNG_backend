@@ -43,6 +43,7 @@ public class PostService {
     private final PostLikeRepository likeRepository;
     private final PostBookmarkRepository bookmarkRepository;
     private final PostCommentRepository commentRepository;
+    private final PostCommentLikeRepository commentLikeRepository;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
     private final ExifExtractor exifExtractor;
@@ -243,6 +244,8 @@ public class PostService {
         List<String> imageObjectKeys = imageRepository.findObjectKeysByPostId(postId);
 
         // 댓글·좋아요·북마크는 데이터가 많아질 수 있으므로 JPA Cascade 대신 게시글 ID 기준 일괄 삭제 쿼리를 사용
+        // 댓글 좋아요는 댓글을 참조하므로 반드시 댓글보다 먼저 지운다(FK 위반 방지).
+        commentLikeRepository.deleteAllByPostId(postId);
         commentRepository.deleteAllByPostId(postId);
         likeRepository.deleteAllByPostId(postId);
         bookmarkRepository.deleteAllByPostId(postId);

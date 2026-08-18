@@ -50,6 +50,7 @@ class PostServiceTest {
     @Mock PostLikeRepository likeRepository;
     @Mock PostBookmarkRepository bookmarkRepository;
     @Mock PostCommentRepository commentRepository;
+    @Mock PostCommentLikeRepository commentLikeRepository;
     @Mock UserRepository userRepository;
     @Mock SpotRepository spotRepository;
     @Mock ExifExtractor exifExtractor;
