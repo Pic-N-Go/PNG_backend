@@ -5,6 +5,7 @@ import com.project.picngo.common.exception.code.InquiryErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.inquiry.domain.Inquiry;
 import com.project.picngo.inquiry.domain.InquiryStatus;
+import com.project.picngo.inquiry.domain.InquiryType;
 import com.project.picngo.inquiry.dto.InquiryResponse;
 import com.project.picngo.inquiry.repository.InquiryRepository;
 import com.project.picngo.user.domain.User;
@@ -30,11 +31,11 @@ public class AdminInquiryService {
     /**
      * 관리자용 전체 1:1 문의 목록 페이징 및 필터/검색 조회
      */
-    public Page<InquiryResponse> getInquiriesForAdmin(InquiryStatus status, Boolean isResolved, String keyword, int page, int size) {
+    public Page<InquiryResponse> getInquiriesForAdmin(InquiryType type, InquiryStatus status, Boolean isResolved, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), Sort.by(Sort.Direction.DESC, "createdAt"));
         String cleanKeyword = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
 
-        Page<Inquiry> inquiries = inquiryRepository.searchInquiriesForAdmin(status, isResolved, cleanKeyword, pageable);
+        Page<Inquiry> inquiries = inquiryRepository.searchInquiriesForAdmin(type, status, isResolved, cleanKeyword, pageable);
         return inquiries.map(InquiryResponse::from);
     }
 

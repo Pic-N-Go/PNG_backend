@@ -1,11 +1,17 @@
 package com.project.picngo.inquiry.dto;
 
+import com.project.picngo.inquiry.domain.InquiryType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 @Schema(description = "1:1 문의 작성 요청 DTO")
 public record InquiryCreateRequest(
+        @Schema(description = "문의 유형 (FEATURE: 기능 문의, BUG: 앱 오류 신고, ACCOUNT: 계정/로그인, SPOT: 스팟 정보 제보, OTHER: 기타)", example = "FEATURE")
+        @NotNull(message = "문의 유형(type)은 필수입니다.")
+        InquiryType type,
+
         @Schema(description = "문의 제목", example = "사진 코스 등록 관련 질문드립니다.")
         @NotBlank(message = "제목은 필수입니다.")
         @Size(max = 150, message = "제목은 최대 150자까지 입력 가능합니다.")

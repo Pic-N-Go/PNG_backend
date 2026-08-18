@@ -39,6 +39,10 @@ public class Inquiry extends BaseTimeEntity {
 
     private LocalDateTime answeredAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    private InquiryType type;
+
     @Column(nullable = false)
     private boolean isResolved = false;
 
@@ -47,17 +51,19 @@ public class Inquiry extends BaseTimeEntity {
     private InquiryStatus status = InquiryStatus.PENDING;
 
     @Builder
-    private Inquiry(User user, String title, String content) {
+    private Inquiry(User user, InquiryType type, String title, String content) {
         this.user = user;
+        this.type = type != null ? type : InquiryType.OTHER;
         this.title = title;
         this.content = content;
         this.isResolved = false;
         this.status = InquiryStatus.PENDING;
     }
 
-    public static Inquiry create(User user, String title, String content) {
+    public static Inquiry create(User user, InquiryType type, String title, String content) {
         return Inquiry.builder()
                 .user(user)
+                .type(type)
                 .title(title)
                 .content(content)
                 .build();

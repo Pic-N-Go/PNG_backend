@@ -2,6 +2,7 @@ package com.project.picngo.inquiry.dto;
 
 import com.project.picngo.inquiry.domain.Inquiry;
 import com.project.picngo.inquiry.domain.InquiryStatus;
+import com.project.picngo.inquiry.domain.InquiryType;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,9 @@ public record InquiryResponse(
 
         @Schema(description = "작성자 이메일", example = "user@example.com")
         String userEmail,
+
+        @Schema(description = "문의 유형 (FEATURE, BUG, ACCOUNT, SPOT, OTHER)", example = "FEATURE")
+        InquiryType type,
 
         @Schema(description = "문의 제목", example = "코스 등록 질문")
         String title,
@@ -53,6 +57,7 @@ public record InquiryResponse(
                 inquiry.getUser().getId(),
                 inquiry.getUser().getNickname(),
                 inquiry.getUser().getEmail(),
+                inquiry.getType(),
                 inquiry.getTitle(),
                 inquiry.getContent(),
                 inquiry.getAnswer(),

@@ -12,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import com.project.picngo.inquiry.domain.InquiryType;
+
 @RestController
 @RequestMapping("/admin/inquiries")
 @RequiredArgsConstructor
@@ -22,13 +24,14 @@ public class AdminInquiryController implements AdminInquiryControllerApiSpec {
     @Override
     @GetMapping
     public ResponseEntity<Page<InquiryResponse>> getInquiriesForAdmin(
+            @RequestParam(required = false) InquiryType type,
             @RequestParam(required = false) InquiryStatus status,
             @RequestParam(required = false) Boolean isResolved,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(adminInquiryService.getInquiriesForAdmin(status, isResolved, keyword, page, size));
+        return ResponseEntity.ok(adminInquiryService.getInquiriesForAdmin(type, status, isResolved, keyword, page, size));
     }
 
     @Override

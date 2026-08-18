@@ -36,7 +36,7 @@ public class InquiryService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
-        Inquiry inquiry = Inquiry.create(user, request.title().trim(), request.content().trim());
+        Inquiry inquiry = Inquiry.create(user, request.type(), request.title().trim(), request.content().trim());
         Inquiry saved = inquiryRepository.save(inquiry);
 
         log.info("신규 1:1 문의 등록 완료: inquiryId={}, userId={}", saved.getId(), userId);
