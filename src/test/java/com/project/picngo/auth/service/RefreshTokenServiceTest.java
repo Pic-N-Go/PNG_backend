@@ -60,11 +60,23 @@ class RefreshTokenServiceTest {
     }
 
     @Test
-    @DisplayName("Redis에 없거나 다른 사용자의 리프레시 토큰은 거부한다")
+    @DisplayName("Redis에 없는 리프레시 토큰은 거부한다")
     void rejectsUnregisteredRefreshToken() {
         when(jwtTokenProvider.getTokenId("refresh-token")).thenReturn("token-id");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.getAndDelete("auth:refresh:token-id")).thenReturn(null);
+
+        boolean consumed = refreshTokenService.consumeRefreshToken("refresh-token", 1L);
+
+        assertThat(consumed).isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 리프레시 토큰은 거부한다")
+    void rejectsRefreshTokenForDifferentUser() {
+        when(jwtTokenProvider.getTokenId("refresh-token")).thenReturn("token-id");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.getAndDelete("auth:refresh:token-id")).thenReturn("2");
 
         boolean consumed = refreshTokenService.consumeRefreshToken("refresh-token", 1L);
 
