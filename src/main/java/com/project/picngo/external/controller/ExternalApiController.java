@@ -1,11 +1,9 @@
 package com.project.picngo.external.controller;
 
 import com.project.picngo.external.DirectionsClient;
-import com.project.picngo.external.KakaoLocalSearchClient;
 import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
-import com.project.picngo.external.dto.PlaceSearchResult;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.spot.service.TourApiSyncService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +22,6 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
     private final WeatherClient weatherClient;
     private final DirectionsClient directionsClient;
     private final TourApiSyncService tourApiSyncService;
-    private final KakaoLocalSearchClient kakaoLocalSearchClient;
 
     // 1. 길찾기 API (바로 출발 시 호출)
     @GetMapping("/directions")
@@ -49,8 +46,8 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         return ResponseEntity.ok(weatherClient.getShortTermForecast(lat, lng, date));
     }
 
-    // 3. TourAPI 특정 지역 동기화 (startPage/endPage로 분할 가능)
-    @PostMapping("/tour-api/sync")
+    // 3. TourAPI 특정 지역 동기화 (admin 전용, startPage/endPage로 분할 가능)
+    @PostMapping("/admin/tour-api/sync")
     public ResponseEntity<String> syncSpots(
             @RequestParam int areaCode,
             @RequestParam(required = false) Integer startPage,
@@ -62,8 +59,8 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         return ResponseEntity.ok(saved + "건 저장 완료");
     }
 
-    // 4. TourAPI 전체 지역 동기화
-    @PostMapping("/tour-api/sync/all")
+    // 4. TourAPI 전체 지역 동기화 (admin 전용)
+    @PostMapping("/admin/tour-api/sync/all")
     public ResponseEntity<String> syncAll() {
         int saved = tourApiSyncService.syncAll();
         return ResponseEntity.ok("전체 지역 동기화 완료: " + saved + "건 저장");
@@ -79,15 +76,5 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         Double mockLat = 37.5665;
         Double mockLng = 126.9780;
         return ResponseEntity.ok(weatherClient.getGoldenHour(mockLat, mockLng, date));
-    }
-
-    // 6. 카카오 로컬 검색 직접 호출 (서킷브레이커 부하테스트용)
-    @GetMapping("/local-search")
-    public ResponseEntity<PlaceSearchResult> searchLocal(
-            @RequestParam String query,
-            @RequestParam Double lat,
-            @RequestParam Double lng
-    ) {
-        return ResponseEntity.ok(kakaoLocalSearchClient.searchNearbyPlace(query, lat, lng, null));
     }
 }
