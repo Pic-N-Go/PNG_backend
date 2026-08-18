@@ -8,10 +8,6 @@ import com.project.picngo.notification.service.FcmService;
 import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.spotalert.service.SpotAlertService;
-import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.enums.SpotSource;
-import com.project.picngo.spot.domain.enums.SpotStatus;
-import com.project.picngo.spot.repository.SpotRepository;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.DisplayName;
@@ -33,7 +29,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,9 +69,6 @@ public class ApiSecurityTest {
 
     @MockitoBean
     private CourseService courseService;
-
-    @Autowired
-    private SpotRepository spotRepository;
 
     // ========== 1. 인증 없이 API 호출 시 엄격하게 차단되는지 검증 ==========
 
@@ -224,15 +216,6 @@ public class ApiSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    @Test
-    @DisplayName("스팟 체크리스트 조회 API - 토큰 없이 호출하면 401 인증 필요 에러가 발생한다")
-    void 스팟_체크리스트_조회_API_토큰_없이_호출시_차단() throws Exception {
-        // /spots/*/checklist/** 는 뒤에 추가 세그먼트가 없는 /spots/1/checklist 도 매치해야 한다.
-        // 매처를 잘못 좁히면(예: /spots/*/checklist/*) 이 요청은 인증 필터를 통과해 404가 떠서 이 테스트는 실패함
-        mockMvc.perform(get("/spots/1/checklist"))
-                .andExpect(status().isUnauthorized());
-    }
-
     // 위의 401(토큰 없음) 테스트들의 짝꿍: 유효한 인증 정보로 호출하면 실제로 통과되는지 검증
     // (라우트 매처를 너무 넓게 잡아 항상 401만 나던 회귀나, 주소 오타로 인한 404 은폐를 막는다)
 
@@ -240,24 +223,6 @@ public class ApiSecurityTest {
     @DisplayName("북마크 컬렉션 목록 조회 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
     void 북마크_컬렉션_목록_조회_API_유효한_인증으로_호출시_정상_응답() throws Exception {
         mockMvc.perform(get("/bookmark-collections")
-                        .with(authentication(createMockAuthToken())))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @DisplayName("스팟 체크리스트 조회 API - 유효한 인증 정보로 호출하면 200 OK가 반환된다")
-    void 스팟_체크리스트_조회_API_유효한_인증으로_호출시_정상_응답() throws Exception {
-        Spot spot = spotRepository.save(Spot.builder()
-                .name("테스트 스팟")
-                .address("서울특별시 종로구")
-                .latitude(37.5)
-                .longitude(127.0)
-                .categories(Set.of())
-                .source(SpotSource.USER)
-                .status(SpotStatus.APPROVED)
-                .build());
-
-        mockMvc.perform(get("/spots/" + spot.getId() + "/checklist")
                         .with(authentication(createMockAuthToken())))
                 .andExpect(status().isOk());
     }

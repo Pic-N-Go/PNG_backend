@@ -401,10 +401,4 @@ public class NotificationScheduler {
                 .toList();
     }
 
-    // TODO: 운영 배포 전 또는 프론트엔드 알림 테스트 완료 후 테스트용 수동 스케줄러 강제 실행 메서드 삭제 필요
-    public void triggerAllSchedulersManually() {
-        log.info("테스트용 수동 스케줄러 강제 실행 (오전 날씨 알림 1회)...");
-        processFixedTimeNotification(TimeCondition.MORNING);
-        log.info("테스트용 수동 스케줄러 강제 실행 완료.");
-    }
 }

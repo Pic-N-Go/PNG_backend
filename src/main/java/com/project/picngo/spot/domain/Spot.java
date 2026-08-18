@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 @Slf4j
@@ -49,6 +50,10 @@ public class Spot extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String overview;
 
+    @Comment("의미 검색용 임베딩 벡터. float32 배열을 그대로 이진 저장(4층 폴백 전용, 응답 DTO에 노출 안 함)")
+    @Column(columnDefinition = "MEDIUMBLOB")
+    private byte[] embedding;
+
     @Comment("GPS 위도. TourAPI: mapy")
     @Column(nullable = false)
     private Double latitude;
@@ -73,7 +78,7 @@ public class Spot extends BaseTimeEntity {
     @Column(name = "category", length = 50)
     private Set<SpotCategory> categories = new HashSet<>();
 
-    @Comment("TourAPI cat3 소분류 코드. 체크리스트 매핑에 사용 (예: A0201=해수욕장)")
+    @Comment("TourAPI cat3 소분류 코드. 카테고리 태깅·시즌 보너스 매핑에 사용 (예: A01011200=해변)")
     @Column(length = 10)
     private String cat3;
 
@@ -220,9 +225,19 @@ public class Spot extends BaseTimeEntity {
         return categories.stream().map(Enum::name).sorted().toList();
     }
 
+    /** 임베딩 계산 결과를 저장한다. 새 스팟 등록 시(이벤트) 또는 백필 배치가 부른다. */
+    public void updateEmbedding(byte[] embedding) {
+        this.embedding = embedding;
+    }
+
     public void updateFromTourApi(String overview, String parking, String usetime,
                                    String restdate, String infocenter,
                                    String wheelchairAccess, String strollerAccess, String petFriendly) {
+        // 설명문이 실제로 바뀌면 임베딩을 비워 백필 배치가 새 텍스트로 다시 계산하게 한다.
+        // 그대로 두면 이름·주소만으로 계산된 옛 임베딩이 설명문이 생긴 뒤에도 안 바뀐다.
+        if (!Objects.equals(this.overview, overview)) {
+            this.embedding = null;
+        }
         this.overview = overview;
         this.parking = parking;
         this.usetime = usetime;

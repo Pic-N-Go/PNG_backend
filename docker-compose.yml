@@ -15,3 +15,42 @@ services:
       - "5672:5672"
       - "15672:15672"
     restart: always
+
+  png-mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    container_name: png-mysqld-exporter
+    restart: always
+    command:
+      - "--mysqld.address=host.docker.internal:3306"
+      - "--mysqld.username=root"
+      - "--collect.info_schema.innodb_metrics"
+      - "--collect.perf_schema.eventsstatements"
+      - "--collect.perf_schema.eventsstatements.limit=50"
+      - "--collect.perf_schema.eventsstatements.digest_text_limit=120"
+      - "--collect.perf_schema.tablelocks"
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: ${DB_PASSWORD:1234}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  png-prometheus:
+    image: prom/prometheus:latest
+    container_name: png-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus-local.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  png-grafana:
+    image: grafana/grafana:latest
+    container_name: png-grafana
+    ports:
+      - "8082:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - png-prometheus
+    restart: always
