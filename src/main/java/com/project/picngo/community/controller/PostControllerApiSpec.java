@@ -33,6 +33,8 @@ public interface PostControllerApiSpec {
                     sort는 POPULAR(기본), LATEST, MY_POSTS, FOLLOWING을 지원합니다.
                     MY_POSTS와 FOLLOWING은 로그인이 필요합니다.
                     keyword는 게시글 내용과 스팟 이름을 검색합니다.
+                    authorId를 주면 그 사용자가 쓴 글만 조회합니다(프로필 화면의 게시글 탭).
+                    MY_POSTS는 "내 글"이라는 뜻이 이미 정해져 있어 authorId를 무시합니다.
                     """
     )
     ResponseEntity<PostPageResponse> getPosts(
@@ -41,6 +43,8 @@ public interface PostControllerApiSpec {
             @RequestParam(defaultValue = "POPULAR") PostSort sort,
             @Parameter(description = "게시글 내용 또는 스팟 이름 검색어", example = "한강")
             @RequestParam(required = false) String keyword,
+            @Parameter(description = "작성자 ID로 필터링", example = "108")
+            @RequestParam(required = false) Long authorId,
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기(1~100)", example = "20")

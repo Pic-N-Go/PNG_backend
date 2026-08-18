@@ -49,7 +49,11 @@ public class PostService {
     private final ExifExtractor exifExtractor;
     private final ImageStorageService imageStorageService;
 
-    public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, int page, int size) {
+    /**
+     * @param authorId 지정하면 그 사용자가 쓴 글만 준다(프로필 화면의 게시글 탭).
+     *                 MY_POSTS는 "내 글"이라는 뜻이 이미 정해져 있어 이 값을 무시한다.
+     */
+    public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, Long authorId, int page, int size) {
 
         if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING) && userId == null) {
             throw new CustomException(AuthErrorCode.LOGIN_REQUIRED);
@@ -61,7 +65,7 @@ public class PostService {
 
         Page<Post> result = switch (sort) {
             case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
-            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, null, pageable);
+            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, pageable);
             case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
         };
         List<PostResponse> posts = toFeedResponses(result.getContent(), userId);
