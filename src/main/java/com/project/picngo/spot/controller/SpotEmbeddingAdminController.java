@@ -2,8 +2,7 @@ package com.project.picngo.spot.controller;
 
 import com.project.picngo.spot.service.SpotEmbeddingBackfillService;
 import com.project.picngo.spot.service.SpotEmbeddingService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,30 +21,27 @@ import org.springframework.web.bind.annotation.RestController;
  * 비워진 것은 새벽 배치로. 이 API는 그 사이를 사람이 메우는 수단이다:
  * 의미 검색을 처음 켤 때, 그리고 스팟을 고친 뒤 새벽까지 기다리지 않고 반영할 때.
  */
-@Tag(name = "관리자 - 임베딩", description = "의미 검색용 임베딩 관리 API")
 @RestController
 @RequestMapping("/admin/embeddings")
 @RequiredArgsConstructor
-public class SpotEmbeddingAdminController {
+public class SpotEmbeddingAdminController implements SpotEmbeddingAdminControllerApiSpec {
 
     private final SpotEmbeddingBackfillService backfillService;
     private final SpotEmbeddingService spotEmbeddingService;
 
-    @Operation(summary = "임베딩 현황 조회", description = "검색 대상 스팟 중 임베딩이 채워진 비율")
+    @Override
     @GetMapping
     public ResponseEntity<SpotEmbeddingBackfillService.EmbeddingCoverage> getCoverage() {
         return ResponseEntity.ok(backfillService.coverage());
     }
 
-    @Operation(summary = "임베딩 일괄 백필",
-            description = "임베딩이 비어 있는 스팟을 채운다. 이미 채워진 스팟은 건너뛴다.")
+    @Override
     @PostMapping("/backfill")
     public ResponseEntity<SpotEmbeddingBackfillService.BackfillResult> backfill() {
         return ResponseEntity.ok(backfillService.backfillMissingEmbeddings());
     }
 
-    @Operation(summary = "스팟 하나 임베딩 재계산",
-            description = "이미 임베딩이 있어도 새로 덮어쓴다. 스팟 내용을 고친 뒤 사용한다.")
+    @Override
     @PostMapping("/spots/{spotId}")
     public ResponseEntity<EmbeddingRecomputeResponse> recompute(@PathVariable Long spotId) {
         boolean saved = spotEmbeddingService.recompute(spotId);
