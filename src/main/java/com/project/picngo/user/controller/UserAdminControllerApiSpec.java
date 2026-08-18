@@ -76,6 +76,7 @@ public interface UserAdminControllerApiSpec {
             @ApiResponse(responseCode = "404", description = "회원을 찾을 수 없음", content = @Content)
     })
     ResponseEntity<AdminUserResponse> updateUserRole(
+            @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails,
             @Parameter(description = "권한을 변경할 회원 ID", example = "1") @PathVariable Long userId,
             @Valid @RequestBody AdminUserRoleUpdateRequest request
     );

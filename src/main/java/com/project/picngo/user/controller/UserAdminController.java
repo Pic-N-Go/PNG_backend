@@ -1,5 +1,6 @@
 package com.project.picngo.user.controller;
 
+import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.user.domain.Role;
 import com.project.picngo.user.dto.AdminUserResponse;
 import com.project.picngo.user.dto.AdminUserRoleUpdateRequest;
@@ -8,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -41,9 +43,11 @@ public class UserAdminController implements UserAdminControllerApiSpec {
     @Override
     @PatchMapping("/{userId}/role")
     public ResponseEntity<AdminUserResponse> updateUserRole(
+            @AuthenticationPrincipal CustomUserDetails adminUserDetails,
             @PathVariable Long userId,
             @Valid @RequestBody AdminUserRoleUpdateRequest request
     ) {
-        return ResponseEntity.ok(userAdminService.updateUserRole(userId, request.role()));
+        Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
+        return ResponseEntity.ok(userAdminService.updateUserRole(adminId, userId, request.role()));
     }
 }

@@ -48,7 +48,9 @@ public interface SpotEmbeddingAdminControllerApiSpec {
             @ApiResponse(responseCode = "401", description = "인증 실패", content = @Content),
             @ApiResponse(responseCode = "403", description = "권한 부족 (ADMIN 권한 없음)", content = @Content)
     })
-    ResponseEntity<SpotEmbeddingBackfillService.BackfillResult> backfill();
+    ResponseEntity<SpotEmbeddingBackfillService.BackfillResult> backfill(
+            @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails
+    );
 
     @Operation(
             summary = "스팟 단건 임베딩 재계산",
@@ -65,6 +67,7 @@ public interface SpotEmbeddingAdminControllerApiSpec {
             @ApiResponse(responseCode = "404", description = "스팟을 찾을 수 없음", content = @Content)
     })
     ResponseEntity<SpotEmbeddingAdminController.EmbeddingRecomputeResponse> recompute(
+            @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails,
             @Parameter(description = "임베딩을 재계산할 스팟 ID", example = "1")
             @PathVariable Long spotId
     );

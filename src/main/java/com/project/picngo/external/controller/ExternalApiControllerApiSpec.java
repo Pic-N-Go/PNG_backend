@@ -20,6 +20,7 @@ public interface ExternalApiControllerApiSpec {
             description = "TourAPI에서 특정 지역 관광지 전체를 페이지 순환하여 DB에 저장합니다. (POST /admin/tour-api/sync, ROLE_ADMIN 권한 필요) areaCode: 1=서울, 6=부산, 39=제주 등",
             security = @SecurityRequirement(name = "bearerAuth"))
     ResponseEntity<String> syncSpots(
+            @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails,
             @Parameter(description = "지역 코드 (1=서울, 2=인천, 3=대전, 4=대구, 5=광주, 6=부산, 7=울산, 8=세종, 31=경기, 32=강원, 33=충북, 34=충남, 35=경북, 36=경남, 37=전북, 38=전남, 39=제주)") @RequestParam int areaCode,
             @Parameter(description = "시작 페이지 (분할 sync 시 사용, 미입력 시 전체)") @RequestParam(required = false) Integer startPage,
             @Parameter(description = "끝 페이지 (분할 sync 시 사용, 미입력 시 전체)") @RequestParam(required = false) Integer endPage
@@ -28,7 +29,9 @@ public interface ExternalApiControllerApiSpec {
     @Operation(summary = "한국관광공사 전체 지역 스팟 동기화 (ADMIN 권한 필요)",
             description = "전국 17개 지역 관광지 데이터를 totalCount 기반 페이지 순환으로 전부 가져옵니다. 최초 1회 실행용 (POST /admin/tour-api/sync/all, ROLE_ADMIN 권한 필요).\n\n⚠️ 주의: 스팟 수만큼 detailCommon API를 추가 호출하므로 완료까지 상당한 시간이 소요됩니다.\n중간 업데이트가 필요하거나 특정 지역만 갱신할 경우 POST /admin/tour-api/sync (areaCode 지정)를 사용하세요.",
             security = @SecurityRequirement(name = "bearerAuth"))
-    ResponseEntity<String> syncAll();
+    ResponseEntity<String> syncAll(
+            @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails
+    );
 
     @Operation(summary = "길찾기 (이동시간/거리)", description = "카카오모빌리티 API를 이용하여 출발지에서 목적지까지의 자동차 예상 소요 시간과 거리를 조회합니다.")
     ResponseEntity<DirectionsResponse> getDirections(

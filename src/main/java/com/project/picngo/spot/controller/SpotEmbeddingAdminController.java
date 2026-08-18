@@ -1,10 +1,15 @@
 package com.project.picngo.spot.controller;
 
+import com.project.picngo.admin.audit.domain.AdminActionType;
+import com.project.picngo.admin.audit.service.AdminAuditLogService;
+import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.service.SpotEmbeddingBackfillService;
 import com.project.picngo.spot.service.SpotEmbeddingService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,14 +18,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 의미 검색용 임베딩 관리. 관리자만 부를 수 있다(SecurityConfig의 /admin/** 규칙).
- *
- * <p>권한을 거는 이유는 두 가지다. 외부 API를 호출해 비용이 발생하고,
- * 스팟 전체를 훑는 작업이라 아무나 연타하면 부담이 된다.
- *
- * <p>평소 임베딩은 자동으로 채워진다 - 새 스팟은 등록 이벤트로 즉시, 내용이 바뀌어
- * 비워진 것은 새벽 배치로. 이 API는 그 사이를 사람이 메우는 수단이다:
- * 의미 검색을 처음 켤 때, 그리고 스팟을 고친 뒤 새벽까지 기다리지 않고 반영할 때.
  */
+@Slf4j
 @RestController
 @RequestMapping("/admin/embeddings")
 @RequiredArgsConstructor
@@ -28,6 +27,7 @@ public class SpotEmbeddingAdminController implements SpotEmbeddingAdminControlle
 
     private final SpotEmbeddingBackfillService backfillService;
     private final SpotEmbeddingService spotEmbeddingService;
+    private final AdminAuditLogService adminAuditLogService;
 
     @Override
     @GetMapping
@@ -37,14 +37,50 @@ public class SpotEmbeddingAdminController implements SpotEmbeddingAdminControlle
 
     @Override
     @PostMapping("/backfill")
-    public ResponseEntity<SpotEmbeddingBackfillService.BackfillResult> backfill() {
-        return ResponseEntity.ok(backfillService.backfillMissingEmbeddings());
+    public ResponseEntity<SpotEmbeddingBackfillService.BackfillResult> backfill(
+            @AuthenticationPrincipal CustomUserDetails adminUserDetails
+    ) {
+        Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
+        SpotEmbeddingBackfillService.BackfillResult result = backfillService.backfillMissingEmbeddings();
+
+        try {
+            adminAuditLogService.record(
+                    adminId,
+                    AdminActionType.EMBEDDING_BACKFILL,
+                    "SPOT_EMBEDDING",
+                    "ALL_MISSING",
+                    String.format("미임베딩 스팟 일괄 백필 실행 (성공: %d, 실패: %d)", result.saved(), result.failed()),
+                    null
+            );
+        } catch (Exception e) {
+            log.warn("임베딩 백필 감사 로그 기록 실패: {}", e.getMessage());
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     @Override
     @PostMapping("/spots/{spotId}")
-    public ResponseEntity<EmbeddingRecomputeResponse> recompute(@PathVariable Long spotId) {
+    public ResponseEntity<EmbeddingRecomputeResponse> recompute(
+            @AuthenticationPrincipal CustomUserDetails adminUserDetails,
+            @PathVariable Long spotId
+    ) {
+        Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
         boolean saved = spotEmbeddingService.recompute(spotId);
+
+        try {
+            adminAuditLogService.record(
+                    adminId,
+                    AdminActionType.EMBEDDING_RECALCULATE,
+                    "SPOT",
+                    String.valueOf(spotId),
+                    String.format("스팟 [#%d] 임베딩 개별 재계산 (결과: %s)", spotId, saved ? "성공" : "실패"),
+                    null
+            );
+        } catch (Exception e) {
+            log.warn("스팟 임베딩 재계산 감사 로그 기록 실패: {}", e.getMessage());
+        }
+
         return ResponseEntity.ok(new EmbeddingRecomputeResponse(spotId, saved));
     }
 
