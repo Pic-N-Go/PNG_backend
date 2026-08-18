@@ -1,6 +1,8 @@
 package com.project.picngo.auth.config;
 
 import com.project.picngo.auth.service.JwtAuthenticationFilter;
+import com.project.picngo.auth.service.JwtAuthenticationEntryPoint;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -50,9 +52,8 @@ public class SecurityConfig {
             "/actuator/prometheus"
     };
 
-
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
 	// loadtest 프로파일에서만 존재하는 빈. 운영에서는 비어 있어 아무 엔드포인트도 열리지 않는다.
 	private final ObjectProvider<LoadTestPublicEndpoints> loadTestPublicEndpoints;
@@ -95,6 +96,15 @@ public class SecurityConfig {
 
 				auth.anyRequest().authenticated();
 			})
+			.exceptionHandling(exception -> exception
+				.authenticationEntryPoint(jwtAuthenticationEntryPoint)
+				.accessDeniedHandler(
+					(request, response, accessDeniedException) ->
+						response.sendError(
+							HttpServletResponse.SC_FORBIDDEN, "접근 권한이 없습니다."
+						)
+				)
+			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 			.build();
 	}

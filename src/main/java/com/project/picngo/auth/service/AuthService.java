@@ -25,6 +25,7 @@ public class AuthService {
 	private final JwtTokenProvider jwtTokenProvider;
 	private final EmailVerificationService emailVerificationService;
 	private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
 	@Transactional
 	public TokenResponse signUp(SignUpRequest request) {
@@ -83,6 +84,9 @@ public class AuthService {
 
 	private TokenResponse createTokenResponse(User user) {
 		String accessToken = jwtTokenProvider.createAccessToken(user);
+        String refreshToken = jwtTokenProvider.createRefreshToken(user);
+
+        refreshTokenService.saveRefreshToken(refreshToken, user.getId());
 		log.info("\n==================================================" +
 				"\n[🔑 로그인 성공 JWT 토큰 수신]" +
 				"\n- UserId: {} ({})" +
@@ -92,9 +96,29 @@ public class AuthService {
 		return TokenResponse.bearer(
 			accessToken,
 			jwtTokenProvider.getAccessTokenExpirationSeconds(),
+            refreshToken,
+                jwtTokenProvider.getRefreshTokenExpirationSeconds(),
 			UserResponse.from(user)
 		);
 	}
+
+    public TokenResponse reissueTokens(RefreshTokenRequest request) {
+        String refreshToken = request.refreshToken();
+
+        if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        Long userId = jwtTokenProvider.getUserId(refreshToken);
+
+        if(!refreshTokenService.consumeRefreshToken(refreshToken, userId)) {
+            throw new CustomException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        User user = userService.getById(userId);
+
+        return createTokenResponse(user);
+    }
 
 	public EmailVerificationResponse sendPasswordResetCode(PasswordResetCodeRequest request) {
 		userService.getByEmail(request.email());
