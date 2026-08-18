@@ -1,10 +1,12 @@
 package com.project.picngo.community.repository;
 
 import com.project.picngo.community.domain.PostComment;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,6 +24,18 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
 
     @EntityGraph(attributePaths = "author")
     Optional<PostComment> findByIdAndPostId(Long commentId, Long postId);
+
+    /**
+     * 좋아요 토글 전에 댓글 행을 잠근다. 없으면 "눌렀는지 확인 → INSERT" 사이에 같은 사용자의
+     * 두 요청이 모두 통과해 유니크 제약(uk_community_post_comment_like) 위반으로 500이 난다
+     * (하트 연타). 게시글 좋아요가 PostRepository.findByIdForUpdate로 막는 것과 같은 방식이다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select comment from PostComment comment where comment.id = :commentId and comment.post.id = :postId")
+    Optional<PostComment> findByIdAndPostIdForUpdate(
+            @Param("commentId") Long commentId,
+            @Param("postId") Long postId
+    );
 
     /** 부모 댓글을 지울 때 답글도 함께 지운다. 몇 개를 지웠는지가 게시글 댓글 수 차감에 필요하다. */
     @Modifying

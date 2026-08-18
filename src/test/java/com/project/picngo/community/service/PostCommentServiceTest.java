@@ -354,6 +354,7 @@ class PostCommentServiceTest {
     @DisplayName("댓글 좋아요를 누르면 좋아요를 저장하고 카운트를 올린다")
     void likeSavesAndCountsUp() {
         PostComment comment = new PostComment(mock(Post.class), null, mock(User.class), "c");
+        when(commentRepository.findByIdAndPostIdForUpdate(10L, 1L)).thenReturn(Optional.of(comment));
         when(commentRepository.findByIdAndPostId(10L, 1L)).thenReturn(Optional.of(comment));
         when(commentLikeRepository.existsByCommentIdAndUserId(10L, 2L)).thenReturn(false);
 
@@ -368,6 +369,7 @@ class PostCommentServiceTest {
     @DisplayName("이미 좋아요한 댓글을 다시 눌러도 중복 저장하지 않는다")
     void likeIsIdempotent() {
         PostComment comment = new PostComment(mock(Post.class), null, mock(User.class), "c");
+        when(commentRepository.findByIdAndPostIdForUpdate(10L, 1L)).thenReturn(Optional.of(comment));
         when(commentRepository.findByIdAndPostId(10L, 1L)).thenReturn(Optional.of(comment));
         when(commentLikeRepository.existsByCommentIdAndUserId(10L, 2L)).thenReturn(true);
 
@@ -382,6 +384,7 @@ class PostCommentServiceTest {
     @DisplayName("누르지 않은 댓글의 좋아요를 취소해도 카운트가 줄지 않는다")
     void unlikeWithoutLikeDoesNothing() {
         PostComment comment = new PostComment(mock(Post.class), null, mock(User.class), "c");
+        when(commentRepository.findByIdAndPostIdForUpdate(10L, 1L)).thenReturn(Optional.of(comment));
         when(commentRepository.findByIdAndPostId(10L, 1L)).thenReturn(Optional.of(comment));
         when(commentLikeRepository.findByCommentIdAndUserId(10L, 2L)).thenReturn(Optional.empty());
 
@@ -403,5 +406,20 @@ class PostCommentServiceTest {
 
         assertFalse(response.comments().get(0).liked());
         verifyNoInteractions(commentLikeRepository);
+    }
+
+    @Test
+    @DisplayName("좋아요 토글은 댓글 행을 잠근 뒤 처리한다(하트 연타 시 중복 INSERT 방지)")
+    void likeLocksCommentRow() {
+        PostComment comment = new PostComment(mock(Post.class), null, mock(User.class), "c");
+        when(commentRepository.findByIdAndPostIdForUpdate(10L, 1L)).thenReturn(Optional.of(comment));
+        when(commentRepository.findByIdAndPostId(10L, 1L)).thenReturn(Optional.of(comment));
+        when(commentLikeRepository.existsByCommentIdAndUserId(10L, 2L)).thenReturn(false);
+
+        service.like(1L, 10L, 2L);
+        service.unlike(1L, 10L, 2L);
+
+        // 잠그지 않는 조회로 되돌아가면 동시 요청이 유니크 제약을 위반해 500이 난다.
+        verify(commentRepository, times(2)).findByIdAndPostIdForUpdate(10L, 1L);
     }
 }

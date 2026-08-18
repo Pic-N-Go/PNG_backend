@@ -130,7 +130,7 @@ public class PostCommentService {
 
     @Transactional
     public ReactionResponse like(Long postId, Long commentId, Long userId) {
-        PostComment comment = findComment(postId, commentId);
+        PostComment comment = findCommentForUpdate(postId, commentId);
         if (!commentLikeRepository.existsByCommentIdAndUserId(commentId, userId)) {
             commentLikeRepository.save(new PostCommentLike(comment, userId));
             commentRepository.changeLikeCount(commentId, 1);
@@ -140,7 +140,7 @@ public class PostCommentService {
 
     @Transactional
     public ReactionResponse unlike(Long postId, Long commentId, Long userId) {
-        findComment(postId, commentId);
+        findCommentForUpdate(postId, commentId);
         commentLikeRepository.findByCommentIdAndUserId(commentId, userId).ifPresent(like -> {
             commentLikeRepository.delete(like);
             commentRepository.changeLikeCount(commentId, -1);
@@ -207,6 +207,12 @@ public class PostCommentService {
         if (!postRepository.existsById(postId)) {
             throw new CustomException(CommunityErrorCode.POST_NOT_FOUND);
         }
+    }
+
+    /** 좋아요 토글 전용. 행을 잠가 같은 사용자의 동시 요청이 중복 INSERT로 500을 내는 걸 막는다. */
+    private PostComment findCommentForUpdate(Long postId, Long commentId) {
+        return commentRepository.findByIdAndPostIdForUpdate(commentId, postId)
+                .orElseThrow(() -> new CustomException(CommunityErrorCode.COMMENT_NOT_FOUND));
     }
 
     private PostComment findComment(Long postId, Long commentId) {
