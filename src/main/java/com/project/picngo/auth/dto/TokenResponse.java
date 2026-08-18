@@ -6,10 +6,17 @@ public record TokenResponse(
 	String tokenType,
 	String accessToken,
 	Long expiresIn,
+    String refreshToken,
+    Long refreshTokenExpiresIn,
 	UserResponse user
 ) {
 
-	public static TokenResponse bearer(String accessToken, Long expiresIn, UserResponse user) {
-		return new TokenResponse("Bearer", accessToken, expiresIn, user);
+	public static TokenResponse bearer(
+            String accessToken,
+            Long expiresIn,
+            String refreshToken,
+            Long refreshTokenExpiresIn,
+            UserResponse user) {
+		return new TokenResponse("Bearer", accessToken, expiresIn, refreshToken, refreshTokenExpiresIn, user);
 	}
 }

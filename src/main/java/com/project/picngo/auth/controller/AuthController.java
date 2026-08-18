@@ -60,4 +60,11 @@ public class AuthController implements AuthControllerApiSpec {
 		authService.resetPassword(request);
 		return ResponseEntity.noContent().build();
 	}
+
+    @PostMapping("/token/refresh")
+    public ResponseEntity<TokenResponse> refreshTokens(
+            @Valid @RequestBody RefreshTokenRequest request
+    ){
+        return ResponseEntity.ok(authService.reissueTokens(request));
+    }
 }

@@ -41,4 +41,9 @@ public interface AuthControllerApiSpec {
 	ResponseEntity<Void> resetPassword(
 			@Valid @RequestBody PasswordResetRequest request
 	);
+
+    @Operation(summary = "토큰 재발급", description = "유효한 리프레시 토큰으로 엑세스 토큰과 리프레시 토큰을 재발급합니다.")
+    ResponseEntity<TokenResponse> refreshTokens(
+            @Valid @RequestBody RefreshTokenRequest request
+    );
 }
