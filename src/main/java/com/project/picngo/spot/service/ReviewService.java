@@ -84,7 +84,7 @@ public class ReviewService {
                     return ReviewListResponse.ReviewInfo.of(
                             review,
                             user != null ? user.getNickname() : "알 수 없음",
-                            user != null ? imageStorageService.getPresignedUrl(user.getProfileImageUrl()) : null,
+                            user != null ? imageStorageService.getPresignedUrl(user.getDisplayProfileImage()) : null,
                             tagMap.getOrDefault(review.getId(), Set.of()),
                             photoMap.getOrDefault(review.getId(), List.of())
                     );

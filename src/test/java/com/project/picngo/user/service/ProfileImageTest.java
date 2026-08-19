@@ -6,6 +6,7 @@ import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,9 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -30,9 +29,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * 프로필 사진은 DB에 objectKey로 저장되고 응답에서만 presigned URL이 된다.
- * 카카오가 준 http URL과 우리가 올린 key가 같은 컬럼에 섞이므로, 어느 쪽인지에 따라
- * 삭제 대상과 카카오 동기화 여부가 갈린다.
+ * 프로필 사진은 두 칸으로 나뉜다 — 사용자가 올린 것(S3 objectKey)과 소셜에서 받은 것(URL).
+ * 표시값은 "올린 것 ?? 소셜 것"이라, 올린 사진을 지우면 카카오 사진으로 되돌아간다.
+ * 한 칸에 섞어 쓰면 사진을 올리는 순간 카카오 URL이 덮여 되돌릴 원본이 없어진다.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -48,9 +47,16 @@ class ProfileImageTest {
     private final MockMultipartFile file =
             new MockMultipartFile("image", "me.jpg", "image/jpeg", new byte[] {1, 2, 3});
 
-    private User userWith(String storedProfileImage) {
+    @BeforeEach
+    void passThroughPresign() {
+        // presign은 이 테스트의 관심사가 아니다 — 값이 그대로 흘러가는지만 본다.
+        when(imageStorageService.getPresignedUrl(anyString())).thenAnswer(i -> i.getArgument(0));
+    }
+
+    /** 카카오로 가입한 사용자. 소셜 사진은 소셜 칸에 들어간다. */
+    private User kakaoUser(String socialImageUrl) {
         User user = User.createSocialUser(
-                "a@kakao.local", "홍길동", storedProfileImage, SocialProvider.KAKAO, "1");
+                "a@kakao.local", "홍길동", socialImageUrl, SocialProvider.KAKAO, "1");
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         return user;
     }
@@ -58,7 +64,7 @@ class ProfileImageTest {
     @Test
     @DisplayName("업로드하면 URL이 아니라 objectKey를 저장하고, 응답에는 presigned URL을 담는다")
     void storesKeyAndReturnsPresignedUrl() {
-        User user = userWith(null);
+        User user = kakaoUser(null);
         when(imageStorageService.upload(any(), anyString()))
                 .thenReturn(new ImageUploadResult("profile/7/abc.jpg", "https://s3/presigned"));
 
@@ -69,9 +75,22 @@ class ProfileImageTest {
     }
 
     @Test
+    @DisplayName("올린 사진은 소셜 사진보다 우선해서 보인다")
+    void uploadedImageWinsOverSocial() {
+        User user = kakaoUser("https://k.kakaocdn.net/profile.jpg");
+        when(imageStorageService.upload(any(), anyString()))
+                .thenReturn(new ImageUploadResult("profile/7/mine.jpg", "https://s3/presigned"));
+
+        service.updateProfileImage(7L, file);
+
+        assertEquals("profile/7/mine.jpg", user.getDisplayProfileImage());
+    }
+
+    @Test
     @DisplayName("직접 올렸던 사진은 교체 시 저장소에서 지운다")
     void deletesPreviousUploadedImage() {
-        userWith("profile/7/old.jpg");
+        User user = kakaoUser(null);
+        user.updateProfileImage("profile/7/old.jpg");
         when(imageStorageService.upload(any(), anyString()))
                 .thenReturn(new ImageUploadResult("profile/7/new.jpg", "https://s3/presigned"));
 
@@ -81,9 +100,9 @@ class ProfileImageTest {
     }
 
     @Test
-    @DisplayName("카카오가 준 사진은 우리 소유가 아니라 지우지 않는다")
-    void doesNotDeleteKakaoImage() {
-        userWith("https://k.kakaocdn.net/profile.jpg");
+    @DisplayName("소셜 사진은 우리 소유가 아니라 지우지 않는다")
+    void doesNotDeleteSocialImage() {
+        kakaoUser("https://k.kakaocdn.net/profile.jpg");
         when(imageStorageService.upload(any(), anyString()))
                 .thenReturn(new ImageUploadResult("profile/7/new.jpg", "https://s3/presigned"));
 
@@ -93,38 +112,41 @@ class ProfileImageTest {
     }
 
     @Test
-    @DisplayName("삭제하면 값을 비우고 올렸던 파일도 지운다")
-    void clearsProfileImage() {
-        User user = userWith("profile/7/old.jpg");
+    @DisplayName("올린 사진을 지우면 카카오 사진으로 되돌아간다")
+    void fallsBackToSocialImageOnDelete() {
+        User user = kakaoUser("https://k.kakaocdn.net/profile.jpg");
+        user.updateProfileImage("profile/7/mine.jpg");
 
         var response = service.deleteProfileImage(7L);
 
         assertNull(user.getProfileImageUrl());
+        assertEquals("https://k.kakaocdn.net/profile.jpg", response.profileImageUrl());
+        verify(imageStorageService).delete("profile/7/mine.jpg");
+    }
+
+    @Test
+    @DisplayName("소셜 사진이 없으면 지운 뒤 사진 없음이 된다")
+    void clearsImageWhenNoSocialFallback() {
+        User user = kakaoUser(null);
+        user.updateProfileImage("profile/7/mine.jpg");
+
+        var response = service.deleteProfileImage(7L);
+
+        assertNull(user.getDisplayProfileImage());
         assertNull(response.profileImageUrl());
-        verify(imageStorageService).delete("profile/7/old.jpg");
     }
 
     @Test
-    @DisplayName("직접 올린 사진은 카카오 재로그인에 덮이지 않는다")
-    void keepsUploadedImageOnKakaoRelogin() {
-        User user = User.createSocialUser(
-                "a@kakao.local", "홍길동", "profile/7/mine.jpg", SocialProvider.KAKAO, "1");
-        assertTrue(user.hasUploadedProfileImage());
-
-        user.updateSocialProfile("https://k.kakaocdn.net/changed.jpg");
-
-        assertEquals("profile/7/mine.jpg", user.getProfileImageUrl());
-    }
-
-    @Test
-    @DisplayName("카카오 사진만 있던 계정은 재로그인 때 최신 카카오 사진으로 갱신된다")
-    void stillSyncsKakaoImageWhenNothingUploaded() {
-        User user = User.createSocialUser(
-                "a@kakao.local", "홍길동", "https://k.kakaocdn.net/old.jpg", SocialProvider.KAKAO, "1");
-        assertFalse(user.hasUploadedProfileImage());
+    @DisplayName("재로그인은 소셜 칸만 갱신한다 — 올린 사진은 그대로 보인다")
+    void reloginUpdatesOnlySocialSlot() {
+        User user = kakaoUser("https://k.kakaocdn.net/old.jpg");
+        user.updateProfileImage("profile/7/mine.jpg");
 
         user.updateSocialProfile("https://k.kakaocdn.net/new.jpg");
 
-        assertEquals("https://k.kakaocdn.net/new.jpg", user.getProfileImageUrl());
+        assertEquals("profile/7/mine.jpg", user.getDisplayProfileImage());
+        // 갱신은 됐다 — 나중에 올린 사진을 지우면 최신 카카오 사진으로 떨어진다.
+        user.updateProfileImage(null);
+        assertEquals("https://k.kakaocdn.net/new.jpg", user.getDisplayProfileImage());
     }
 }

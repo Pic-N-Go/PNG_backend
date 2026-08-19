@@ -370,7 +370,7 @@ public class PostService {
                 post.getCameraModel(),
                 post.getLensModel(),
                 List.copyOf(post.getTags()),
-                PostAuthorResponse.from(post.getAuthor(), imageStorageService.getPresignedUrl(post.getAuthor().getProfileImageUrl())),
+                PostAuthorResponse.from(post.getAuthor(), imageStorageService.getPresignedUrl(post.getAuthor().getDisplayProfileImage())),
                 images,
                 post.getLikeCount(),
                 post.getCommentCount(),

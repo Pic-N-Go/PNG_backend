@@ -121,6 +121,6 @@ class SocialNicknameTest {
 
         user.updateSocialProfile(null);
 
-        assertEquals("https://img/stored.jpg", user.getProfileImageUrl());
+        assertEquals("https://img/stored.jpg", user.getDisplayProfileImage());
     }
 }

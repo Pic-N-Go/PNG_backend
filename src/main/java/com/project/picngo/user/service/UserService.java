@@ -47,7 +47,7 @@ public class UserService {
 	 * 두 형태가 같은 컬럼에 섞여 있어도 된다.
 	 */
 	private String profileImageUrlOf(User user) {
-		return imageStorageService.getPresignedUrl(user.getProfileImageUrl());
+		return imageStorageService.getPresignedUrl(user.getDisplayProfileImage());
 	}
 
 	public User getByEmail(String email) {
@@ -249,28 +249,31 @@ public class UserService {
 	@Transactional
 	public UserResponse updateProfileImage(Long userId, MultipartFile image) {
 		User user = getById(userId);
-		String previousKey = user.hasUploadedProfileImage() ? user.getProfileImageUrl() : null;
+		String previousKey = user.getProfileImageUrl();
 
 		ImageUploadResult uploaded = imageStorageService.upload(image, "profile/" + userId);
 		user.updateProfileImage(uploaded.key());
 
 		// 새 사진이 올라간 뒤에 지운다 — 먼저 지우면 업로드가 실패했을 때 사진 없는 계정이 된다.
-		// 카카오가 준 http URL은 우리 소유가 아니라 지울 대상이 아니다(previousKey가 null).
+		// 소셜 사진은 다른 칸에 있어 여기서 지워지지 않는다.
 		deletePreviousImage(previousKey);
 
 		return UserResponse.from(user, uploaded.url());
 	}
 
-	/** 프로필 사진 삭제(기본 이미지로). 카카오에서 받은 사진도 함께 비운다 — 사용자가 지운 것이다. */
+	/**
+	 * 올린 프로필 사진 삭제. 소셜 계정이면 카카오 사진으로 되돌아간다 —
+	 * 소셜 사진은 별도 칸에 남아 있어 표시값이 자연스럽게 그쪽으로 떨어진다.
+	 */
 	@Transactional
 	public UserResponse deleteProfileImage(Long userId) {
 		User user = getById(userId);
-		String previousKey = user.hasUploadedProfileImage() ? user.getProfileImageUrl() : null;
+		String previousKey = user.getProfileImageUrl();
 
 		user.updateProfileImage(null);
 		deletePreviousImage(previousKey);
 
-		return UserResponse.from(user, null);
+		return UserResponse.from(user, profileImageUrlOf(user));
 	}
 
 	/** 저장소에서 지우는 데 실패해도 사용자 동작은 성공이다 — 남은 객체는 정리 작업의 몫이다. */

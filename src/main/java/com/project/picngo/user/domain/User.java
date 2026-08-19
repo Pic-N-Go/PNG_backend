@@ -38,8 +38,17 @@ public class User extends BaseTimeEntity {
 	@Column(nullable = false, length = 50)
 	private String nickname;
 
+	/** 사용자가 앱에서 올린 프로필 사진의 S3 objectKey. 안 올렸으면 null이다. */
 	@Column(length = 500)
 	private String profileImageUrl;
+
+	/**
+	 * 소셜 로그인이 준 프로필 사진 URL. 로그인할 때마다 갱신되며, 사용자가 직접 올린 사진이
+	 * 없을 때의 표시값이다. 두 값을 한 컬럼에 섞으면 사진을 올리는 순간 소셜 사진이 사라져
+	 * 되돌릴 수 없다.
+	 */
+	@Column(length = 500)
+	private String socialProfileImageUrl;
 
 	// 자기소개. 프로필 수정에서만 채워지고 가입 시에는 비어 있어 빌더 인자로 두지 않는다.
 	@Column(length = 100)
@@ -72,7 +81,7 @@ public class User extends BaseTimeEntity {
 		String email,
 		String password,
 		String nickname,
-		String profileImageUrl,
+		String socialProfileImageUrl,
 		Role role,
 		SocialProvider provider,
 		String providerId
@@ -80,7 +89,7 @@ public class User extends BaseTimeEntity {
 		this.email = email;
 		this.password = password;
 		this.nickname = nickname;
-		this.profileImageUrl = profileImageUrl;
+		this.socialProfileImageUrl = socialProfileImageUrl;
 		this.role = role;
 		this.provider = provider;
 		this.providerId = providerId;
@@ -115,14 +124,14 @@ public class User extends BaseTimeEntity {
 	public static User createSocialUser(
 		String email,
 		String nickname,
-		String profileImageUrl,
+		String socialProfileImageUrl,
 		SocialProvider provider,
 		String providerId
 	) {
 		return User.builder()
 			.email(email)
 			.nickname(nickname)
-			.profileImageUrl(profileImageUrl)
+			.socialProfileImageUrl(socialProfileImageUrl)
 			.role(Role.USER)
 			.provider(provider)
 			.providerId(providerId)
@@ -133,23 +142,28 @@ public class User extends BaseTimeEntity {
 	 * 재로그인 시 소셜 프로필 동기화. 닉네임은 일부러 받지 않는다 — 덮어쓰면 사용자가
 	 * 프로필 편집에서 정한 닉네임이 매 로그인마다 카카오 이름으로 원복된다.
 	 */
-	public void updateSocialProfile(String profileImageUrl) {
-		// null이면 그대로 둔다 — 카카오 프로필 사진 제공은 선택 동의라 미동의 사용자는
-		// 매 로그인마다 null이 온다. 덮으면 이미 있던 사진이 로그인할 때마다 지워진다.
-		if (profileImageUrl == null) {
-			return;
+	/**
+	 * 재로그인 시 소셜 사진 동기화. 사용자가 올린 사진과 다른 칸이라 덮어써도 안전하다.
+	 * null이면 그대로 둔다 — 카카오 프로필 사진 제공은 선택 동의라 미동의 사용자는 매 로그인마다
+	 * null이 온다. 덮으면 이미 있던 사진이 로그인할 때마다 지워진다.
+	 */
+	public void updateSocialProfile(String socialProfileImageUrl) {
+		if (socialProfileImageUrl != null) {
+			this.socialProfileImageUrl = socialProfileImageUrl;
 		}
-		// 사용자가 앱에서 직접 올린 사진(S3 objectKey)은 카카오 사진으로 덮지 않는다.
-		// 저장된 값이 http로 시작하면 카카오가 준 URL이고, 아니면 우리가 올린 것이다.
-		if (hasUploadedProfileImage()) {
-			return;
-		}
-		this.profileImageUrl = profileImageUrl;
 	}
 
-	/** 앱에서 직접 올린 사진인지. S3 objectKey는 http로 시작하지 않는다(카카오 URL과의 구분점). */
+	/** 앱에서 직접 올린 사진이 있는지. 저장소에서 지울 대상인지를 이 값으로 판단한다. */
 	public boolean hasUploadedProfileImage() {
-		return this.profileImageUrl != null && !this.profileImageUrl.startsWith("http");
+		return this.profileImageUrl != null;
+	}
+
+	/**
+	 * 화면에 보여줄 프로필 사진. 직접 올린 것이 우선이고, 없으면 소셜에서 받은 것으로 떨어진다.
+	 * 그래서 올린 사진을 지우면 카카오 사진으로 자연스럽게 되돌아간다.
+	 */
+	public String getDisplayProfileImage() {
+		return profileImageUrl != null ? profileImageUrl : socialProfileImageUrl;
 	}
 
 	/** 프로필 사진 교체·삭제. objectKey를 그대로 담는다(응답 직전에 presigned URL로 바꾼다). */

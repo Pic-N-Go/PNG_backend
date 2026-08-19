@@ -101,7 +101,7 @@ public class AuthService {
 			jwtTokenProvider.getAccessTokenExpirationSeconds(),
             refreshToken,
                 jwtTokenProvider.getRefreshTokenExpirationSeconds(),
-			UserResponse.from(user, imageStorageService.getPresignedUrl(user.getProfileImageUrl())),
+			UserResponse.from(user, imageStorageService.getPresignedUrl(user.getDisplayProfileImage())),
 			isNewUser
 		);
 	}

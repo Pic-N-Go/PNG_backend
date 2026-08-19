@@ -232,7 +232,7 @@ public class PostCommentService {
         return new CommentResponse(
                 comment.getId(),
                 comment.getContent(),
-                PostAuthorResponse.from(comment.getAuthor(), imageStorageService.getPresignedUrl(comment.getAuthor().getProfileImageUrl())),
+                PostAuthorResponse.from(comment.getAuthor(), imageStorageService.getPresignedUrl(comment.getAuthor().getDisplayProfileImage())),
                 comment.isReply() ? comment.getParent().getId() : null,
                 comment.getReplyCount(),
                 comment.getLikeCount(),
