@@ -3,6 +3,7 @@ package com.project.picngo.auth.service;
 import com.project.picngo.auth.domain.EmailVerificationPurpose;
 import com.project.picngo.auth.dto.*;
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
@@ -26,6 +27,7 @@ public class AuthService {
 	private final EmailVerificationService emailVerificationService;
 	private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+	private final ImageStorageService imageStorageService;
 
 	@Transactional
 	public TokenResponse signUp(SignUpRequest request) {
@@ -99,7 +101,7 @@ public class AuthService {
 			jwtTokenProvider.getAccessTokenExpirationSeconds(),
             refreshToken,
                 jwtTokenProvider.getRefreshTokenExpirationSeconds(),
-			UserResponse.from(user),
+			UserResponse.from(user, imageStorageService.getPresignedUrl(user.getProfileImageUrl())),
 			isNewUser
 		);
 	}

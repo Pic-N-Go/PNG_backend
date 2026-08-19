@@ -1,6 +1,7 @@
 package com.project.picngo.community.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.common.exception.code.CommunityErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.community.domain.Post;
@@ -49,6 +50,7 @@ public class PostCommentService {
     private final PostCommentRepository commentRepository;
     private final PostCommentLikeRepository commentLikeRepository;
     private final UserRepository userRepository;
+    private final ImageStorageService imageStorageService;
 
     /**
      * 최상위 댓글만 준다. 답글은 getReplies로 따로 받아간다("답글 N개 보기").
@@ -230,7 +232,7 @@ public class PostCommentService {
         return new CommentResponse(
                 comment.getId(),
                 comment.getContent(),
-                PostAuthorResponse.from(comment.getAuthor()),
+                PostAuthorResponse.from(comment.getAuthor(), imageStorageService.getPresignedUrl(comment.getAuthor().getProfileImageUrl())),
                 comment.isReply() ? comment.getParent().getId() : null,
                 comment.getReplyCount(),
                 comment.getLikeCount(),

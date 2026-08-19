@@ -1,5 +1,6 @@
 package com.project.picngo.auth.service;
 
+import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.auth.dto.KakaoLoginRequest;
 import com.project.picngo.auth.dto.KakaoProfile;
 import com.project.picngo.auth.dto.PasswordResetCodeRequest;
@@ -48,6 +49,7 @@ class AuthServiceTest {
 
     @Mock
     private RefreshTokenService refreshTokenService;
+    @Mock ImageStorageService imageStorageService;
 
     @InjectMocks
     private AuthService authService;

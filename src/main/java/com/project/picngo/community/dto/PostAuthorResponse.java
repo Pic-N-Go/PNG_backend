@@ -7,7 +7,7 @@ public record PostAuthorResponse(
         String nickname,
         String profileImageUrl
 ) {
-    public static PostAuthorResponse from(User user) {
-        return new PostAuthorResponse(user.getId(), user.getNickname(), user.getProfileImageUrl());
+    public static PostAuthorResponse from(User user, String profileImageUrl) {
+        return new PostAuthorResponse(user.getId(), user.getNickname(), profileImageUrl);
     }
 }

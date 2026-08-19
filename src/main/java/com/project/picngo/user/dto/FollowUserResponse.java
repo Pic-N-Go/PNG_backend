@@ -8,11 +8,11 @@ public record FollowUserResponse(Long id,
                                  String bio) {
 
     // 팔로워/팔로잉 목록에 보여줄 사용자 정보
-    public static FollowUserResponse from(User user) {
+    public static FollowUserResponse from(User user, String profileImageUrl) {
         return new FollowUserResponse(
                 user.getId(),
                 user.getNickname(),
-                user.getProfileImageUrl(),
+                profileImageUrl,
                 user.getBio()
         );
     }

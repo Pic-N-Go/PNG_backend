@@ -1,6 +1,7 @@
 package com.project.picngo.user.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.image.service.ImageStorageService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.project.picngo.common.util.ValidationRules;
 
@@ -34,6 +35,16 @@ public class UserService {
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
 	private final PasswordEncoder passwordEncoder;
+	private final ImageStorageService imageStorageService;
+
+	/**
+	 * 프로필 사진은 S3 objectKey로 저장돼 있어 그대로는 열리지 않는다 — 응답에 담기 전에
+	 * presigned URL로 바꾼다. 카카오처럼 http로 시작하는 값은 getPresignedUrl이 통과시키므로
+	 * 두 형태가 같은 컬럼에 섞여 있어도 된다.
+	 */
+	private String profileImageUrlOf(User user) {
+		return imageStorageService.getPresignedUrl(user.getProfileImageUrl());
+	}
 
 	public User getByEmail(String email) {
 		return userRepository.findByEmail(email)
@@ -58,7 +69,8 @@ public class UserService {
 	}
 
 	public UserResponse getMyInfo(Long userId) {
-		return UserResponse.from(getById(userId));
+		User user = getById(userId);
+		return UserResponse.from(user, profileImageUrlOf(user));
 	}
 
 	@Transactional
@@ -178,7 +190,7 @@ public class UserService {
 	public UserResponse updateUserSpotCategories(Long userId, Set<SpotCategory> spotCategories) {
 		User user = getById(userId);
 		user.updateSpotCategories(spotCategories);
-		return UserResponse.from(user);
+		return UserResponse.from(user, profileImageUrlOf(user));
 	}
 
 	// 내 프로필 수정
@@ -202,7 +214,7 @@ public class UserService {
 
 		user.updateProfile(request.nickname(), request.profileImageUrl(), request.bio());
 
-		return UserResponse.from(user);
+		return UserResponse.from(user, profileImageUrlOf(user));
 	}
 
 	/**
@@ -232,6 +244,7 @@ public class UserService {
 		User user = getById(userId);
 		return UserProfileResponse.from(
 				user,
+				profileImageUrlOf(user),
 				followRepository.countByFollowing(user),
 				followRepository.countByFollower(user)
 		);
@@ -273,7 +286,7 @@ public class UserService {
 		User user = getById(userId);
 
 		return followRepository.findAllByFollowing(user).stream()
-				.map(follow -> FollowUserResponse.from(follow.getFollower()))
+				.map(follow -> FollowUserResponse.from(follow.getFollower(), profileImageUrlOf(follow.getFollower())))
 				.toList();
 	}
 
@@ -282,7 +295,7 @@ public class UserService {
 		User user = getById(userId);
 
 		return followRepository.findAllByFollower(user).stream()
-				.map(follow -> FollowUserResponse.from(follow.getFollowing()))
+				.map(follow -> FollowUserResponse.from(follow.getFollowing(), profileImageUrlOf(follow.getFollowing())))
 				.toList();
 	}
 
@@ -294,7 +307,7 @@ public class UserService {
 
 		return userRepository
 				.findByNicknameContainingIgnoreCase(keyword.trim(), PageRequest.of(page, size))
-				.map(FollowUserResponse::from);
+				.map(user -> FollowUserResponse.from(user, profileImageUrlOf(user)));
 	}
 
     // 내 활동 통계 조회 서비스

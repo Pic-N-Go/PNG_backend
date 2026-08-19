@@ -1,5 +1,6 @@
 package com.project.picngo.user.service;
 
+import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.user.domain.User;
@@ -36,6 +37,7 @@ class UserProfileServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock FollowRepository followRepository;
+    @Mock ImageStorageService imageStorageService;
 
     @InjectMocks UserService service;
 
