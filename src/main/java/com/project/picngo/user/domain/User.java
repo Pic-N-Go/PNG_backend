@@ -134,7 +134,11 @@ public class User extends BaseTimeEntity {
 	 * 프로필 편집에서 정한 닉네임이 매 로그인마다 카카오 이름으로 원복된다.
 	 */
 	public void updateSocialProfile(String profileImageUrl) {
-		this.profileImageUrl = profileImageUrl;
+		// null이면 그대로 둔다 — 카카오 프로필 사진 제공은 선택 동의라 미동의 사용자는
+		// 매 로그인마다 null이 온다. 덮으면 이미 있던 사진이 로그인할 때마다 지워진다.
+		if (profileImageUrl != null) {
+			this.profileImageUrl = profileImageUrl;
+		}
 	}
 
 	public void updatePassword(String encodedPassword) {

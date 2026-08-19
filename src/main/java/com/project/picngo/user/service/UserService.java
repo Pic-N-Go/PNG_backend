@@ -98,7 +98,7 @@ public class UserService {
 					throw new CustomException(AuthErrorCode.SOCIAL_EMAIL_ALREADY_EXISTS);
 				}
 
-				String resolved = resolveUniqueNickname(sanitizeNickname(nickname, providerId));
+				String resolved = resolveUniqueNickname(sanitizeNickname(nickname, providerId), providerId);
 				User created = userRepository.save(
 					User.createSocialUser(email, resolved, profileImageUrl, provider, providerId));
 				return new SocialUserResult(created, true);
@@ -117,22 +117,46 @@ public class UserService {
 		}
 		// 정제 후 남는 글자가 없거나 너무 짧은 경우(이모지만으로 된 닉네임 등)
 		if (cleaned.length() < NICKNAME_MIN) {
-			String digits = providerId == null ? "" : providerId.replaceAll("\\D", "");
-			String tail = digits.length() > 6 ? digits.substring(digits.length() - 6) : digits;
-			return "user" + tail;
+			return fallbackNickname(providerId);
 		}
 		return cleaned;
 	}
 
 	/**
+	 * 닉네임으로 쓸 글자가 하나도 안 남았을 때의 대체값. providerId는 계정마다 다르므로
+	 * 여기서 나온 값은 사실상 겹치지 않는다 — 숫자가 없는 providerId도 해시로 떨어뜨려
+	 * 전부 "user"로 수렴하지 않게 한다(그러면 아래 접미사 루프가 상시 동작한다).
+	 */
+	private String fallbackNickname(String providerId) {
+		if (providerId == null || providerId.isBlank()) {
+			return "user";
+		}
+		String digits = providerId.replaceAll("\\D", "");
+		if (!digits.isEmpty()) {
+			return "user" + (digits.length() > 6 ? digits.substring(digits.length() - 6) : digits);
+		}
+		// 36진수라 [0-9a-z]만 나온다. 최대 7자까지 나오므로 "user"(4자)와 합쳐 10자를
+		// 넘지 않도록 자른다 — 넘으면 NICKNAME_REGEX를 위반한 값이 저장된다.
+		String hashed = Integer.toUnsignedString(providerId.hashCode(), 36);
+		int room = NICKNAME_MAX - "user".length();
+		return "user" + (hashed.length() > room ? hashed.substring(hashed.length() - room) : hashed);
+	}
+
+	/**
 	 * 이미 쓰이는 닉네임이면 뒤에 숫자를 붙인다. 정상 경로는 온보딩에서 사용자가 직접 고르는
 	 * 것이고, 이건 온보딩을 마치지 못한 계정도 유효한 닉네임을 갖게 하는 안전망이다.
+	 *
+	 * ⚠️ `users.nickname`에 unique 제약이 추가되면 이 사전 검사만으로는 부족하다.
+	 * 검사와 INSERT 사이에 다른 요청이 같은 값을 넣을 수 있어, save 지점에서
+	 * DataIntegrityViolationException을 잡아 재시도해야 한다.
+	 * `createLocalUser`·`updateMyProfile`도 같은 check-then-write 구조다.
 	 */
-	private String resolveUniqueNickname(String base) {
+	private String resolveUniqueNickname(String base, String providerId) {
 		if (!userRepository.existsByNickname(base)) {
 			return base;
 		}
-		for (int suffix = 2; suffix <= 999; suffix++) {
+		// 순차 조회라 시도 횟수가 곧 쿼리 수다. 98개까지만 훑고 그 뒤는 계정 고유값으로 뛴다.
+		for (int suffix = 2; suffix <= 99; suffix++) {
 			String tail = String.valueOf(suffix);
 			// 접미사를 붙여도 최대 길이를 넘지 않도록 앞을 자른다
 			String head = base.length() + tail.length() > NICKNAME_MAX
@@ -143,7 +167,9 @@ public class UserService {
 				return candidate;
 			}
 		}
-		throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
+		// 여기까지 왔으면 예외를 던지는 대신 계정 고유값으로 떨어진다 — 카카오 로그인 버튼을
+		// 누른 사용자에게 "이미 사용 중인 닉네임입니다"(입력한 적도 없는 값)를 돌려줄 수는 없다.
+		return fallbackNickname(providerId);
 	}
 
 	@Transactional
@@ -165,7 +191,9 @@ public class UserService {
 			if (!request.nickname().matches(ValidationRules.NICKNAME_REGEX)) {
 				throw new CustomException(UserErrorCode.INVALID_NICKNAME);
 			}
-			if (userRepository.existsByNickname(request.nickname())) {
+			// 자기 자신은 제외한다 — MySQL 기본 collation(utf8mb4_0900_ai_ci)은 대소문자를
+			// 구분하지 않아, abc → Abc처럼 대소문자만 바꾸면 자기 행에 매치돼 중복으로 잡힌다.
+			if (userRepository.existsByNicknameAndIdNot(request.nickname(), userId)) {
 				throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
 			}
 		}

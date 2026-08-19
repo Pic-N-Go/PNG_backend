@@ -1,9 +1,12 @@
 package com.project.picngo.auth.service;
 
+import com.project.picngo.auth.dto.KakaoLoginRequest;
+import com.project.picngo.auth.dto.KakaoProfile;
 import com.project.picngo.auth.dto.RefreshTokenRequest;
 import com.project.picngo.auth.dto.TokenResponse;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.AuthErrorCode;
+import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.service.UserService;
 import org.junit.jupiter.api.DisplayName;
@@ -67,7 +70,44 @@ class AuthServiceTest {
         assertThat(response.refreshToken()).isEqualTo("new-refresh-token");
         assertThat(response.expiresIn()).isEqualTo(60L);
         assertThat(response.refreshTokenExpiresIn()).isEqualTo(120L);
+        // 재발급은 기존 계정이다 — true면 클라이언트가 매번 온보딩을 띄운다.
+        assertThat(response.isNewUser()).isFalse();
         verify(refreshTokenService).saveRefreshToken("new-refresh-token", 1L);
+    }
+
+    /**
+     * isNewUser는 신규 카카오 가입자를 온보딩으로 보낼지 정하는 유일한 신호다.
+     * false여야 할 때 true면 기존 사용자가 매 로그인마다 온보딩을 보고,
+     * true여야 할 때 false면 신규 사용자가 서버가 임의로 지은 닉네임에 갇힌다.
+     * 둘 다 예외 없이 조용히 깨지는 종류라 여기서 못 박는다.
+     */
+    @Test
+    @DisplayName("카카오 신규 가입이면 isNewUser가 true로 전파된다")
+    void propagatesIsNewUserForNewKakaoSignUp() {
+        assertThat(kakaoLoginResponse(true).isNewUser()).isTrue();
+    }
+
+    @Test
+    @DisplayName("카카오 기존 계정이면 isNewUser가 false로 전파된다")
+    void propagatesIsNewUserForExistingKakaoAccount() {
+        assertThat(kakaoLoginResponse(false).isNewUser()).isFalse();
+    }
+
+    private TokenResponse kakaoLoginResponse(boolean newUser) {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(user.getEmail()).thenReturn("test@kakao.local");
+        when(kakaoAuthClient.getProfile("kakao-access-token"))
+                .thenReturn(new KakaoProfile("provider-1", "test@kakao.local", "홍길동", null));
+        when(userService.getOrCreateSocialUser(
+                "test@kakao.local", "홍길동", null, SocialProvider.KAKAO, "provider-1"))
+                .thenReturn(new UserService.SocialUserResult(user, newUser));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+        when(jwtTokenProvider.getAccessTokenExpirationSeconds()).thenReturn(60L);
+        when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
+
+        return authService.loginWithKakao(new KakaoLoginRequest("kakao-access-token"));
     }
 
     @Test

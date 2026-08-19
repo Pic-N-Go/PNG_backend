@@ -23,6 +23,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 	boolean existsByNickname(String nickname);
 
+	/** 프로필 수정용 — 자기 자신은 중복으로 잡히면 안 된다(대소문자만 바꾸는 경우). */
+	boolean existsByNicknameAndIdNot(String nickname, Long id);
+
 	Optional<User> findByProviderAndProviderId(SocialProvider provider, String providerId);
 
 	// 사용자 검색 — 닉네임 부분일치. 닉네임이 유니크라 별도 핸들 없이 이것만으로 사람을 찾을 수 있다.

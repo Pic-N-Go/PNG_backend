@@ -17,7 +17,9 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static com.project.picngo.common.util.ValidationRules.NICKNAME_REGEX;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -75,8 +77,11 @@ class SocialNicknameTest {
         assertEquals("user847213", savedNicknameFor("😀😀😀", "9999847213", Set.of()));
         assertEquals("user555", savedNicknameFor("   ", "555", Set.of()));
         assertEquals("user", savedNicknameFor(null, null, Set.of()));
-        // providerId에 숫자가 없으면 접미사 없이 "user"로 떨어진다(2자 이상이라 규칙은 만족).
-        assertEquals("user", savedNicknameFor("♥♥", "kakao_abc", Set.of()));
+        // providerId에 숫자가 없으면 해시로 떨어진다. 값 자체보다 "규칙을 만족하고 계정마다
+        // 다르다"가 중요하다 — 전부 "user"로 수렴하면 접미사 루프가 상시 동작한다.
+        String hashed = savedNicknameFor("♥♥", "kakao_abc", Set.of());
+        assertTrue(hashed.matches(NICKNAME_REGEX), "규칙 위반: " + hashed);
+        assertNotEquals(hashed, savedNicknameFor("♥♥", "kakao_xyz", Set.of()));
     }
 
     @Test
@@ -106,5 +111,16 @@ class SocialNicknameTest {
         assertFalse(result.newUser(), "기존 계정이면 newUser가 false여야 한다");
         verify(existing).updateSocialProfile("https://img/new.jpg");
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("카카오가 프로필 사진을 안 주면(선택 동의 미동의) 저장된 사진을 지우지 않는다")
+    void keepsStoredImageWhenKakaoSendsNull() {
+        User user = User.createSocialUser(
+                "a@kakao.local", "홍길동", "https://img/stored.jpg", SocialProvider.KAKAO, "1");
+
+        user.updateSocialProfile(null);
+
+        assertEquals("https://img/stored.jpg", user.getProfileImageUrl());
     }
 }

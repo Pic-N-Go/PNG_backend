@@ -83,7 +83,7 @@ class UserProfileServiceTest {
 
         verify(user).updateProfile("홍길동님♥", null, "안녕하세요");
         // 안 바꿨으므로 중복 조회조차 하지 않는다
-        verify(userRepository, never()).existsByNickname(anyString());
+        verify(userRepository, never()).existsByNicknameAndIdNot(anyString(), any());
     }
 
     @Test
@@ -108,7 +108,7 @@ class UserProfileServiceTest {
         User user = mock(User.class);
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
         when(user.getNickname()).thenReturn("홍길동");
-        when(userRepository.existsByNickname("김지우")).thenReturn(true);
+        when(userRepository.existsByNicknameAndIdNot("김지우", 7L)).thenReturn(true);
 
         CustomException exception = assertThrows(
                 CustomException.class,
