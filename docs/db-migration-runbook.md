@@ -38,7 +38,30 @@ mysql -u "$DB_USERNAME" -p --default-character-set=utf8mb4 picngo -e "source doc
 mysql -u "$DB_USERNAME" -p --default-character-set=utf8mb4 picngo -e "source docs/search-map-bounds-index-migration.sql"
 ```
 
-이 세 개만 하면 됩니다. 나머지는 앱을 켜면 Hibernate가 알아서 만듭니다.
+이 세 개만 하면 됩니다. 나머지 컬럼은 앱을 켜면 Hibernate가 알아서 만듭니다.
+
+### ⚠️ 코스를 수정할 때 500이 난다면 — `course.version` 하나 더 실행
+
+```bash
+mysql -u "$DB_USERNAME" -p --default-character-set=utf8mb4 picngo -e "source docs/course-version-column-migration.sql"
+```
+
+증상은 이렇습니다.
+
+```
+Could not commit JPA transaction
+Caused by: NullPointerException: Cannot invoke "java.lang.Long.longValue()" because "current" is null
+    at org.hibernate.engine.internal.Versioning.increment
+```
+
+낙관적 락을 넣으면서 `course`에 `version` 컬럼이 생겼는데, **로컬은 `ddl-auto=update`라
+Hibernate가 `NULL 허용`으로 만듭니다.** 그러면 그 전에 저장돼 있던 코스들이 `version = NULL`이
+되고, 그 코스를 수정하는 순간 `NULL + 1`을 시도하다 터집니다.
+
+새로 만드는 코스는 0이 들어가서 괜찮고, **기존 코스만** 문제입니다.
+위 SQL이 `NULL`을 0으로 채우고 컬럼을 `NOT NULL`로 맞춰줍니다.
+
+> 이미 컬럼이 있어도 안전합니다. 없으면 만들고, 있으면 `NULL`만 채웁니다.
 
 > `mysql` 명령이 없으면 `mysqlsh --sql --user=... --schema=picngo --file=docs/....sql` 로도 됩니다.
 

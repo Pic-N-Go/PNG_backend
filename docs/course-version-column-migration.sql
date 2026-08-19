@@ -31,6 +31,18 @@
 --
 -- ⚠️ 이 컬럼은 사람이 채우거나 고치는 값이 아니다. 수동으로 UPDATE 하면
 --    그 순간 진행 중이던 요청이 엉뚱하게 충돌 처리된다.
+-- ⚠️ 컬럼이 "이미 있는" 경우도 처리해야 한다.
+--
+--    로컬(ddl-auto=update)에서 이 SQL보다 앱을 먼저 켜면 Hibernate가 컬럼을
+--    자기 방식으로 만든다: ALTER TABLE course ADD COLUMN version BIGINT (NULL 허용).
+--    그러면 이미 저장돼 있던 코스들이 version = NULL을 갖게 되고,
+--    그 코스를 수정하는 순간 Hibernate가 "NULL + 1"을 시도하다 터진다:
+--
+--      NullPointerException: Cannot invoke "java.lang.Long.longValue()"
+--        at org.hibernate.engine.internal.Versioning.increment
+--
+--    실제로 로컬에서 이 오류가 났다(코스 2건이 전부 NULL). 그래서 "없으면 추가"만으로는
+--    부족하고, 이미 있는 컬럼의 NULL도 채우고 NOT NULL로 맞춰야 한다.
 DROP PROCEDURE IF EXISTS add_course_version_column;
 DELIMITER $$
 CREATE PROCEDURE add_course_version_column()
@@ -41,8 +53,17 @@ BEGIN
           AND TABLE_NAME = 'course'
           AND COLUMN_NAME = 'version'
     ) THEN
+        -- 컬럼이 없는 경우(운영 등 깨끗한 상태)
         ALTER TABLE course
             ADD COLUMN `version` BIGINT NOT NULL DEFAULT 0
+                COMMENT '낙관적 락 버전. JPA가 자동 증가시킨다(수동 변경 금지)';
+    ELSE
+        -- 이미 있는 경우(로컬에서 ddl-auto가 먼저 만든 상태).
+        -- 순서가 중요하다: NULL을 먼저 채워야 NOT NULL로 바꿀 수 있다.
+        UPDATE course SET `version` = 0 WHERE `version` IS NULL;
+
+        ALTER TABLE course
+            MODIFY COLUMN `version` BIGINT NOT NULL DEFAULT 0
                 COMMENT '낙관적 락 버전. JPA가 자동 증가시킨다(수동 변경 금지)';
     END IF;
 END$$
@@ -63,8 +84,13 @@ WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_NAME = 'course'
   AND COLUMN_NAME = 'version';
 
--- 기존 코스가 모두 0에서 시작하는지 확인. 방금 추가했다면 전부 0이어야 한다.
-SELECT COUNT(*) AS total_courses, MIN(`version`) AS min_version, MAX(`version`) AS max_version
+-- null_version이 0이어야 한다. 하나라도 남아 있으면 그 코스를 수정할 때
+-- "NULL + 1"로 터진다(Versioning.increment NPE).
+SELECT
+    COUNT(*)                    AS total_courses,
+    SUM(`version` IS NULL)      AS null_version,
+    MIN(`version`)              AS min_version,
+    MAX(`version`)              AS max_version
 FROM course;
 
 
