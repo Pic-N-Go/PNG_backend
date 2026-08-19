@@ -9,6 +9,9 @@ public final class ValidationRules {
 
     /** 한글/영문/숫자 2~10자. 특수문자·공백 불가. */
     public static final String NICKNAME_REGEX = "^[가-힣a-zA-Z0-9]{2,10}$";
+    /** 정규식과 같은 값이어야 한다 — 소셜 닉네임을 규칙에 맞게 다듬을 때 쓴다. */
+    public static final int NICKNAME_MIN = 2;
+    public static final int NICKNAME_MAX = 10;
     public static final String NICKNAME_MESSAGE = "닉네임은 한글/영문/숫자 2~10자여야 합니다. (특수문자 불가)";
 
     private ValidationRules() {

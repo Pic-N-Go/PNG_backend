@@ -38,7 +38,8 @@ public class AuthService {
 				request.spotCategories()
 		);
 
-		return createTokenResponse(user);
+		// 이메일 가입은 가입 화면에서 이미 닉네임을 받았으므로 온보딩이 필요 없다.
+		return createTokenResponse(user, false);
 	}
 
 	public TokenResponse login(LoginRequest request) {
@@ -49,13 +50,13 @@ public class AuthService {
 			throw new CustomException(AuthErrorCode.INVALID_LOGIN);
 		}
 
-		return createTokenResponse(user);
+		return createTokenResponse(user, false);
 	}
 
 	@Transactional
 	public TokenResponse loginWithKakao(KakaoLoginRequest request) {
 		KakaoProfile profile = kakaoAuthClient.getProfile(request.accessToken());
-		User user = userService.getOrCreateSocialUser(
+		UserService.SocialUserResult result = userService.getOrCreateSocialUser(
 			profile.email(),
 			profile.nickname(),
 			profile.profileImageUrl(),
@@ -63,7 +64,7 @@ public class AuthService {
 			profile.providerId()
 		);
 
-		return createTokenResponse(user);
+		return createTokenResponse(result.user(), result.newUser());
 	}
 
 	public EmailVerificationResponse sendEmailVerificationCode(EmailVerificationRequest request) {
@@ -82,7 +83,7 @@ public class AuthService {
 		return new NicknameCheckResponse(nickname, !userService.existsByNickname(nickname));
 	}
 
-	private TokenResponse createTokenResponse(User user) {
+	private TokenResponse createTokenResponse(User user, boolean isNewUser) {
 		String accessToken = jwtTokenProvider.createAccessToken(user);
         String refreshToken = jwtTokenProvider.createRefreshToken(user);
 
@@ -98,7 +99,8 @@ public class AuthService {
 			jwtTokenProvider.getAccessTokenExpirationSeconds(),
             refreshToken,
                 jwtTokenProvider.getRefreshTokenExpirationSeconds(),
-			UserResponse.from(user)
+			UserResponse.from(user),
+			isNewUser
 		);
 	}
 
@@ -117,7 +119,8 @@ public class AuthService {
 
         User user = userService.getById(userId);
 
-        return createTokenResponse(user);
+        // 토큰 재발급은 기존 계정이므로 항상 false다.
+        return createTokenResponse(user, false);
     }
 
 	public EmailVerificationResponse sendPasswordResetCode(PasswordResetCodeRequest request) {

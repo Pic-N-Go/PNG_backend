@@ -129,8 +129,11 @@ public class User extends BaseTimeEntity {
 			.build();
 	}
 
-	public void updateSocialProfile(String nickname, String profileImageUrl) {
-		this.nickname = nickname;
+	/**
+	 * 재로그인 시 소셜 프로필 동기화. 닉네임은 일부러 받지 않는다 — 덮어쓰면 사용자가
+	 * 프로필 편집에서 정한 닉네임이 매 로그인마다 카카오 이름으로 원복된다.
+	 */
+	public void updateSocialProfile(String profileImageUrl) {
 		this.profileImageUrl = profileImageUrl;
 	}
 
