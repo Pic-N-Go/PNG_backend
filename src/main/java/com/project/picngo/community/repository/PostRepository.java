@@ -68,6 +68,31 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             """)
     void changeCommentCount(@Param("postId") Long postId, @Param("delta") long delta);
 
+    // 내가 저장한 글. 정렬은 저장 시각이 아니라 작성 시각이다 —
+    // PostBookmark에 생성 시각 컬럼이 없고, 다른 목록과 같은 기준이라 페이지를 넘겨도 순서가 안 흔들린다.
+    @EntityGraph(attributePaths = {"author", "spot"})
+    @Query("""
+        select p
+        from Post p
+        left join p.spot spot
+        where exists (
+            select bookmark.id
+            from PostBookmark bookmark
+            where bookmark.userId = :userId
+              and bookmark.post.id = p.id
+        )
+        and (
+            :keyword is null
+            or lower(p.content) like lower(concat('%', :keyword, '%'))
+            or lower(coalesce(spot.name, '')) like lower(concat('%', :keyword, '%'))
+        )
+        """)
+    Page<Post> searchBookmarked(
+            @Param("keyword") String keyword,
+            @Param("userId") Long userId,
+            Pageable pageable
+    );
+
     @EntityGraph(attributePaths = {"author", "spot"})
     @Query("""
         select p

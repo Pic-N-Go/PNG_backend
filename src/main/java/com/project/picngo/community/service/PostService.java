@@ -55,7 +55,7 @@ public class PostService {
      */
     public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, Long authorId, int page, int size) {
 
-        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING) && userId == null) {
+        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING || sort == PostSort.BOOKMARKED) && userId == null) {
             throw new CustomException(AuthErrorCode.LOGIN_REQUIRED);
         }
         // 너무 큰 사이즈 요청이 올 경우 100으로 조정
@@ -67,6 +67,7 @@ public class PostService {
             case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
             case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, pageable);
             case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
+            case BOOKMARKED -> postRepository.searchBookmarked(normalizedKeyword, userId, pageable);
         };
         List<PostResponse> posts = toFeedResponses(result.getContent(), userId);
 
@@ -390,7 +391,7 @@ public class PostService {
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
-            case MY_POSTS, LATEST, FOLLOWING -> Sort.by(
+            case MY_POSTS, LATEST, FOLLOWING, BOOKMARKED -> Sort.by(
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
