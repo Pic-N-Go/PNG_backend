@@ -55,13 +55,14 @@ Migration checksum mismatch for migration version 2
 | 파일 | 내용 |
 |---|---|
 | `V1__baseline_schema.sql` | 기준 스키마 (테이블 37개) |
-| `V2__converge_search_schema.sql` | 검색 인덱스·생성 컬럼 |
+| `V2__converge_schema.sql` | 검색 인덱스·생성 컬럼 추가, 고아 테이블 제거 |
 
 **V1은 빈 DB에서만 실행된다.** 이미 테이블이 있는 DB에서는
 `baseline-on-migrate` 설정이 "V1까지는 이미 적용됨"으로 기록하고 V2부터 시작한다.
 
 그래서 V2가 따로 필요했다. Flyway 도입 이전에 `docs/*.sql`을 실행하지 않은
-환경(실제로 팀원 한 명의 로컬이 그랬다)에 인덱스를 채워 넣는 역할이다.
+환경(실제로 팀원 한 명의 로컬이 그랬다)에 인덱스를 채워 넣고, 코드에서 사라진
+고아 테이블을 지워 모든 환경을 같은 상태로 맞춘다.
 
 ---
 
@@ -99,7 +100,7 @@ mysql -u "$DB_USERNAME" -p picngo -e "SELECT version, description, success, inst
 ```
 version | description            | success | installed_on
 1       | baseline schema        | 1       | 2026-08-19 ...
-2       | converge search schema | 1       | 2026-08-19 ...
+2       | converge schema        | 1       | 2026-08-19 ...
 ```
 
 지금까지 사람이 기억하던 것을 DB가 대신 기억한다.
@@ -145,7 +146,6 @@ MIGRATION_TEST_PASSWORD="$DB_PASSWORD" \
 
 - `db-migration-wishlist-to-spotalert.sql`
 - `review-time-slot-drop-migration.sql`
-- `spot-checklist-drop-migration.sql`
 - `spot-categories-migration.sql`
 
 ### 데이터 백필

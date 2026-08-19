@@ -5,11 +5,12 @@
 
 | 이 파일 | 지금은 어디에 |
 |---|---|
-| `search-fulltext-index-migration.sql` | `db/migration/V2__converge_search_schema.sql` |
+| `search-fulltext-index-migration.sql` | `db/migration/V2__converge_schema.sql` |
 | `search-normalized-column-migration.sql` | 〃 |
 | `search-map-bounds-index-migration.sql` | 〃 |
 | `spot-embedding-column-migration.sql` | `db/migration/V1__baseline_schema.sql` |
 | `comment-reply-and-like-migration.sql` | 〃 |
+| `spot-checklist-drop-migration.sql` | `db/migration/V2__converge_schema.sql` (고아 테이블 제거) |
 
 ## 지우지 않고 남긴 이유
 

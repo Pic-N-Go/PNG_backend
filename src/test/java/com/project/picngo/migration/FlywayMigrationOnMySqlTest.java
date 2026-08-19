@@ -112,7 +112,7 @@ class FlywayMigrationOnMySqlTest {
 
         try {
             // Flyway 이전부터 쓰던 DB를 흉내낸다: 테이블은 있는데 이력 테이블이 없는 상태.
-            // 검색 인덱스가 없는 팀원의 로컬이 딱 이 모습이다.
+            // 검색 인덱스가 없고 고아 테이블은 남아 있는, 팀원 로컬의 모습이다.
             try (Connection c = DriverManager.getConnection(baseUrl() + "/" + SCHEMA, user(), password());
                  Statement s = c.createStatement()) {
                 s.execute("CREATE TABLE spot ("
@@ -124,6 +124,17 @@ class FlywayMigrationOnMySqlTest {
                         + "is_active BIT(1) NOT NULL,"
                         + "latitude DOUBLE NOT NULL,"
                         + "longitude DOUBLE NOT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                // 스팟 체크리스트가 코스로 통합되며 코드에서 사라졌지만 테이블은 남은 상태
+                s.execute("CREATE TABLE checklist_item ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "spot_id BIGINT NOT NULL,"
+                        + "CONSTRAINT fk_ci_spot FOREIGN KEY (spot_id) REFERENCES spot(id)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                s.execute("CREATE TABLE hidden_checklist_default ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "spot_id BIGINT NOT NULL,"
+                        + "CONSTRAINT fk_hcd_spot FOREIGN KEY (spot_id) REFERENCES spot(id)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             }
 
@@ -138,6 +149,12 @@ class FlywayMigrationOnMySqlTest {
                     + "AND INDEX_NAME IN ('ft_spot_search','ft_spot_search_norm','idx_spot_map_bounds')"))
                     .as("인덱스가 없던 DB에 V2가 채워 넣어야 한다")
                     .isEqualTo(3);
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.TABLES "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' "
+                    + "AND TABLE_NAME IN ('checklist_item','hidden_checklist_default')"))
+                    .as("코드에서 사라진 고아 테이블은 V2가 지워야 한다")
+                    .isZero();
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }
