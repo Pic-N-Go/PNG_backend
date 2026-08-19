@@ -68,37 +68,37 @@ class SpotServiceFullTextTest {
     @Test
     @DisplayName("FULLTEXT 엔진이면 LIKE 쿼리 대신 전문검색 쿼리를 호출한다")
     void usesFullTextQuery() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         spotService.searchSpots("한라산", null, 0, 20, null);
 
-        verify(spotRepository).searchSpotsFullText(eq("\"한라산\""), eq("APPROVED"), any());
+        verify(spotRepository).searchSpotsFullText(eq("\"한라산\""), eq("한라산"), eq("APPROVED"), any());
         verify(spotRepository, never()).searchSpots(any(), any(), any());
     }
 
     @Test
     @DisplayName("네이티브 쿼리에 Sort를 얹지 않는다 - ORDER BY가 두 번 붙어 쿼리가 깨진다")
     void passesUnsortedPageable() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         spotService.searchSpots("한라산", null, 0, 20, null);
 
-        verify(spotRepository).searchSpotsFullText(any(), any(), pageableCaptor.capture());
+        verify(spotRepository).searchSpotsFullText(any(), any(), any(), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort().isSorted()).isFalse();
     }
 
     @Test
     @DisplayName("카테고리 필터가 있으면 enum이 아니라 이름 문자열로 넘긴다 - 네이티브 쿼리라 바인딩이 모호하다")
     void passesCategoryNamesAsStrings() {
-        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any()))
+        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         spotService.searchSpots("한라산", List.of("MOUNTAIN"), 0, 20, null);
 
         verify(spotRepository).searchSpotsFullTextByCategories(
-                eq("\"한라산\""), eq(List.of("MOUNTAIN")), eq("APPROVED"), any());
+                eq("\"한라산\""), eq("한라산"), eq(List.of("MOUNTAIN")), eq("APPROVED"), any());
     }
 
     @Test
@@ -107,13 +107,13 @@ class SpotServiceFullTextTest {
         var response = spotService.searchSpots("+++", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isZero();
-        verify(spotRepository, never()).searchSpotsFullText(any(), any(), any());
+        verify(spotRepository, never()).searchSpotsFullText(any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("지표에 engine=FULLTEXT 태그가 붙는다 - 공통 태그와 대소문자가 같아야 한다")
     void tagsMetricsWithEngine() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         spotService.searchSpots("한라산", null, 0, 20, null);

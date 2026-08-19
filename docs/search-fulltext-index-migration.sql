@@ -52,18 +52,34 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'spot';
 --   ERROR 1191 (HY000): Can't find FULLTEXT index matching the column list
 --
 -- name·address만이라 overview를 포함할 때보다 생성이 빠르고 인덱스도 작다.
+-- 이름만 보고 건너뛰면 안 된다. 예전 버전은 (name, address, overview) 3컬럼으로 만들었는데,
+-- 그 인덱스가 남아 있는 DB에 새 코드(MATCH(name, address))를 올리면 컬럼 목록이 맞지 않아
+-- 검색이 전부 ERROR 1191로 실패한다. 컬럼 목록까지 비교해서 다르면 지우고 다시 만든다.
 DROP PROCEDURE IF EXISTS add_spot_fulltext_index;
 DELIMITER $$
 CREATE PROCEDURE add_spot_fulltext_index()
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.STATISTICS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'spot'
-          AND INDEX_NAME = 'ft_spot_search'
-    ) THEN
+    DECLARE existing_columns VARCHAR(255);
+
+    SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) INTO existing_columns
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'spot'
+      AND INDEX_NAME = 'ft_spot_search';
+
+    -- 컬럼 목록이 다르면(예: 옛 3컬럼 인덱스) 지운다. 재생성은 행 수에 비례해 시간이 걸리고
+    -- 그 사이 FULLTEXT 검색은 실패하므로, 트래픽이 적은 시간에 적용할 것.
+    IF existing_columns IS NOT NULL AND existing_columns <> 'name,address' THEN
+        SELECT CONCAT('ft_spot_search 컬럼 목록이 달라 재생성: ', existing_columns, ' -> name,address') AS msg;
+        ALTER TABLE spot DROP INDEX ft_spot_search;
+        SET existing_columns = NULL;
+    END IF;
+
+    IF existing_columns IS NULL THEN
         ALTER TABLE spot
             ADD FULLTEXT INDEX ft_spot_search (name, address) WITH PARSER ngram;
+    ELSE
+        SELECT 'ft_spot_search 이미 존재(name,address) - 건너뜀' AS msg;
     END IF;
 END$$
 DELIMITER ;

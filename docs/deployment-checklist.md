@@ -102,18 +102,14 @@ docker exec -i picngo-mysql mysql -uroot -p"$DB_PASSWORD" --default-character-se
 `(name, address, overview)` 3컬럼이면 **컬럼 목록이 맞지 않아 검색이 전부 실패한다**
 (`ERROR 1191: Can't find FULLTEXT index matching the column list`).
 
-`search-fulltext-index-migration.sql`은 **인덱스 이름만 보고 건너뛰므로 이 경우를 고치지
-못한다.** 0번에서 컬럼 목록에 `overview`가 보이면 손으로 지운 뒤 마이그레이션을 다시 돌린다.
+`search-fulltext-index-migration.sql`이 **컬럼 목록까지 비교해 다르면 DROP 후 재생성한다.**
+2번을 그대로 실행하면 되고, 출력에 아래 줄이 보이면 재생성된 것이다.
 
-```sql
-ALTER TABLE spot DROP INDEX ft_spot_search;
 ```
-```bash
-docker exec -i picngo-mysql mysql -uroot -p"$DB_PASSWORD" --default-character-set=utf8mb4 picngo \
-  < docs/search-fulltext-index-migration.sql
+ft_spot_search 컬럼 목록이 달라 재생성: address,name,overview -> name,address
 ```
 
-인덱스 재생성은 행 수에 비례해 시간이 걸린다. 그 사이 FULLTEXT 검색은 실패하므로
+인덱스 재생성은 행 수에 비례해 시간이 걸린다. **그 사이 FULLTEXT 검색은 실패하므로**
 `SEARCH_ENGINE=LIKE`로 잠시 내려두거나 트래픽이 적은 시간에 할 것.
 
 > 각 파일 안에 검증 쿼리가 들어 있다. 실행 후 출력에서 컬럼·인덱스가 생겼는지 확인할 것.

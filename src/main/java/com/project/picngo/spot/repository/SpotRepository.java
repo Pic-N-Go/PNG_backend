@@ -149,7 +149,7 @@ s.createdAt desc
             where s.status = :status
             and s.is_active = true
             and match(s.name, s.address) against (:keyword in boolean mode)
-            order by (lower(s.name) like lower(concat('%', :keyword, '%'))) desc, s.created_at desc
+            order by (lower(s.name) like lower(concat('%', :rawKeyword, '%'))) desc, s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -160,6 +160,7 @@ s.createdAt desc
             nativeQuery = true)
     Page<Spot> searchSpotsFullText(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("status") String status,
             Pageable pageable
     );
@@ -173,7 +174,7 @@ s.createdAt desc
                 where sc.spot_id = s.id and sc.category in (:categories)
             )
             and match(s.name, s.address) against (:keyword in boolean mode)
-            order by (lower(s.name) like lower(concat('%', :keyword, '%'))) desc, s.created_at desc
+            order by (lower(s.name) like lower(concat('%', :rawKeyword, '%'))) desc, s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -188,6 +189,7 @@ s.createdAt desc
             nativeQuery = true)
     Page<Spot> searchSpotsFullTextByCategories(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("categories") Collection<String> categories,
             @Param("status") String status,
             Pageable pageable
@@ -198,12 +200,17 @@ s.createdAt desc
     //
     //    엔티티에 매핑하지 않은 컬럼이라 JPQL로는 접근할 수 없어 네이티브 쿼리로 쓴다.
     //    나머지 제약(String status, 정렬 없는 Pageable)은 위 FULLTEXT 쿼리와 같은 이유다.
+    //
+    //    정렬용 rawKeyword는 검색식(:keyword)과 다른 값이다. :keyword는 BOOLEAN MODE 구문식이라
+    //    따옴표가 붙어 있어(FullTextKeyword.toSpacelessPhrase) LIKE 비교에 쓰면 아무것도 맞지 않는다.
+    //    비교 대상도 s.name이 아니라 s.search_norm이다 — 이 경로에 온 이유가 띄어쓰기 불일치라,
+    //    공백이 남아 있는 s.name과는 짝이 맞지 않는다.
     @Query(value = """
             select s.* from spot s
             where s.status = :status
             and s.is_active = true
             and match(s.search_norm) against (:keyword in boolean mode)
-            order by (lower(s.name) like lower(concat('%', :keyword, '%'))) desc, s.created_at desc
+            order by (s.search_norm like concat('%', :rawKeyword, '%')) desc, s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -214,6 +221,7 @@ s.createdAt desc
             nativeQuery = true)
     Page<Spot> searchSpotsNormalized(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("status") String status,
             Pageable pageable
     );
@@ -227,7 +235,7 @@ s.createdAt desc
                 where sc.spot_id = s.id and sc.category in (:categories)
             )
             and match(s.search_norm) against (:keyword in boolean mode)
-            order by (lower(s.name) like lower(concat('%', :keyword, '%'))) desc, s.created_at desc
+            order by (s.search_norm like concat('%', :rawKeyword, '%')) desc, s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -242,6 +250,7 @@ s.createdAt desc
             nativeQuery = true)
     Page<Spot> searchSpotsNormalizedByCategories(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("categories") Collection<String> categories,
             @Param("status") String status,
             Pageable pageable
