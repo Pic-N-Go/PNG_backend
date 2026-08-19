@@ -34,8 +34,7 @@ public class ContestRankingScheduler {
         LocalDateTime now = LocalDateTime.now();
         LocalDate snapshotDate = LocalDate.now();
 
-        contestRepository.findAll().stream()
-                .filter(contest -> now.isAfter(contest.getVoteStartAt()) && now.isBefore(contest.getVoteEndAt()))
+        contestRepository.findAllByVoteStartAtLessThanEqualAndVoteEndAtGreaterThan(now, now).stream()
                 .forEach(contest -> createSnapshotIfAbsent(contest, snapshotDate));
     }
 
