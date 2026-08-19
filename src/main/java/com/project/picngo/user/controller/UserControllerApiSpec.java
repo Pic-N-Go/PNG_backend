@@ -37,7 +37,7 @@ public interface UserControllerApiSpec {
 			@RequestBody UserSpotCategoryUpdateRequest request
 	);
 
-	@Operation(summary = "내 프로필 수정", description = "현재 인증된 사용자의 닉네임과 프로필 이미지를 수정합니다")
+	@Operation(summary = "내 프로필 수정", description = "현재 인증된 사용자의 닉네임·프로필 이미지·자기소개를 수정합니다. 전체 교체이므로 생략한 값은 비워집니다.")
 	ResponseEntity<UserResponse> updateMe(
 			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
 			@RequestBody UserProfileUpdateRequest request

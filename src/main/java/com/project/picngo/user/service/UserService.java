@@ -106,7 +106,7 @@ public class UserService {
 			throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
 		}
 
-		user.updateProfile(request.nickname(), request.profileImageUrl());
+		user.updateProfile(request.nickname(), request.profileImageUrl(), request.bio());
 
 		return UserResponse.from(user);
 	}

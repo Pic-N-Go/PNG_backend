@@ -9,6 +9,7 @@ public record UserProfileResponse (
         Long id,
         String nickname,
         String profileImageUrl,
+        String bio,
         Set<SpotCategory> spotCategories,
         long followerCount,
         long followingCount
@@ -22,6 +23,7 @@ public record UserProfileResponse (
                 user.getId(),
                 user.getNickname(),
                 user.getProfileImageUrl(),
+                user.getBio(),
                 user.getSpotCategories(),
                 followerCount,
                 followingCount

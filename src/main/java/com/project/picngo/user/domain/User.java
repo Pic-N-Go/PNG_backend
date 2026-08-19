@@ -41,6 +41,10 @@ public class User extends BaseTimeEntity {
 	@Column(length = 500)
 	private String profileImageUrl;
 
+	// 자기소개. 프로필 수정에서만 채워지고 가입 시에는 비어 있어 빌더 인자로 두지 않는다.
+	@Column(length = 100)
+	private String bio;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private Role role;
@@ -134,8 +138,10 @@ public class User extends BaseTimeEntity {
 		this.password = encodedPassword;
 	}
 
-	public void updateProfile(String nickname, String profileImageUrl){
+	// PUT /users/me는 전체 교체라 null이 오면 비운다. 항목별 부분 수정이 필요해지면 PATCH를 따로 둘 것.
+	public void updateProfile(String nickname, String profileImageUrl, String bio){
 		this.nickname = nickname;
 		this.profileImageUrl = profileImageUrl;
+		this.bio = bio;
 	}
 }

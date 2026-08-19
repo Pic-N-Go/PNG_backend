@@ -12,6 +12,7 @@ public record UserResponse(
 	String email,
 	String nickname,
 	String profileImageUrl,
+	String bio,
 	Role role,
 	SocialProvider provider,
 	Set<SpotCategory> spotCategories
@@ -23,6 +24,7 @@ public record UserResponse(
 			user.getEmail(),
 			user.getNickname(),
 			user.getProfileImageUrl(),
+			user.getBio(),
 			user.getRole(),
 			user.getProvider(),
 				user.getSpotCategories()

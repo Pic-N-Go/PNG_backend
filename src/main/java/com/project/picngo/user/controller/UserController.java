@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -50,7 +51,7 @@ public class UserController implements UserControllerApiSpec {
 	@PutMapping("/me")
 	public ResponseEntity<UserResponse> updateMe(
 			@AuthenticationPrincipal CustomUserDetails userDetails,
-			@RequestBody UserProfileUpdateRequest request
+			@Valid @RequestBody UserProfileUpdateRequest request
 			){
 		return ResponseEntity.ok(
 				userService.updateMyProfile(userDetails.getId(), request)
