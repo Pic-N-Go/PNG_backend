@@ -2,10 +2,14 @@ package com.project.picngo.contest.repository;
 
 import com.project.picngo.contest.domain.Contest;
 import com.project.picngo.contest.domain.ContestEntry;
+import com.project.picngo.contest.dto.ContestMyRankSummary;
+import com.project.picngo.contest.dto.ContestPastSummary;
 import com.project.picngo.user.domain.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,4 +36,53 @@ public interface ContestEntryRepository extends JpaRepository<ContestEntry, Long
 
     // 특정 콘테스트에 속한 출품작 조회
     Optional<ContestEntry> findByIdAndContest(Long id, Contest contest);
+
+    @Query("""
+            select new com.project.picngo.contest.dto.ContestPastSummary(
+                e.contest.id,
+                count(e),
+                count(distinct e.user.id),
+                coalesce(sum(e.voteCount), 0)
+            )
+            from ContestEntry e
+            where e.contest.id in :contestIds
+            group by e.contest.id
+            """)
+    List<ContestPastSummary> findPastSummariesByContestIds(@Param("contestIds") List<Long> contestIds);
+
+    @Query("""
+            select e
+            from ContestEntry e
+            join fetch e.user
+            where e.contest.id in :contestIds
+              and not exists (
+                  select 1
+                  from ContestEntry other
+                  where other.contest = e.contest
+                    and (
+                        other.voteCount > e.voteCount
+                        or (other.voteCount = e.voteCount and other.createdAt < e.createdAt)
+                    )
+              )
+            """)
+    List<ContestEntry> findWinnersByContestIds(@Param("contestIds") List<Long> contestIds);
+
+    @Query("""
+            select new com.project.picngo.contest.dto.ContestMyRankSummary(
+                e.contest.id,
+                (
+                    select count(higher) + 1
+                    from ContestEntry higher
+                    where higher.contest = e.contest
+                      and higher.voteCount > e.voteCount
+                )
+            )
+            from ContestEntry e
+            where e.contest.id in :contestIds
+              and e.user = :user
+            """)
+    List<ContestMyRankSummary> findMyRanksByContestIds(
+            @Param("contestIds") List<Long> contestIds,
+            @Param("user") User user
+    );
 }

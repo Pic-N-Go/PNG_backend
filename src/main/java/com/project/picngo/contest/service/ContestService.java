@@ -19,9 +19,11 @@ import com.project.picngo.contest.dto.ContestEntryPageResponse;
 import com.project.picngo.contest.dto.ContestEntryResponse;
 import com.project.picngo.contest.dto.ContestMyEntryResponse;
 import com.project.picngo.contest.dto.ContestMyHistoryResponse;
+import com.project.picngo.contest.dto.ContestMyRankSummary;
 import com.project.picngo.contest.dto.ContestMyVoteResponse;
 import com.project.picngo.contest.dto.ContestPastPageResponse;
 import com.project.picngo.contest.dto.ContestPastResponse;
+import com.project.picngo.contest.dto.ContestPastSummary;
 import com.project.picngo.contest.dto.ContestRankingHistoryResponse;
 import com.project.picngo.contest.dto.ContestReportRequest;
 import com.project.picngo.contest.dto.ContestResponse;
@@ -51,6 +53,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -95,21 +100,52 @@ public class ContestService {
                 pageable
         );
 
+        List<Long> contestIds = contests.getContent().stream()
+                .map(Contest::getId)
+                .toList();
+
+        if (contestIds.isEmpty()) {
+            return new ContestPastPageResponse(
+                    List.of(),
+                    contests.getNumber(),
+                    contests.getSize(),
+                    contests.getTotalElements(),
+                    contests.getTotalPages(),
+                    contests.isLast()
+            );
+        }
+
+        Map<Long, ContestPastSummary> summaryMap = contestEntryRepository
+                .findPastSummariesByContestIds(contestIds)
+                .stream()
+                .collect(Collectors.toMap(ContestPastSummary::contestId, Function.identity()));
+
+        Map<Long, ContestEntry> winnerMap = contestEntryRepository
+                .findWinnersByContestIds(contestIds)
+                .stream()
+                .collect(Collectors.toMap(entry -> entry.getContest().getId(), Function.identity(), (first, second) -> first));
+
+        Map<Long, Integer> myRankMap = contestEntryRepository
+                .findMyRanksByContestIds(contestIds, user)
+                .stream()
+                .collect(Collectors.toMap(
+                        ContestMyRankSummary::contestId,
+                        rankSummary -> (int) rankSummary.rank(),
+                        Math::min
+                ));
+
         Page<ContestPastResponse> responses = contests.map(contest -> {
-            int entryCount = (int) contestEntryRepository.countByContest(contest);
-            long participantCount = contestEntryRepository.countDistinctUserByContest(contest);
-            int totalVoteCount = (int) contestVoteRepository.countByContest(contest);
-            List<ContestEntry> rankedEntries = findRankedEntries(contest);
-            ContestEntry winner = rankedEntries.stream().findFirst().orElse(null);
+            ContestPastSummary summary = summaryMap.get(contest.getId());
+            ContestEntry winner = winnerMap.get(contest.getId());
 
             return new ContestPastResponse(
                     contest.getId(),
                     contest.getTitle(),
                     contest.getThemeImageUrl(),
-                    entryCount,
-                    participantCount,
-                    totalVoteCount,
-                    findMyBestRank(rankedEntries, contest, user),
+                    summary != null ? (int) summary.entryCount() : 0,
+                    summary != null ? summary.participantCount() : 0,
+                    summary != null ? (int) summary.totalVoteCount() : 0,
+                    myRankMap.get(contest.getId()),
                     winner != null ? winner.getUser().getNickname() : null
             );
         });
@@ -605,14 +641,6 @@ public class ContestService {
                                 .thenComparing(ContestEntry::getCreatedAt)
                 )
                 .toList();
-    }
-
-    private Integer findMyBestRank(List<ContestEntry> rankedEntries, Contest contest, User user) {
-        return contestEntryRepository.findAllByContestAndUser(contest, user).stream()
-                .map(entry -> rankOf(rankedEntries, entry))
-                .filter(rank -> rank != Integer.MAX_VALUE)
-                .min(Integer::compareTo)
-                .orElse(null);
     }
 
     private Contest getContestById(Long contestId) {
