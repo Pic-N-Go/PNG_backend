@@ -63,9 +63,21 @@ public class UserService {
 		return imageStorageService.getPresignedUrl(user.getDisplayProfileImage());
 	}
 
+	/**
+	 * getById와 대칭으로 탈퇴 계정을 걸러낸다.
+	 *
+	 * 이 메서드는 비밀번호 재설정 경로(코드 발송·실제 교체)만 쓴다. 걸러내지 않으면 탈퇴 계정이
+	 * 재설정 코드를 받고 비밀번호까지 바꿀 수 있다 — 복구는 /auth/restore로만 가야 한다.
+	 *
+	 * 탈퇴 계정을 찾아야 하는 경로(로그인 차단 판정, 복구)는 findByEmail을 쓴다.
+	 */
 	public User getByEmail(String email) {
-		return userRepository.findByEmail(email)
+		User user = userRepository.findByEmail(email)
 			.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+		if (user.isWithdrawn()) {
+			throw new CustomException(AuthErrorCode.ACCOUNT_WITHDRAWN);
+		}
+		return user;
 	}
 
 	/**

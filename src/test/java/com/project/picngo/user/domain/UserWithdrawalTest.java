@@ -146,6 +146,17 @@ class UserWithdrawalTest {
     }
 
     @Test
+    @DisplayName("파기된 계정도 탈퇴 상태를 유지한다 — 비밀번호 재설정 등 진입 경로가 계속 막혀야 한다")
+    void purgedUserStaysWithdrawn() {
+        User user = newUser();
+        user.withdraw(LocalDateTime.now());
+        user.purgePersonalData();
+
+        // getByEmail·getById가 isWithdrawn()으로 거르므로 이 값이 살아 있어야 차단이 유지된다.
+        assertTrue(user.isWithdrawn());
+    }
+
+    @Test
     @DisplayName("정상 계정은 파기된 계정으로 오인되지 않는다")
     void activeUserIsNotPurged() {
         assertFalse(newUser().isPurged(), "비밀번호가 있어 파기 대상과 구별된다");
