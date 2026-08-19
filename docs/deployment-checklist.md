@@ -63,7 +63,8 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'uk_us
 | `@@ngram_token_size` | `2` |
 
 없는 것만 아래에서 적용하면 된다. 모든 마이그레이션은 재실행해도 안전하다(멱등).
-단 `ft_spot_search`는 **이미 있어도 컬럼 목록이 다르면 손으로 DROP해야 한다**(2-1).
+`ft_spot_search`의 컬럼 목록이 다르면 `search-fulltext-index-migration.sql`을 다시 실행하면 된다
+— 스크립트가 목록을 비교해 스스로 DROP 후 재생성한다(2-1).
 
 ---
 
@@ -105,8 +106,8 @@ docker exec -i picngo-mysql mysql -uroot -p"$DB_PASSWORD" --default-character-se
 `search-fulltext-index-migration.sql`이 **컬럼 목록까지 비교해 다르면 DROP 후 재생성한다.**
 2번을 그대로 실행하면 되고, 출력에 아래 줄이 보이면 재생성된 것이다.
 
-```
-ft_spot_search 컬럼 목록이 달라 재생성: address,name,overview -> name,address
+```text
+ft_spot_search 컬럼 목록이 달라 재생성: name,address,overview -> name,address
 ```
 
 인덱스 재생성은 행 수에 비례해 시간이 걸린다. **그 사이 FULLTEXT 검색은 실패하므로**
@@ -151,7 +152,7 @@ CI/CD로 배포한다. 기동 로그에서 아래를 확인한다.
 
 배포 직후에는 기존 스팟의 임베딩이 전부 비어 있다. 관리자 API로 채운다.
 
-```
+```text
 GET  /admin/embeddings              현황 확인 (total / withEmbedding / missing)
 POST /admin/embeddings/backfill     일괄 채우기
 ```

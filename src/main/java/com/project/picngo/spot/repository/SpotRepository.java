@@ -205,12 +205,20 @@ s.createdAt desc
     //    따옴표가 붙어 있어(FullTextKeyword.toSpacelessPhrase) LIKE 비교에 쓰면 아무것도 맞지 않는다.
     //    비교 대상도 s.name이 아니라 s.search_norm이다 — 이 경로에 온 이유가 띄어쓰기 불일치라,
     //    공백이 남아 있는 s.name과는 짝이 맞지 않는다.
+    //
+    //    이름 먼저 정렬은 search_norm 전체가 아니라 앞 조각으로 따로 본다. search_norm은
+    //    CONCAT_WS(' ', 정규화한 name, 정규화한 address)라 이름만 맞은 결과와 주소만 맞은 결과가
+    //    같은 값을 받아버리고, 그러면 주소만 맞은 최신 스팟이 이름이 맞는 옛 스팟보다 앞에 온다.
+    //    정규화한 name에는 공백이 없으므로 첫 조각(substring_index(..., ' ', 1))이 곧 이름이다.
+    //    REGEXP_REPLACE를 다시 쓰지 않는 이유 = 정규화 규칙을 세 곳에 복제하지 않기 위해서다.
     @Query(value = """
             select s.* from spot s
             where s.status = :status
             and s.is_active = true
             and match(s.search_norm) against (:keyword in boolean mode)
-            order by (s.search_norm like concat('%', :rawKeyword, '%')) desc, s.created_at desc
+            order by (substring_index(s.search_norm, ' ', 1) like concat('%', :rawKeyword, '%')) desc,
+                     (s.search_norm like concat('%', :rawKeyword, '%')) desc,
+                     s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -235,7 +243,9 @@ s.createdAt desc
                 where sc.spot_id = s.id and sc.category in (:categories)
             )
             and match(s.search_norm) against (:keyword in boolean mode)
-            order by (s.search_norm like concat('%', :rawKeyword, '%')) desc, s.created_at desc
+            order by (substring_index(s.search_norm, ' ', 1) like concat('%', :rawKeyword, '%')) desc,
+                     (s.search_norm like concat('%', :rawKeyword, '%')) desc,
+                     s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s

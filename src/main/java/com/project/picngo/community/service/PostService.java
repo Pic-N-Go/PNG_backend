@@ -51,7 +51,9 @@ public class PostService {
 
     /**
      * @param authorId 지정하면 그 사용자가 쓴 글만 준다(프로필 화면의 게시글 탭).
-     *                 MY_POSTS는 "내 글"이라는 뜻이 이미 정해져 있어 이 값을 무시한다.
+     *                 POPULAR·LATEST에만 적용된다. MY_POSTS·FOLLOWING·BOOKMARKED는 대상 글이
+     *                 "내 글"·"팔로우한 사람의 글"·"내가 저장한 글"로 이미 정해져 있어 이 값을 무시한다
+     *                 (섞어 쓸 화면이 없다 — 프로필 게시글 탭은 LATEST + authorId로 조회한다).
      */
     public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, Long authorId, int page, int size) {
 

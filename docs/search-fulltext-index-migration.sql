@@ -42,10 +42,8 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'spot';
 -- overview는 두 방식 모두에서 검색 대상에서 빠졌다. 긴 산문이라 두 글자만 겹쳐도 걸려서
 -- '테' 검색 405건 중 396건이 설명만 맞은 결과였다. 자세한 근거는 SpotRepository.searchSpots 주석 참고.
 --
--- ⚠️ 이미 ft_spot_search(name, address, overview)를 적용해 뒀다면 이 프로시저는
---    "인덱스가 있음"으로 판단해 건너뛴다. 컬럼 목록이 달라 MATCH()가 ERROR 1191을 내므로
---    아래 DROP을 한 번 실행한 뒤 다시 적용할 것:
---      ALTER TABLE spot DROP INDEX ft_spot_search;
+-- ⚠️ 이미 ft_spot_search(name, address, overview)를 적용해 뒀다면 이 스크립트를 그대로 다시
+--    실행하면 된다. 프로시저가 컬럼 목록까지 비교해 다르면 DROP 후 재생성한다(손으로 DROP할 필요 없다).
 --
 -- MATCH()의 컬럼 목록은 FULLTEXT 인덱스의 컬럼 목록과 순서까지 정확히 일치해야 한다.
 -- 하나라도 다르면 MySQL이 인덱스를 찾지 못하고 에러를 낸다:

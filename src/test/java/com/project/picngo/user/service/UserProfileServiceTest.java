@@ -10,11 +10,14 @@ import com.project.picngo.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 
@@ -118,5 +121,21 @@ class UserProfileServiceTest {
         );
 
         assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("사용자 검색의 범위 밖 page/size는 500이 아니라 보정된다")
+    void clampsSearchPageAndSize() {
+        when(userRepository.findByNicknameContainingIgnoreCaseAndDeletedAtIsNull(anyString(), any()))
+                .thenReturn(Page.empty());
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+
+        service.searchUsers("홍", -1, 100_000);
+
+        verify(userRepository)
+                .findByNicknameContainingIgnoreCaseAndDeletedAtIsNull(anyString(), pageable.capture());
+        // size를 안 자르면 행마다 presigned URL을 만드는 비용까지 같이 커진다.
+        assertEquals(0, pageable.getValue().getPageNumber());
+        assertEquals(50, pageable.getValue().getPageSize());
     }
 }

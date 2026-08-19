@@ -18,6 +18,8 @@ import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,6 +156,21 @@ class ProfileImageTest {
 
         assertNull(user.getDisplayProfileImage());
         assertNull(response.profileImageUrl());
+    }
+
+    @Test
+    @DisplayName("파기 배치는 올린 사진도 저장소에서 지운다 — 키는 파기 전에 들고 있어야 한다")
+    void purgeDeletesUploadedImage() {
+        User user = kakaoUser(null);
+        user.updateProfileImage("profile/7/mine.jpg");
+        user.withdraw(LocalDateTime.now().minusDays(31));
+        when(userRepository.findPurgeTargets(any(), anyString())).thenReturn(List.of(user));
+
+        assertEquals(1, service.purgeExpiredAccounts());
+
+        // purgePersonalData가 objectKey를 비우므로, 여기서 안 지우면 지울 키를 영구히 잃는다.
+        assertNull(user.getProfileImageUrl());
+        verify(imageStorageService).delete("profile/7/mine.jpg");
     }
 
     @Test

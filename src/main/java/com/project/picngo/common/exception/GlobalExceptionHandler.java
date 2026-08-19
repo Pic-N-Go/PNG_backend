@@ -139,7 +139,9 @@ public class GlobalExceptionHandler {
             return handleException(e);
         }
 
-        log.warn("DataIntegrityViolationException(duplicate): {}", cause.getMessage());
+        // 메시지는 찍지 않는다 — MySQL 1062 메시지에는 충돌한 값이 그대로 들어 있어
+        // (Duplicate entry 'a@b.com' for key ...) 이메일 같은 개인정보가 로그에 남는다.
+        log.warn("DataIntegrityViolationException(duplicate): errorCode={}", MYSQL_DUPLICATE_ENTRY);
         return ResponseEntity
                 .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, "이미 사용 중인 값입니다. 다시 시도해 주세요."));

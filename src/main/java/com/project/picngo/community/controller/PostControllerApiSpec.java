@@ -35,7 +35,8 @@ public interface PostControllerApiSpec {
                     BOOKMARKED는 내가 저장한 글이며, 정렬은 저장 시각이 아니라 작성 시각입니다.
                     keyword는 게시글 내용과 스팟 이름을 검색합니다.
                     authorId를 주면 그 사용자가 쓴 글만 조회합니다(프로필 화면의 게시글 탭).
-                    MY_POSTS는 "내 글"이라는 뜻이 이미 정해져 있어 authorId를 무시합니다.
+                    POPULAR·LATEST에서만 적용되며, MY_POSTS·FOLLOWING·BOOKMARKED는 대상 글이
+                    "내 글"·"팔로우한 사람의 글"·"내가 저장한 글"로 이미 정해져 있어 authorId를 무시합니다.
                     """
     )
     ResponseEntity<PostPageResponse> getPosts(

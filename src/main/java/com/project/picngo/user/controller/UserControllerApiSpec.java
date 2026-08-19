@@ -39,7 +39,11 @@ public interface UserControllerApiSpec {
 			@RequestBody UserSpotCategoryUpdateRequest request
 	);
 
-	@Operation(summary = "내 프로필 수정", description = "현재 인증된 사용자의 닉네임·프로필 이미지·자기소개를 수정합니다. 전체 교체이므로 생략한 값은 비워집니다.")
+	@Operation(
+			summary = "내 프로필 수정",
+			description = "현재 인증된 사용자의 닉네임·자기소개를 수정합니다. 전체 교체이므로 생략한 값은 비워집니다. "
+					+ "프로필 사진은 이 API로 바뀌지 않습니다 — PATCH/DELETE /users/me/profile-image를 쓰세요."
+	)
 	ResponseEntity<UserResponse> updateMe(
 			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
 			@RequestBody UserProfileUpdateRequest request
@@ -106,12 +110,12 @@ public interface UserControllerApiSpec {
 
 	@Operation(
 			summary = "사용자 검색",
-			description = "닉네임 부분일치로 사용자를 검색합니다. 대소문자를 구분하지 않습니다."
+			description = "닉네임 부분일치로 사용자를 검색합니다. 대소문자를 구분하지 않습니다. 탈퇴 계정은 제외됩니다."
 	)
 	ResponseEntity<Page<FollowUserResponse>> searchUsers(
 			@Parameter(description = "검색어(닉네임)") @RequestParam String keyword,
 			@Parameter(description = "페이지 번호 (0부터)") @RequestParam(defaultValue = "0") int page,
-			@Parameter(description = "페이지 크기") @RequestParam(defaultValue = "20") int size
+			@Parameter(description = "페이지 크기 (최대 50)") @RequestParam(defaultValue = "20") int size
 	);
 
 	@Operation(

@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -46,6 +47,9 @@ public class UserService {
 	 * ponytail: 상수로 둔다 — 운영 중 조정할 값이 아니고, 바꿀 일이 생기면 이 한 줄이다.
 	 */
 	public static final int WITHDRAWAL_GRACE_DAYS = 30;
+
+	/** 사용자 검색 한 페이지 최대 크기. 스팟 검색(SpotService)과 같은 값으로 맞춘다. */
+	private static final int MAX_PAGE_SIZE = 50;
 
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
@@ -479,17 +483,22 @@ public class UserService {
 
 	/**
 	 * 유예 기간이 지난 탈퇴 계정의 개인정보를 파기한다. row는 남긴다.
-	 * 이미 파기된 계정은 건너뛰므로 여러 번 돌려도(다중 인스턴스 포함) 안전하다.
+	 * 이미 파기된 계정은 조회에서 빠지므로 여러 번 돌려도(다중 인스턴스 포함) 안전하다.
+	 * 업로드한 프로필 사진은 커밋 후 저장소에서 지운다.
 	 */
 	@Transactional
 	public int purgeExpiredAccounts() {
 		LocalDateTime cutoff = LocalDateTime.now().minusDays(WITHDRAWAL_GRACE_DAYS);
 		int purged = 0;
-		for (User user : userRepository.findByDeletedAtBefore(cutoff)) {
+		for (User user : userRepository.findPurgeTargets(cutoff, User.PURGED_NICKNAME_PREFIX)) {
 			if (user.isPurged()) {
 				continue;
 			}
+			// 업로드한 사진의 objectKey는 purgePersonalData가 비운다. 먼저 들고 있지 않으면
+			// 지울 키를 잃어버려 개인정보인 사진만 저장소에 영구히 남는다.
+			String uploadedImageKey = user.getProfileImageUrl();
 			user.purgePersonalData();
+			deleteAfterCommit(uploadedImageKey);
 			purged++;
 		}
 		return purged;
@@ -501,8 +510,12 @@ public class UserService {
 			throw new CustomException(UserErrorCode.SEARCH_KEYWORD_REQUIRED);
 		}
 
+		// 음수면 PageRequest.of가 IllegalArgumentException을 던져 500이 되고, 큰 size는 행마다
+		// presigned URL을 만드는 비용까지 같이 늘어난다. 다른 목록 조회와 같은 방식으로 잘라 쓴다.
+		Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
 		return userRepository
-				.findByNicknameContainingIgnoreCaseAndDeletedAtIsNull(keyword.trim(), PageRequest.of(page, size))
+				.findByNicknameContainingIgnoreCaseAndDeletedAtIsNull(keyword.trim(), pageable)
 				.map(user -> FollowUserResponse.from(user, profileImageUrlOf(user)));
 	}
 

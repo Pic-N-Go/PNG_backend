@@ -81,10 +81,15 @@ public class ReviewService {
         List<ReviewListResponse.ReviewInfo> reviewInfos = reviews.stream()
                 .map(review -> {
                     User user = userMap.get(review.getUserId());
+                    // 탈퇴 계정은 게시글(PostAuthorResponse.from)과 같은 규칙으로 가린다 —
+                    // 파기(30일)까지 기다리면 그 기간 동안 닉네임과 프로필 사진이 그대로 노출된다.
+                    boolean withdrawn = user != null && user.isWithdrawn();
                     return ReviewListResponse.ReviewInfo.of(
                             review,
-                            user != null ? user.getNickname() : "알 수 없음",
-                            user != null ? imageStorageService.getPresignedUrl(user.getDisplayProfileImage()) : null,
+                            user == null ? "알 수 없음"
+                                    : withdrawn ? User.WITHDRAWN_DISPLAY_NAME : user.getNickname(),
+                            user == null || withdrawn ? null
+                                    : imageStorageService.getPresignedUrl(user.getDisplayProfileImage()),
                             tagMap.getOrDefault(review.getId(), Set.of()),
                             photoMap.getOrDefault(review.getId(), List.of())
                     );

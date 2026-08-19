@@ -54,9 +54,32 @@ PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 --    아래가 0건이어야 그대로 진행할 수 있다. 있으면 개별 판단이 필요하다
 --    (대개 그냥 NULL로 비우는 게 맞다 — 만료된 URL일 가능성이 높다).
 --    개발 DB 기준 0건이었다(2026-08-19 확인).
+--
+--    확인 쿼리 결과를 눈으로 볼 거라 믿을 수 없다 — 배포 절차는 파일을 통째로 파이프로
+--    밀어넣게 되어 있어(docs/deployment-checklist.md) 출력이 그냥 스크롤되어 지나간다.
+--    그래서 0건이 아니면 아래 백필 UPDATE 전에 스크립트를 세운다.
 
 SELECT COUNT(*) AS local_http_profile_image
 FROM users WHERE profile_image_url LIKE 'http%' AND provider = 'LOCAL';
+
+DROP PROCEDURE IF EXISTS assert_no_local_http_profile_image;
+DELIMITER $$
+CREATE PROCEDURE assert_no_local_http_profile_image()
+BEGIN
+    DECLARE local_http INT;
+
+    SELECT COUNT(*) INTO local_http
+    FROM users WHERE profile_image_url LIKE 'http%' AND provider = 'LOCAL';
+
+    IF local_http > 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT =
+            'LOCAL 계정에 http profile_image_url이 남아 있어 백필을 중단했다. 위 확인 쿼리의 행을 먼저 정리(대개 NULL)한 뒤 다시 실행할 것.';
+    END IF;
+END$$
+DELIMITER ;
+
+CALL assert_no_local_http_profile_image();
+DROP PROCEDURE assert_no_local_http_profile_image;
 
 UPDATE users
 SET social_profile_image_url = profile_image_url,
