@@ -23,7 +23,20 @@ public interface ContestVoteRepository extends JpaRepository<ContestVote, Long> 
     Optional<ContestVote> findByEntryAndUser(ContestEntry entry, User user);
 
     // 내가 투표한 출품작 목록 조회
-    List<ContestVote> findAllByContestAndUser(Contest contest, User user);
+    @Query("""
+            select v
+            from ContestVote v
+            join fetch v.entry e
+            join fetch e.user
+            left join fetch e.spot
+            where v.contest = :contest
+              and v.user = :user
+            order by v.createdAt desc
+            """)
+    List<ContestVote> findAllByContestAndUser(
+            @Param("contest") Contest contest,
+            @Param("user") User user
+    );
 
     // 콘테스트 전체 투표 내역 조회
     List<ContestVote> findAllByContest(Contest contest);
