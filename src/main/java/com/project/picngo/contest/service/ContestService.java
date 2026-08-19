@@ -541,7 +541,8 @@ public class ContestService {
         List<ContestResultResponse.ResultEntry> responses = new ArrayList<>();
 
         for (int i = 0; i < rankedEntries.size() && i < limit; i++) {
-            responses.add(toResultEntry(contest, rankedEntries.get(i), i + 1));
+            ContestEntry entry = rankedEntries.get(i);
+            responses.add(toResultEntry(contest, entry, rankOf(rankedEntries, entry)));
         }
 
         return responses;
@@ -574,13 +575,25 @@ public class ContestService {
     }
 
     private int rankOf(List<ContestEntry> entries, ContestEntry targetEntry) {
+        Integer targetVoteCount = null;
+
         for (int i = 0; i < entries.size(); i++) {
             if (entries.get(i).getId().equals(targetEntry.getId())) {
-                return i + 1;
+                targetVoteCount = entries.get(i).getVoteCount();
+                break;
             }
         }
 
-        return Integer.MAX_VALUE;
+        if (targetVoteCount == null) {
+            return Integer.MAX_VALUE;
+        }
+
+        int voteCount = targetVoteCount;
+        long higherVoteEntryCount = entries.stream()
+                .filter(entry -> entry.getVoteCount() > voteCount)
+                .count();
+
+        return (int) higherVoteEntryCount + 1;
     }
 
     private List<ContestEntry> findRankedEntries(Contest contest) {

@@ -61,10 +61,18 @@ public class ContestRankingScheduler {
                             contest,
                             entry,
                             snapshotDate,
-                            i + 1,
+                            calculateRank(topEntries, entry),
                             entry.getVoteCount()
                     )
             );
         }
+    }
+
+    private int calculateRank(List<ContestEntry> entries, ContestEntry targetEntry) {
+        long higherVoteEntryCount = entries.stream()
+                .filter(entry -> entry.getVoteCount() > targetEntry.getVoteCount())
+                .count();
+
+        return (int) higherVoteEntryCount + 1;
     }
 }
