@@ -1,6 +1,7 @@
 package com.project.picngo.user.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.util.ValidationRules;
 
 import static com.project.picngo.common.util.ValidationRules.NICKNAME_MAX;
 import static com.project.picngo.common.util.ValidationRules.NICKNAME_MIN;
@@ -157,10 +158,16 @@ public class UserService {
 	public UserResponse updateMyProfile(Long userId, UserProfileUpdateRequest request){
 		User user = getById(userId);
 
-		// 닉네임 변경된 경우 중복 검사 진행
-		if(!user.getNickname().equals(request.nickname())
-				&& userRepository.existsByNickname(request.nickname())) {
-			throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
+		// 닉네임을 실제로 바꾼 경우에만 형식·중복을 검사한다. 안 바꿨으면 그냥 통과시킨다 —
+		// 새 규칙 이전에 만들어진 닉네임(카카오 원본 등)을 가진 계정이 자기소개만 고치려다
+		// 막히면 안 된다. 그 계정은 닉네임을 한 번 바꿀 때 자연스럽게 규칙에 맞춰진다.
+		if (!user.getNickname().equals(request.nickname())) {
+			if (!request.nickname().matches(ValidationRules.NICKNAME_REGEX)) {
+				throw new CustomException(UserErrorCode.INVALID_NICKNAME);
+			}
+			if (userRepository.existsByNickname(request.nickname())) {
+				throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
+			}
 		}
 
 		user.updateProfile(request.nickname(), request.profileImageUrl(), request.bio());

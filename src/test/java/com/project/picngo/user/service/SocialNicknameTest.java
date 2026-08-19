@@ -59,6 +59,12 @@ class SocialNicknameTest {
     void sanitizesKakaoNickname() {
         assertEquals("홍길동님", savedNicknameFor("홍길동님♥", "1", Set.of()));
         assertEquals("sunsetjk12", savedNicknameFor("sunset_jk_1234", "1", Set.of()));
+        // 서로게이트 페어(non-BMP). String.length()·substring()이 code unit 기준이라
+        // 반쪽만 남으면 깨진 문자가 저장된다 — ♥ 같은 BMP 문자로는 이 경로가 안 잡힌다.
+        assertEquals("사진가", savedNicknameFor("사진가😀😀", "1", Set.of()));
+        assertEquals("ab", savedNicknameFor("a😀b", "1", Set.of()));
+        // 한글 호환 자모(ㅋ, ㅎ)는 가-힣 밖이라 걸러진다 — 의도된 제약이다.
+        assertEquals("user12345", savedNicknameFor("ㅋㅋㅋ", "12345", Set.of()));
     }
 
     @Test
@@ -66,6 +72,11 @@ class SocialNicknameTest {
     void fallsBackWhenNothingLeft() {
         assertEquals("user847213", savedNicknameFor("♥♥♥", "9999847213", Set.of()));
         assertEquals("user7", savedNicknameFor("김", "7", Set.of()));
+        assertEquals("user847213", savedNicknameFor("😀😀😀", "9999847213", Set.of()));
+        assertEquals("user555", savedNicknameFor("   ", "555", Set.of()));
+        assertEquals("user", savedNicknameFor(null, null, Set.of()));
+        // providerId에 숫자가 없으면 접미사 없이 "user"로 떨어진다(2자 이상이라 규칙은 만족).
+        assertEquals("user", savedNicknameFor("♥♥", "kakao_abc", Set.of()));
     }
 
     @Test
