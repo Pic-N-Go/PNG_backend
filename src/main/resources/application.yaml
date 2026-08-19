@@ -3,6 +3,22 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: picngo
+  # 스키마 변경은 전부 여기로 모은다. 앱이 뜰 때 아직 적용되지 않은 SQL만
+  # 버전 순서대로 실행하고, 이력을 flyway_schema_history 테이블에 남긴다.
+  #
+  # 새 변경을 넣을 때: db/migration에 V{다음번호}__설명.sql 파일을 추가하고 커밋하면 끝.
+  # 손으로 실행할 필요도, 팀원에게 "이거 돌리세요"라고 전달할 필요도 없다.
+  #
+  # ⚠️ 한 번 적용된 파일은 고치지 말 것. Flyway가 내용 지문을 대조해 기동을 거부한다.
+  #    고쳐야 하면 다음 번호 파일을 새로 만든다.
+  flyway:
+    enabled: true
+    # 이미 테이블이 있는 DB(운영, 기존 팀원 로컬)를 위한 설정.
+    # 이력 테이블이 없는데 테이블은 있으면 "V1까지는 이미 적용됨"으로 기록하고
+    # V2부터 실행한다. 빈 DB에는 해당되지 않아 V1부터 정상 실행된다.
+    baseline-on-migrate: true
+    baseline-version: 1
+
   sql:
     init:
       mode: always
@@ -39,9 +55,16 @@ spring:
   jpa:
     defer-datasource-initialization: true
     hibernate:
+      # 스키마는 이제 Flyway가 만든다(src/main/resources/db/migration).
+      # validate는 "엔티티와 실제 테이블이 맞는지 검사만" 한다 - 만들지도 고치지도 않는다.
+      #
+      # update에서 바꾼 이유: 로컬만 자동 생성되고 운영(validate)은 아니라서 환경이 갈렸다.
+      # 그 차이로 실제 사고가 났다 - Hibernate가 course.version을 NULL 허용으로 만들어
+      # 기존 코스 수정 시 500이 났다(2026-08-19). 이제 양쪽 다 같은 SQL을 적용받는다.
+      #
       # create로 두면 기동마다 전체 테이블을 DROP+재생성해 users/review 등 데이터가 소실된다.
-      # 스키마를 갈아엎어야 하면 임시로 바꾸되 커밋하지 말 것. (2026-06 5c3502a에 이어 두 번째 회귀)
-      ddl-auto: update
+      # 스키마를 갈아엎어야 하면 DB를 지우고 앱을 켤 것 - Flyway가 V1부터 다시 만든다.
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
