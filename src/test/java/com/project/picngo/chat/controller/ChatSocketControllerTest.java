@@ -40,12 +40,13 @@ class ChatSocketControllerTest {
     void sendMessageBroadcastsSavedMessage() {
         Authentication authentication = authentication(2L, "여행자");
         ChatMessageSendRequest request = new ChatMessageSendRequest("안녕하세요");
+        SimpMessageHeaderAccessor accessor = accessorForSpot(7L);
         ChatMessageResponse response = new ChatMessageResponse(
                 1L, 2L, "여행자", ChatMessageType.TEXT, "안녕하세요", null
         );
         when(chatMessageService.sendMessage(7L, 2L, "여행자", request)).thenReturn(response);
 
-        controller.sendMessage(7L, request, authentication);
+        controller.sendMessage(7L, request, authentication, accessor);
 
         verify(messagingTemplate).convertAndSend("/topic/chats/7", response);
     }
@@ -121,7 +122,7 @@ class ChatSocketControllerTest {
 
         assertThrows(
                 AccessDeniedException.class,
-                () -> controller.sendMessage(7L, request, null)
+                () -> controller.sendMessage(7L, request, null, mock(SimpMessageHeaderAccessor.class))
         );
 
         verify(chatMessageService, never()).sendMessage(
@@ -132,9 +133,58 @@ class ChatSocketControllerTest {
         );
     }
 
+    @Test
+    @DisplayName("현재 참여 중인 채팅방과 다른 스팟에는 메시지를 보낼 수 없다")
+    void sendMessageRejectsMismatchedSessionSpotId() {
+        Authentication authentication = authentication(2L, "여행자");
+        ChatMessageSendRequest request = new ChatMessageSendRequest("안녕하세요");
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> controller.sendMessage(8L, request, authentication, accessorForSpot(7L))
+        );
+
+        verify(chatMessageService, never()).sendMessage(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any()
+        );
+        org.mockito.Mockito.verifyNoInteractions(messagingTemplate);
+    }
+
+    @Test
+    @DisplayName("채팅방에 입장하지 않은 세션은 메시지를 보낼 수 없다")
+    void sendMessageRejectsSessionWithoutSpotId() {
+        Authentication authentication = authentication(2L, "여행자");
+        ChatMessageSendRequest request = new ChatMessageSendRequest("안녕하세요");
+        SimpMessageHeaderAccessor accessor = mock(SimpMessageHeaderAccessor.class);
+
+        assertThrows(
+                AccessDeniedException.class,
+                () -> controller.sendMessage(7L, request, authentication, accessor)
+        );
+
+        verify(chatMessageService, never()).sendMessage(
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any()
+        );
+        org.mockito.Mockito.verifyNoInteractions(messagingTemplate);
+    }
+
+    private SimpMessageHeaderAccessor accessorForSpot(Long spotId) {
+        SimpMessageHeaderAccessor accessor = mock(SimpMessageHeaderAccessor.class);
+        Map<String, Object> sessionAttributes = new HashMap<>();
+        sessionAttributes.put("spotId", spotId);
+        when(accessor.getSessionAttributes()).thenReturn(sessionAttributes);
+        return accessor;
+    }
+
     private Authentication authentication(Long userId, String nickname) {
         CustomUserDetails userDetails = mock(CustomUserDetails.class);
-        when(userDetails.getId()).thenReturn(userId);
+        org.mockito.Mockito.lenient().when(userDetails.getId()).thenReturn(userId);
         org.mockito.Mockito.lenient().when(userDetails.getNickname()).thenReturn(nickname);
         Authentication authentication = mock(Authentication.class);
         when(authentication.getPrincipal()).thenReturn(userDetails);
