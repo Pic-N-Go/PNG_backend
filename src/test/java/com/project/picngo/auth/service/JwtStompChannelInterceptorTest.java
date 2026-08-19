@@ -1,6 +1,8 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.auth.domain.AccessTokenValidationResult;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.AuthErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,15 +68,15 @@ class JwtStompChannelInterceptorTest {
         when(jwtTokenProvider.validateAccessTokenResult("expired-token"))
                 .thenReturn(AccessTokenValidationResult.EXPIRED);
 
-        AccessDeniedException exception = assertThrows(
-                AccessDeniedException.class,
+        CustomException exception = assertThrows(
+                CustomException.class,
                 () -> interceptor.preSend(
                         stompMessage(StompCommand.SEND, "expired-token", sessionAttributes),
                         channel
                 )
         );
 
-        assertEquals("만료된 WebSocket Access Token입니다.", exception.getMessage());
+        assertEquals(AuthErrorCode.ACCESS_TOKEN_EXPIRED, exception.getErrorCode());
         verify(userDetailsService, never()).loadUserById(org.mockito.ArgumentMatchers.anyLong());
     }
 
@@ -89,11 +91,12 @@ class JwtStompChannelInterceptorTest {
                 accessor.getMessageHeaders()
         );
 
-        assertThrows(
-                AccessDeniedException.class,
+        CustomException exception = assertThrows(
+                CustomException.class,
                 () -> interceptor.preSend(message, channel)
         );
 
+        assertEquals(AuthErrorCode.ACCESS_TOKEN_REQUIRED, exception.getErrorCode());
         verify(userDetailsService, never()).loadUserById(org.mockito.ArgumentMatchers.anyLong());
     }
 
