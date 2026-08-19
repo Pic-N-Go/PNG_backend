@@ -246,10 +246,6 @@ public class ContestService {
 
         validatePhase(contest, ContestPhase.VOTING, ContestErrorCode.NOT_VOTING_PERIOD);
 
-        if (isMine(entry, user)) {
-            throw new CustomException(ContestErrorCode.SELF_VOTE_NOT_ALLOWED);
-        }
-
         if (contestVoteRepository.existsByEntryAndUser(entry, user)) {
             throw new CustomException(ContestErrorCode.ALREADY_VOTED);
         }

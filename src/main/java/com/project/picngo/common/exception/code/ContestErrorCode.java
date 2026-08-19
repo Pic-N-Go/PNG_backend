@@ -20,8 +20,7 @@ public enum ContestErrorCode implements BaseErrorCode {
     ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 출품작입니다."),
     ALREADY_SUBSCRIBED(HttpStatus.CONFLICT, "이미 알림을 신청한 콘테스트입니다."),
 
-    NOT_MY_ENTRY(HttpStatus.FORBIDDEN, "내 출품작만 처리할 수 있습니다."),
-    SELF_VOTE_NOT_ALLOWED(HttpStatus.FORBIDDEN, "내 출품작에는 투표할 수 없습니다.");
+    NOT_MY_ENTRY(HttpStatus.FORBIDDEN, "내 출품작만 처리할 수 있습니다.");
 
     private final HttpStatus status;
     private final String message;
