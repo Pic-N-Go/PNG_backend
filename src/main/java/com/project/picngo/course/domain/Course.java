@@ -21,6 +21,17 @@ public class Course extends BaseTimeEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * 낙관적 락용 버전. 저장할 때마다 JPA가 1씩 올리고,
+     * {@code UPDATE ... WHERE id = ? AND version = ?} 조건으로 충돌을 잡아낸다.
+     *
+     * <p>주의: 이 값이 <b>언제 오르는지</b>가 이 락의 유효 범위를 결정한다.
+     * 자식(CourseSpot)의 필드만 바뀌는 경우에도 오르는지는 실측으로 확인해야 한다
+     * (CourseVersionBehaviorTest). 안 오른다면 순서 변경은 이 락으로 보호되지 않는다.
+     */
+    @Version
+    private Long version;
+
     @Column(nullable = false)
     private Long userId;
 

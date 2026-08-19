@@ -12,6 +12,7 @@ import com.project.picngo.course.repository.CourseRepository;
 import com.project.picngo.course.repository.CourseSpotRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,10 @@ class CourseValidationTest {
     private UserRepository userRepository;
     @Mock
     private SpotRepository spotRepository;
+    // syncCourseSpots가 Course의 버전을 강제로 올릴 때 쓴다(낙관적 락).
+    // 목이 없으면 생성자 주입에서 null이 되어 NPE가 난다.
+    @Mock
+    private EntityManager entityManager;
 
     @InjectMocks
     private CourseService courseService;
