@@ -69,8 +69,11 @@ public class UserService {
 	}
 
 	/**
-	 * 탈퇴 계정은 없는 것으로 취급한다. 이 메서드를 거치는 모든 기능(프로필·팔로우·글쓰기 등)이
-	 * 한 번에 막히므로 기능마다 검사를 흩뿌리지 않는다.
+	 * 탈퇴 계정은 없는 것으로 취급한다.
+	 *
+	 * 단 이 메서드가 모든 경로를 막아주지는 않는다 — 글쓰기·댓글은 userRepository.findById를
+	 * 직접 쓴다(PostService, PostCommentService). 그래서 실제 차단은 인증 단계
+	 * (CustomUserDetailsService.requireActive)에서 하고, 이건 그 뒤의 2차 방어다.
 	 *
 	 * 복구·파기 경로는 탈퇴 계정을 찾아야 하므로 이걸 쓰지 않는다(findByIdIncludingWithdrawn).
 	 */
@@ -442,6 +445,9 @@ public class UserService {
 	@Transactional
 	public void withdraw(Long userId) {
 		getById(userId).withdraw(LocalDateTime.now());
+		// 재발급 경로를 의도적으로 닫는다. 액세스 토큰은 만료를 기다리지만(최대 1시간),
+		// 리프레시 토큰이 살아 있으면 그 뒤로도 세션이 이어진다.
+		refreshTokenService.revokeAllByUserId(userId);
 	}
 
 	/**
