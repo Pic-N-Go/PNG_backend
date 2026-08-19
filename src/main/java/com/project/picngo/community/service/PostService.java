@@ -43,12 +43,17 @@ public class PostService {
     private final PostLikeRepository likeRepository;
     private final PostBookmarkRepository bookmarkRepository;
     private final PostCommentRepository commentRepository;
+    private final PostCommentLikeRepository commentLikeRepository;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
     private final ExifExtractor exifExtractor;
     private final ImageStorageService imageStorageService;
 
-    public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, int page, int size) {
+    /**
+     * @param authorId 지정하면 그 사용자가 쓴 글만 준다(프로필 화면의 게시글 탭).
+     *                 MY_POSTS는 "내 글"이라는 뜻이 이미 정해져 있어 이 값을 무시한다.
+     */
+    public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, Long authorId, int page, int size) {
 
         if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING) && userId == null) {
             throw new CustomException(AuthErrorCode.LOGIN_REQUIRED);
@@ -60,7 +65,7 @@ public class PostService {
 
         Page<Post> result = switch (sort) {
             case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
-            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, null, pageable);
+            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, pageable);
             case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
         };
         List<PostResponse> posts = toFeedResponses(result.getContent(), userId);
@@ -243,6 +248,8 @@ public class PostService {
         List<String> imageObjectKeys = imageRepository.findObjectKeysByPostId(postId);
 
         // 댓글·좋아요·북마크는 데이터가 많아질 수 있으므로 JPA Cascade 대신 게시글 ID 기준 일괄 삭제 쿼리를 사용
+        // 댓글 좋아요는 댓글을 참조하므로 반드시 댓글보다 먼저 지운다(FK 위반 방지).
+        commentLikeRepository.deleteAllByPostId(postId);
         commentRepository.deleteAllByPostId(postId);
         likeRepository.deleteAllByPostId(postId);
         bookmarkRepository.deleteAllByPostId(postId);

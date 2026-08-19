@@ -45,7 +45,7 @@ public interface UserControllerApiSpec {
 
 	@Operation(
 			summary = "타 유저 프로필 조회",
-			description = "특정 사용자의 공개 프로필 정보를 조회합니다."
+			description = "특정 사용자의 공개 프로필 정보와 팔로워·팔로잉 수를 조회합니다."
 	)
 	ResponseEntity<UserProfileResponse> getUserProfile(
 			@Parameter(description = "조회할 사용자 ID") @PathVariable Long id
