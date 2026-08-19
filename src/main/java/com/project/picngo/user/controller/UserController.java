@@ -6,6 +6,7 @@ import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.user.dto.*;
 import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -82,6 +83,16 @@ public class UserController implements UserControllerApiSpec {
 	){
 		userService.unfollow(userDetails.getId(), id);
 		return ResponseEntity.ok().build();
+	}
+
+	// 사용자 검색 API — 파라미터는 GET /spots/search와 같은 형태로 맞춘다
+	@GetMapping("/search")
+	public ResponseEntity<Page<FollowUserResponse>> searchUsers(
+			@RequestParam String keyword,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "20") int size
+	){
+		return ResponseEntity.ok(userService.searchUsers(keyword, page, size));
 	}
 
 	// 팔로워 목록 조회 API

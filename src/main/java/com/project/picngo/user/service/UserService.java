@@ -15,6 +15,8 @@ import com.project.picngo.user.dto.*;
 import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -224,6 +226,17 @@ public class UserService {
 		return followRepository.findAllByFollower(user).stream()
 				.map(follow -> FollowUserResponse.from(follow.getFollowing()))
 				.toList();
+	}
+
+	// 사용자 검색 — 팔로우할 사람을 찾는 경로다. 응답은 팔로워·팔로잉 목록과 같은 DTO를 쓴다(항목이 동일).
+	public Page<FollowUserResponse> searchUsers(String keyword, int page, int size) {
+		if (keyword == null || keyword.isBlank()) {
+			throw new CustomException(UserErrorCode.SEARCH_KEYWORD_REQUIRED);
+		}
+
+		return userRepository
+				.findByNicknameContainingIgnoreCase(keyword.trim(), PageRequest.of(page, size))
+				.map(FollowUserResponse::from);
 	}
 
     // 내 활동 통계 조회 서비스

@@ -3,6 +3,8 @@ package com.project.picngo.user.repository;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	boolean existsByNickname(String nickname);
 
 	Optional<User> findByProviderAndProviderId(SocialProvider provider, String providerId);
+
+	// 사용자 검색 — 닉네임 부분일치. 닉네임이 유니크라 별도 핸들 없이 이것만으로 사람을 찾을 수 있다.
+	Page<User> findByNicknameContainingIgnoreCase(String nickname, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :userId")
