@@ -7,9 +7,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
@@ -38,8 +40,12 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
             Pageable pageable
     );
 
-    java.util.List<Inquiry> findByStatusAndIsResolvedFalseAndAnsweredAtBefore(
-            InquiryStatus status,
-            java.time.LocalDateTime threshold
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Inquiry i SET i.isResolved = true, i.status = :resolvedStatus " +
+            "WHERE i.status = :answeredStatus AND i.isResolved = false AND i.answeredAt < :threshold")
+    int bulkAutoResolveInquiries(
+            @Param("answeredStatus") InquiryStatus answeredStatus,
+            @Param("resolvedStatus") InquiryStatus resolvedStatus,
+            @Param("threshold") LocalDateTime threshold
     );
 }

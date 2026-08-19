@@ -1,6 +1,5 @@
 package com.project.picngo.inquiry.service;
 
-import com.project.picngo.inquiry.domain.Inquiry;
 import com.project.picngo.inquiry.domain.InquiryStatus;
 import com.project.picngo.inquiry.repository.InquiryRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 1:1 문의 7일 미응답 건 자동 해결(RESOLVED) 처리 스케줄러.
@@ -36,19 +34,10 @@ public class InquiryAutoResolveScheduler {
     @Transactional
     public int autoResolveOldInquiries() {
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
-        List<Inquiry> targetInquiries = inquiryRepository.findByStatusAndIsResolvedFalseAndAnsweredAtBefore(
+        return inquiryRepository.bulkAutoResolveInquiries(
                 InquiryStatus.ANSWERED,
+                InquiryStatus.RESOLVED,
                 sevenDaysAgo
         );
-
-        if (targetInquiries.isEmpty()) {
-            return 0;
-        }
-
-        for (Inquiry inquiry : targetInquiries) {
-            inquiry.updateResolved(true);
-        }
-
-        return targetInquiries.size();
     }
 }
