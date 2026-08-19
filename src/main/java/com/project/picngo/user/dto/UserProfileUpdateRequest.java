@@ -3,6 +3,10 @@ package com.project.picngo.user.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * 프로필 사진은 여기 없다 — PATCH/DELETE /users/me/profile-image 전용 경로로만 바꾼다.
+ * 응답의 사진 값은 presigned URL이라 그대로 되돌려 받으면 만료된 URL이 저장된다.
+ */
 public record UserProfileUpdateRequest(
         /*
          * 형식 검증은 여기가 아니라 UserService.updateMyProfile에서 한다 — @Pattern을 걸면
@@ -12,7 +16,6 @@ public record UserProfileUpdateRequest(
          */
         @NotBlank
         String nickname,
-        String profileImageUrl,
         // 클라이언트 입력창도 100자로 제한한다(ProfileEditScreen BIO_MAX)
         @Size(max = 100, message = "자기소개는 100자 이내여야 합니다.")
         String bio

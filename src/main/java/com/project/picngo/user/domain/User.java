@@ -136,9 +136,25 @@ public class User extends BaseTimeEntity {
 	public void updateSocialProfile(String profileImageUrl) {
 		// null이면 그대로 둔다 — 카카오 프로필 사진 제공은 선택 동의라 미동의 사용자는
 		// 매 로그인마다 null이 온다. 덮으면 이미 있던 사진이 로그인할 때마다 지워진다.
-		if (profileImageUrl != null) {
-			this.profileImageUrl = profileImageUrl;
+		if (profileImageUrl == null) {
+			return;
 		}
+		// 사용자가 앱에서 직접 올린 사진(S3 objectKey)은 카카오 사진으로 덮지 않는다.
+		// 저장된 값이 http로 시작하면 카카오가 준 URL이고, 아니면 우리가 올린 것이다.
+		if (hasUploadedProfileImage()) {
+			return;
+		}
+		this.profileImageUrl = profileImageUrl;
+	}
+
+	/** 앱에서 직접 올린 사진인지. S3 objectKey는 http로 시작하지 않는다(카카오 URL과의 구분점). */
+	public boolean hasUploadedProfileImage() {
+		return this.profileImageUrl != null && !this.profileImageUrl.startsWith("http");
+	}
+
+	/** 프로필 사진 교체·삭제. objectKey를 그대로 담는다(응답 직전에 presigned URL로 바꾼다). */
+	public void updateProfileImage(String objectKey) {
+		this.profileImageUrl = objectKey;
 	}
 
 	public void updatePassword(String encodedPassword) {
@@ -146,9 +162,13 @@ public class User extends BaseTimeEntity {
 	}
 
 	// PUT /users/me는 전체 교체라 null이 오면 비운다. 항목별 부분 수정이 필요해지면 PATCH를 따로 둘 것.
-	public void updateProfile(String nickname, String profileImageUrl, String bio){
+	/**
+	 * 닉네임·자기소개만 바꾼다. 프로필 사진은 여기서 건드리지 않는다 —
+	 * 클라이언트가 받은 값은 presigned URL이라, 그대로 되돌려 받아 저장하면
+	 * 만료된 URL이 컬럼에 박힌다. 사진은 updateProfileImage 전용 경로로만 바뀐다.
+	 */
+	public void updateProfile(String nickname, String bio){
 		this.nickname = nickname;
-		this.profileImageUrl = profileImageUrl;
 		this.bio = bio;
 	}
 }

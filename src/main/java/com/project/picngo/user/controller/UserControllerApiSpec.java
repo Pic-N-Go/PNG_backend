@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,6 +43,20 @@ public interface UserControllerApiSpec {
 	ResponseEntity<UserResponse> updateMe(
 			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
 			@RequestBody UserProfileUpdateRequest request
+	);
+
+	@Operation(
+			summary = "프로필 사진 교체",
+			description = "multipart로 사진을 올려 프로필 사진을 바꿉니다. 이전에 올린 사진은 저장소에서 삭제됩니다."
+	)
+	ResponseEntity<UserResponse> updateProfileImage(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+			@Parameter(description = "업로드할 이미지") MultipartFile image
+	);
+
+	@Operation(summary = "프로필 사진 삭제", description = "프로필 사진을 비웁니다(기본 이미지).")
+	ResponseEntity<UserResponse> deleteProfileImage(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
 	);
 
 	@Operation(

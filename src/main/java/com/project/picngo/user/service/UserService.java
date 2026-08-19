@@ -1,7 +1,9 @@
 package com.project.picngo.user.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.service.ImageStorageService;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.project.picngo.common.util.ValidationRules;
 
@@ -18,6 +20,7 @@ import com.project.picngo.user.dto.*;
 import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -30,6 +33,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class UserService {
 
 	private final UserRepository userRepository;
@@ -212,7 +216,7 @@ public class UserService {
 			}
 		}
 
-		user.updateProfile(request.nickname(), request.profileImageUrl(), request.bio());
+		user.updateProfile(request.nickname(), request.bio());
 
 		return UserResponse.from(user, profileImageUrlOf(user));
 	}
@@ -236,6 +240,49 @@ public class UserService {
 		}
 
 		user.updatePassword(passwordEncoder.encode(request.newPassword()));
+	}
+
+	/**
+	 * 프로필 사진 교체. 게시글·리뷰 사진과 같은 저장소를 쓰고(ImageStorageService), DB에는
+	 * objectKey만 담는다 — presigned URL은 만료되므로 저장하면 안 된다.
+	 */
+	@Transactional
+	public UserResponse updateProfileImage(Long userId, MultipartFile image) {
+		User user = getById(userId);
+		String previousKey = user.hasUploadedProfileImage() ? user.getProfileImageUrl() : null;
+
+		ImageUploadResult uploaded = imageStorageService.upload(image, "profile/" + userId);
+		user.updateProfileImage(uploaded.key());
+
+		// 새 사진이 올라간 뒤에 지운다 — 먼저 지우면 업로드가 실패했을 때 사진 없는 계정이 된다.
+		// 카카오가 준 http URL은 우리 소유가 아니라 지울 대상이 아니다(previousKey가 null).
+		deletePreviousImage(previousKey);
+
+		return UserResponse.from(user, uploaded.url());
+	}
+
+	/** 프로필 사진 삭제(기본 이미지로). 카카오에서 받은 사진도 함께 비운다 — 사용자가 지운 것이다. */
+	@Transactional
+	public UserResponse deleteProfileImage(Long userId) {
+		User user = getById(userId);
+		String previousKey = user.hasUploadedProfileImage() ? user.getProfileImageUrl() : null;
+
+		user.updateProfileImage(null);
+		deletePreviousImage(previousKey);
+
+		return UserResponse.from(user, null);
+	}
+
+	/** 저장소에서 지우는 데 실패해도 사용자 동작은 성공이다 — 남은 객체는 정리 작업의 몫이다. */
+	private void deletePreviousImage(String objectKey) {
+		if (objectKey == null) {
+			return;
+		}
+		try {
+			imageStorageService.delete(objectKey);
+		} catch (RuntimeException e) {
+			log.warn("이전 프로필 사진 삭제 실패 (key={}): {}", objectKey, e.getMessage());
+		}
 	}
 
 	// 타 유저 프로필 조회

@@ -7,7 +7,9 @@ import com.project.picngo.user.dto.*;
 import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
@@ -57,6 +59,23 @@ public class UserController implements UserControllerApiSpec {
 		return ResponseEntity.ok(
 				userService.updateMyProfile(userDetails.getId(), request)
 		);
+	}
+
+	// 프로필 사진 교체 API (multipart) — 게시글·리뷰 업로드와 같은 저장소를 쓴다.
+	@PatchMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<UserResponse> updateProfileImage(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@RequestPart("image") MultipartFile image
+	) {
+		return ResponseEntity.ok(userService.updateProfileImage(userDetails.getId(), image));
+	}
+
+	// 프로필 사진 삭제 API (기본 이미지로 되돌리기)
+	@DeleteMapping("/me/profile-image")
+	public ResponseEntity<UserResponse> deleteProfileImage(
+			@AuthenticationPrincipal CustomUserDetails userDetails
+	) {
+		return ResponseEntity.ok(userService.deleteProfileImage(userDetails.getId()));
 	}
 
 	// 비밀번호 변경 API (설정 > 비밀번호 변경)

@@ -81,9 +81,9 @@ class UserProfileServiceTest {
         // 새 규칙 이전에 카카오에서 들어온 닉네임(특수문자 포함, 규칙 위반)
         when(user.getNickname()).thenReturn("홍길동님♥");
 
-        service.updateMyProfile(7L, new UserProfileUpdateRequest("홍길동님♥", null, "안녕하세요"));
+        service.updateMyProfile(7L, new UserProfileUpdateRequest("홍길동님♥", "안녕하세요"));
 
-        verify(user).updateProfile("홍길동님♥", null, "안녕하세요");
+        verify(user).updateProfile("홍길동님♥", "안녕하세요");
         // 안 바꿨으므로 중복 조회조차 하지 않는다
         verify(userRepository, never()).existsByNicknameAndIdNot(anyString(), any());
     }
@@ -97,11 +97,11 @@ class UserProfileServiceTest {
 
         CustomException exception = assertThrows(
                 CustomException.class,
-                () -> service.updateMyProfile(7L, new UserProfileUpdateRequest("홍길동!!", null, null))
+                () -> service.updateMyProfile(7L, new UserProfileUpdateRequest("홍길동!!", null))
         );
 
         assertEquals(UserErrorCode.INVALID_NICKNAME, exception.getErrorCode());
-        verify(user, never()).updateProfile(anyString(), any(), any());
+        verify(user, never()).updateProfile(anyString(), any());
     }
 
     @Test
@@ -114,7 +114,7 @@ class UserProfileServiceTest {
 
         CustomException exception = assertThrows(
                 CustomException.class,
-                () -> service.updateMyProfile(7L, new UserProfileUpdateRequest("김지우", null, null))
+                () -> service.updateMyProfile(7L, new UserProfileUpdateRequest("김지우", null))
         );
 
         assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.getErrorCode());
