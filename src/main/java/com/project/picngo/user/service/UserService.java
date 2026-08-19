@@ -1,6 +1,7 @@
 package com.project.picngo.user.service;
 
 import com.project.picngo.common.exception.CustomException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import com.project.picngo.common.util.ValidationRules;
 
 import static com.project.picngo.common.util.ValidationRules.NICKNAME_MAX;
@@ -32,6 +33,7 @@ public class UserService {
 
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
+	private final PasswordEncoder passwordEncoder;
 
 	public User getByEmail(String email) {
 		return userRepository.findByEmail(email)
@@ -201,6 +203,27 @@ public class UserService {
 		user.updateProfile(request.nickname(), request.profileImageUrl(), request.bio());
 
 		return UserResponse.from(user);
+	}
+
+	/**
+	 * 설정에서 비밀번호 변경. 이메일 코드로 재설정하는 `/auth/password/reset`과 달리
+	 * 이미 로그인한 사용자가 현재 비밀번호를 확인받고 바꾼다.
+	 *
+	 * 소셜 계정은 비밀번호가 없어(password null) 이 경로를 쓸 수 없다. 여기서 막지 않으면
+	 * matches(raw, null)이 터지거나 소셜 계정에 비밀번호가 생겨 이메일 로그인 진입점이 열린다.
+	 */
+	@Transactional
+	public void changePassword(Long userId, PasswordChangeRequest request) {
+		User user = getById(userId);
+
+		if (user.getProvider() != SocialProvider.LOCAL || user.getPassword() == null) {
+			throw new CustomException(AuthErrorCode.SOCIAL_ACCOUNT_HAS_NO_PASSWORD);
+		}
+		if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
+			throw new CustomException(AuthErrorCode.INVALID_CURRENT_PASSWORD);
+		}
+
+		user.updatePassword(passwordEncoder.encode(request.newPassword()));
 	}
 
 	// 타 유저 프로필 조회

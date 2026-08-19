@@ -2,6 +2,8 @@ package com.project.picngo.auth.service;
 
 import com.project.picngo.auth.dto.KakaoLoginRequest;
 import com.project.picngo.auth.dto.KakaoProfile;
+import com.project.picngo.auth.dto.PasswordResetCodeRequest;
+import com.project.picngo.auth.dto.PasswordResetRequest;
 import com.project.picngo.auth.dto.RefreshTokenRequest;
 import com.project.picngo.auth.dto.TokenResponse;
 import com.project.picngo.common.exception.CustomException;
@@ -20,6 +22,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -91,6 +95,43 @@ class AuthServiceTest {
     @DisplayName("카카오 기존 계정이면 isNewUser가 false로 전파된다")
     void propagatesIsNewUserForExistingKakaoAccount() {
         assertThat(kakaoLoginResponse(false).isNewUser()).isFalse();
+    }
+
+    /**
+     * 소셜 계정은 비밀번호로 로그인하지 않는다. 이 흐름을 열어두면 카카오 전용 계정에
+     * 비밀번호가 생겨, 의도한 적 없는 이메일 로그인 진입점이 만들어진다.
+     */
+    @Test
+    @DisplayName("소셜 계정은 비밀번호 재설정 코드를 받을 수 없다")
+    void rejectsPasswordResetCodeForSocialAccount() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getProvider()).thenReturn(SocialProvider.KAKAO);
+        when(userService.getByEmail("a@kakao.local")).thenReturn(user);
+
+        CustomException exception = assertThrows(
+                CustomException.class,
+                () -> authService.sendPasswordResetCode(new PasswordResetCodeRequest("a@kakao.local"))
+        );
+
+        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.SOCIAL_ACCOUNT_HAS_NO_PASSWORD);
+        verify(emailVerificationService, never()).issueCode(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("코드를 이미 받아뒀더라도 소셜 계정의 비밀번호는 교체되지 않는다")
+    void rejectsPasswordResetForSocialAccount() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getProvider()).thenReturn(SocialProvider.KAKAO);
+        when(userService.getByEmail("a@kakao.local")).thenReturn(user);
+
+        CustomException exception = assertThrows(
+                CustomException.class,
+                () -> authService.resetPassword(
+                        new PasswordResetRequest("a@kakao.local", "123456", "new-password"))
+        );
+
+        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.SOCIAL_ACCOUNT_HAS_NO_PASSWORD);
+        verify(user, never()).updatePassword(anyString());
     }
 
     private TokenResponse kakaoLoginResponse(boolean newUser) {

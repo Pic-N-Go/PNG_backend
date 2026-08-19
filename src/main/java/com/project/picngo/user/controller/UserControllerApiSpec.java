@@ -45,6 +45,15 @@ public interface UserControllerApiSpec {
 	);
 
 	@Operation(
+			summary = "비밀번호 변경",
+			description = "현재 비밀번호를 확인한 뒤 새 비밀번호로 변경합니다. 소셜 계정은 비밀번호가 없어 사용할 수 없습니다."
+	)
+	ResponseEntity<Void> changePassword(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+			@RequestBody PasswordChangeRequest request
+	);
+
+	@Operation(
 			summary = "타 유저 프로필 조회",
 			description = "특정 사용자의 공개 프로필 정보와 팔로워·팔로잉 수를 조회합니다."
 	)

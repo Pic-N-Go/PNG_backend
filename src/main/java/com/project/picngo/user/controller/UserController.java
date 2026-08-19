@@ -59,6 +59,16 @@ public class UserController implements UserControllerApiSpec {
 		);
 	}
 
+	// 비밀번호 변경 API (설정 > 비밀번호 변경)
+	@PatchMapping("/me/password")
+	public ResponseEntity<Void> changePassword(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@Valid @RequestBody PasswordChangeRequest request
+	) {
+		userService.changePassword(userDetails.getId(), request);
+		return ResponseEntity.noContent().build();
+	}
+
 	// 타 유저 프로필 조회 API
 	@GetMapping("/{id}/profile")
 	public ResponseEntity<UserProfileResponse> getUserProfile(@PathVariable Long id){

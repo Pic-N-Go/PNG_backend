@@ -124,8 +124,17 @@ public class AuthService {
     }
 
 	public EmailVerificationResponse sendPasswordResetCode(PasswordResetCodeRequest request) {
-		userService.getByEmail(request.email());
+		User user = userService.getByEmail(request.email());
+		// 소셜 계정은 비밀번호로 로그인하지 않는다. 막지 않으면 이 흐름으로 소셜 전용 계정에
+		// 비밀번호가 생겨, 의도한 적 없는 이메일 로그인 진입점이 열린다.
+		requireLocalAccount(user);
 		return emailVerificationService.issueCode(request.email(), EmailVerificationPurpose.PASSWORD_RESET);
+	}
+
+	private void requireLocalAccount(User user) {
+		if (user.getProvider() != SocialProvider.LOCAL) {
+			throw new CustomException(AuthErrorCode.SOCIAL_ACCOUNT_HAS_NO_PASSWORD);
+		}
 	}
 
 	@Transactional
@@ -133,6 +142,8 @@ public class AuthService {
 		emailVerificationService.confirmCode(request.email(), request.code());
 
 		User user = userService.getByEmail(request.email());
+		// 코드 발송을 막아도 이미 받아둔 코드로 여기만 호출할 수 있다 — 실제 교체 지점에서도 검사한다.
+		requireLocalAccount(user);
 		user.updatePassword(passwordEncoder.encode(request.newPassword()));
 	}
 
