@@ -444,8 +444,10 @@ public class SpotService {
                 phrase, categoryNames, SpotStatus.APPROVED.name(), pageable);
     }
 
+    // 이름 우선 정렬이 쿼리 안에 있으므로 정렬 없는 Pageable을 넘긴다
+    // (Sort를 얹으면 Spring이 ORDER BY를 덧붙여 이름 우선순위가 뒤로 밀린다).
     private Page<Spot> searchByLike(String keyword, List<SpotCategory> categories, int page, int size) {
-        Pageable pageable = createPageable(page, size, "latest");
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
 
         return (categories == null)
                 ? spotRepository.searchSpots(keyword, SpotStatus.APPROVED, pageable)

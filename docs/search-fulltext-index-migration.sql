@@ -36,14 +36,22 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'spot';
 -- ─────────────────────────────────────────────────────────────
 -- 2) FULLTEXT 인덱스 생성
 --
--- 컬럼 구성은 기존 LIKE 쿼리와 정확히 같게 맞춘다(name, address, overview).
+-- 컬럼 구성은 기존 LIKE 쿼리와 정확히 같게 맞춘다(name, address).
 -- 대상 컬럼이 달라지면 성능 차이가 인덱스 덕분인지 검색 범위가 줄어서인지 구별할 수 없다.
+--
+-- overview는 두 방식 모두에서 검색 대상에서 빠졌다. 긴 산문이라 두 글자만 겹쳐도 걸려서
+-- '테' 검색 405건 중 396건이 설명만 맞은 결과였다. 자세한 근거는 SpotRepository.searchSpots 주석 참고.
+--
+-- ⚠️ 이미 ft_spot_search(name, address, overview)를 적용해 뒀다면 이 프로시저는
+--    "인덱스가 있음"으로 판단해 건너뛴다. 컬럼 목록이 달라 MATCH()가 ERROR 1191을 내므로
+--    아래 DROP을 한 번 실행한 뒤 다시 적용할 것:
+--      ALTER TABLE spot DROP INDEX ft_spot_search;
 --
 -- MATCH()의 컬럼 목록은 FULLTEXT 인덱스의 컬럼 목록과 순서까지 정확히 일치해야 한다.
 -- 하나라도 다르면 MySQL이 인덱스를 찾지 못하고 에러를 낸다:
 --   ERROR 1191 (HY000): Can't find FULLTEXT index matching the column list
 --
--- 10만 건 기준 생성에 수십 초가 걸릴 수 있다. overview가 TEXT라 bigram이 많이 나온다.
+-- name·address만이라 overview를 포함할 때보다 생성이 빠르고 인덱스도 작다.
 DROP PROCEDURE IF EXISTS add_spot_fulltext_index;
 DELIMITER $$
 CREATE PROCEDURE add_spot_fulltext_index()
@@ -55,7 +63,7 @@ BEGIN
           AND INDEX_NAME = 'ft_spot_search'
     ) THEN
         ALTER TABLE spot
-            ADD FULLTEXT INDEX ft_spot_search (name, address, overview) WITH PARSER ngram;
+            ADD FULLTEXT INDEX ft_spot_search (name, address) WITH PARSER ngram;
     END IF;
 END$$
 DELIMITER ;
@@ -73,7 +81,7 @@ EXPLAIN
 SELECT s.* FROM spot s
 WHERE s.status = 'APPROVED'
   AND s.is_active = true
-  AND MATCH(s.name, s.address, s.overview) AGAINST ('"한라산"' IN BOOLEAN MODE)
+  AND MATCH(s.name, s.address) AGAINST ('"한라산"' IN BOOLEAN MODE)
 ORDER BY s.created_at DESC
 LIMIT 20;
 
@@ -82,7 +90,7 @@ EXPLAIN ANALYZE
 SELECT s.* FROM spot s
 WHERE s.status = 'APPROVED'
   AND s.is_active = true
-  AND MATCH(s.name, s.address, s.overview) AGAINST ('"한라산"' IN BOOLEAN MODE)
+  AND MATCH(s.name, s.address) AGAINST ('"한라산"' IN BOOLEAN MODE)
 ORDER BY s.created_at DESC
 LIMIT 20;
 
