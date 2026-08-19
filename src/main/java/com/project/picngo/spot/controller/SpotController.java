@@ -32,30 +32,38 @@ public class SpotController implements SpotControllerApiSpec {
 
     @GetMapping
     public ResponseEntity<Page<SpotResponse>> getSpots(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(spotService.getSpots(category, sort, page, size));
+        return ResponseEntity.ok(spotService.getSpots(category, sort, page, size, userIdOrNull(userDetails)));
     }
 
     @GetMapping("/popular")
     public ResponseEntity<List<SpotResponse>> getPopularSpots(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "10") int size
     ){
-        return ResponseEntity.ok(spotService.getPopularSpots(category, size));
+        return ResponseEntity.ok(spotService.getPopularSpots(category, size, userIdOrNull(userDetails)));
     }
 
     @GetMapping("/search")
     public ResponseEntity<Page<SpotResponse>> searchSpots(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam String keyword,
             @RequestParam(required = false) List<String> category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(spotService.searchSpots(keyword, category, page, size));
+        return ResponseEntity.ok(spotService.searchSpots(keyword, category, page, size, userIdOrNull(userDetails)));
+    }
+
+    // 목록류는 permitAll이라 비로그인 요청이 그대로 들어온다. 이때 userDetails는 null.
+    private Long userIdOrNull(CustomUserDetails userDetails) {
+        return userDetails == null ? null : userDetails.getId();
     }
 
     @GetMapping("/map")

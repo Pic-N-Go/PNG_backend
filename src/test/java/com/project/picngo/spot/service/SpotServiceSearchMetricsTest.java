@@ -82,7 +82,7 @@ class SpotServiceSearchMetricsTest {
         given(spotRepository.searchSpots(eq("없는키워드"), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        spotService.searchSpots("없는키워드", null, 0, 20);
+        spotService.searchSpots("없는키워드", null, 0, 20, null);
 
         assertThat(counter("keyword", "zero")).isEqualTo(1d);
         assertThat(counter("keyword", "hit")).isEqualTo(0d);
@@ -94,7 +94,7 @@ class SpotServiceSearchMetricsTest {
         given(spotRepository.searchSpots(eq("한라산"), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        spotService.searchSpots("한라산", null, 0, 20);
+        spotService.searchSpots("한라산", null, 0, 20, null);
 
         assertThat(timerCount("keyword", "query", "false")).isEqualTo(1L);
         assertThat(timerCount("keyword", "mapping", "false")).isEqualTo(1L);
@@ -107,7 +107,7 @@ class SpotServiceSearchMetricsTest {
         given(spotRepository.searchSpotsByCategories(eq("한라산"), any(), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        spotService.searchSpots("한라산", List.of("MOUNTAIN"), 0, 20);
+        spotService.searchSpots("한라산", List.of("MOUNTAIN"), 0, 20, null);
 
         assertThat(timerCount("keyword", "query", "true")).isEqualTo(1L);
         assertThat(timerCount("keyword", "query", "false")).isEqualTo(0L);
@@ -119,7 +119,7 @@ class SpotServiceSearchMetricsTest {
         given(spotRepository.searchSpots(eq("한라산"), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot(), spot())));
 
-        spotService.searchSpots("한라산", null, 0, 20);
+        spotService.searchSpots("한라산", null, 0, 20, null);
 
         // 단위 테스트에는 Hibernate가 없어 SQL 개수는 0이지만, 지표가 올바른 이름/태그로
         // 등록되는지는 여기서 고정한다. 이름이 어긋나면 대시보드만 조용히 비어버린다.
@@ -140,7 +140,7 @@ class SpotServiceSearchMetricsTest {
         // 정리하지 않으면 요청 스레드가 재사용될 때 다음 요청 수치가 오염된다.
         SqlCountingStatementInspector.start();
         try {
-            spotService.searchSpots("  ", null, 0, 20);
+            spotService.searchSpots("  ", null, 0, 20, null);
         } catch (RuntimeException expected) {
             // 검색어 검증 실패는 SqlCounter.start() 이전이라 여기선 그대로 남는다.
         }
@@ -150,7 +150,7 @@ class SpotServiceSearchMetricsTest {
                 .willThrow(new IllegalStateException("DB 실패"));
 
         try {
-            spotService.searchSpots("한라산", null, 0, 20);
+            spotService.searchSpots("한라산", null, 0, 20, null);
         } catch (IllegalStateException expected) {
             // 기대한 예외
         }

@@ -92,7 +92,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.findByIdIn(List.of(5L)))
                 .willReturn(List.of(spot(5L, "협재해수욕장")));
 
-        var response = service(false, true).searchSpots("헙재", null, 0, 20);
+        var response = service(false, true).searchSpots("헙재", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(response.getContent().get(0).name()).isEqualTo("협재해수욕장");
@@ -109,7 +109,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.findByIdIn(List.of(3L)))
                 .willReturn(List.of(spot(3L, "오설록 티 뮤지엄")));
 
-        var response = service(false, true).searchSpots("오셜록", null, 0, 20);
+        var response = service(false, true).searchSpots("오셜록", null, 0, 20, null);
 
         assertThat(response.getContent().get(0).name()).isEqualTo("오설록 티 뮤지엄");
         assertThat(stageCount("fuzzy")).isEqualTo(1d);
@@ -127,7 +127,7 @@ class SpotServiceFuzzyFallbackTest {
                 spot(1L, "협제해변"), spot(2L, "협재해수욕장")
         ));
 
-        var response = service(false, true).searchSpots("협재", null, 0, 20);
+        var response = service(false, true).searchSpots("협재", null, 0, 20, null);
 
         assertThat(response.getContent()).extracting("name")
                 .containsExactly("협재해수욕장", "협제해변");
@@ -141,7 +141,7 @@ class SpotServiceFuzzyFallbackTest {
                 candidate(9L, "한라산", "제주특별자치도 서귀포시")
         ));
 
-        var response = service(false, true).searchSpots("헙재", null, 0, 20);
+        var response = service(false, true).searchSpots("헙재", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isZero();
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -153,7 +153,7 @@ class SpotServiceFuzzyFallbackTest {
     void skipsSingleCharacterKeyword() {
         primaryReturnsNothing();
 
-        service(false, true).searchSpots("협", null, 0, 20);
+        service(false, true).searchSpots("협", null, 0, 20, null);
 
         verify(spotRepository, never()).findFuzzyCandidates(any());
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -165,7 +165,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot(5L, "협재해수욕장"))));
 
-        service(false, true).searchSpots("협재", null, 0, 20);
+        service(false, true).searchSpots("협재", null, 0, 20, null);
 
         verify(spotRepository, never()).findFuzzyCandidates(any());
         assertThat(stageCount("primary")).isEqualTo(1d);
@@ -178,7 +178,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot(5L, "협재해수욕장"))));
 
-        service(true, true).searchSpots("협재해수욕쟝", null, 0, 20);
+        service(true, true).searchSpots("협재해수욕쟝", null, 0, 20, null);
 
         verify(spotRepository, never()).findFuzzyCandidates(any());
         assertThat(stageCount("similar")).isEqualTo(1d);
@@ -189,7 +189,7 @@ class SpotServiceFuzzyFallbackTest {
     void neverQueriesWhenDisabled() {
         primaryReturnsNothing();
 
-        service(false, false).searchSpots("헙재", null, 0, 20);
+        service(false, false).searchSpots("헙재", null, 0, 20, null);
 
         verify(spotRepository, never()).findFuzzyCandidates(any());
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -205,7 +205,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.findByIdIn(List.of(5L)))
                 .willReturn(List.of(spot(5L, "협재해수욕장")));
 
-        var response = service(false, true).searchSpots("헙재", List.of("BEACH"), 0, 20);
+        var response = service(false, true).searchSpots("헙재", List.of("BEACH"), 0, 20, null);
 
         assertThat(response.getTotalElements()).isEqualTo(1);
         verify(spotRepository, never()).findFuzzyCandidates(any());

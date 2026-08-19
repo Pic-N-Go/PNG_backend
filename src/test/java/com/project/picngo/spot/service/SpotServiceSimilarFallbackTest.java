@@ -74,7 +74,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        var response = service(true, true).searchSpots("갈산공줜", null, 0, 20);
+        var response = service(true, true).searchSpots("갈산공줜", null, 0, 20, null);
 
         // 따옴표가 붙으면 구문 검색이 되어 오타를 흡수하지 못한다. 반드시 맨 문자열이어야 한다.
         verify(spotRepository).searchSpotsSimilar(eq("갈산공줜"), eq("APPROVED"), any());
@@ -88,7 +88,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        service(true, true).searchSpots("갈산공원", null, 0, 20);
+        service(true, true).searchSpots("갈산공원", null, 0, 20, null);
 
         verify(spotRepository, never()).searchSpotsSimilar(any(), any(), any());
         assertThat(stageCount("primary")).isEqualTo(1d);
@@ -102,7 +102,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsNormalized(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        service(true, true).searchSpots("갈 산공원", null, 0, 20);
+        service(true, true).searchSpots("갈 산공원", null, 0, 20, null);
 
         verify(spotRepository, never()).searchSpotsSimilar(any(), any(), any());
         assertThat(stageCount("normalized")).isEqualTo(1d);
@@ -116,7 +116,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        service(false, true).searchSpots("극락사(서 울)", null, 0, 20);
+        service(false, true).searchSpots("극락사(서 울)", null, 0, 20, null);
 
         verify(spotRepository).searchSpotsSimilar(eq("극락사서울"), eq("APPROVED"), any());
     }
@@ -129,7 +129,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsSimilarByCategories(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        service(false, true).searchSpots("갈산공줜", List.of("PARK"), 0, 20);
+        service(false, true).searchSpots("갈산공줜", List.of("PARK"), 0, 20, null);
 
         verify(spotRepository).searchSpotsSimilarByCategories(
                 eq("갈산공줜"), eq(List.of("PARK")), eq("APPROVED"), any());
@@ -141,7 +141,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        service(false, false).searchSpots("갈산공줜", null, 0, 20);
+        service(false, false).searchSpots("갈산공줜", null, 0, 20, null);
 
         verify(spotRepository, never()).searchSpotsSimilar(any(), any(), any());
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -155,7 +155,7 @@ class SpotServiceSimilarFallbackTest {
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        service(false, true).searchSpots("없는스팟", null, 0, 20);
+        service(false, true).searchSpots("없는스팟", null, 0, 20, null);
 
         assertThat(stageCount("none")).isEqualTo(1d);
         assertThat(stageCount("similar")).isZero();

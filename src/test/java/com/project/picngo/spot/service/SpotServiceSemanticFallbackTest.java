@@ -92,7 +92,7 @@ class SpotServiceSemanticFallbackTest {
         given(spotRepository.findByIdIn(List.of(1L)))
                 .willReturn(List.of(spot(1L, "노을공원")));
 
-        var response = service(true).searchSpots("해질녘 걷기 좋은 곳", null, 0, 20);
+        var response = service(true).searchSpots("해질녘 걷기 좋은 곳", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(response.getContent().get(0).name()).isEqualTo("노을공원");
@@ -114,7 +114,7 @@ class SpotServiceSemanticFallbackTest {
                 spot(1L, "3위"), spot(2L, "1위"), spot(3L, "2위")
         ));
 
-        var response = service(true).searchSpots("아무 검색어", null, 0, 20);
+        var response = service(true).searchSpots("아무 검색어", null, 0, 20, null);
 
         assertThat(response.getContent()).extracting("name")
                 .containsExactly("1위", "2위", "3위");
@@ -126,7 +126,7 @@ class SpotServiceSemanticFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot(1L, "갈산공원"))));
 
-        service(true).searchSpots("갈산공원", null, 0, 20);
+        service(true).searchSpots("갈산공원", null, 0, 20, null);
 
         verify(embeddingClient, never()).embed(any());
     }
@@ -137,7 +137,7 @@ class SpotServiceSemanticFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        service(false).searchSpots("없는스팟", null, 0, 20);
+        service(false).searchSpots("없는스팟", null, 0, 20, null);
 
         verify(embeddingClient, never()).embed(any());
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -150,7 +150,7 @@ class SpotServiceSemanticFallbackTest {
                 .willReturn(new PageImpl<>(List.of()));
         given(embeddingClient.embed(any())).willReturn(Optional.empty());
 
-        service(true).searchSpots("없는스팟", null, 0, 20);
+        service(true).searchSpots("없는스팟", null, 0, 20, null);
 
         verify(spotRepository, never()).findEmbeddingCandidates(any());
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -165,7 +165,7 @@ class SpotServiceSemanticFallbackTest {
         given(embeddingClient.embed(any())).willReturn(Optional.of(new float[]{1f, 0f}));
         given(spotRepository.findEmbeddingCandidates(SpotStatus.APPROVED)).willReturn(List.of());
 
-        service(true).searchSpots("없는스팟", null, 0, 20);
+        service(true).searchSpots("없는스팟", null, 0, 20, null);
 
         assertThat(stageCount("none")).isEqualTo(1d);
     }

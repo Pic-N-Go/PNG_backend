@@ -66,7 +66,7 @@ class SpotServiceCategoryTest {
         given(spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(any(), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot(Set.of(SpotCategory.MOUNTAIN, SpotCategory.SUNRISE_SUNSET)))));
 
-        spotService.getSpots(List.of("MOUNTAIN,SUNRISE_SUNSET"), "latest", 0, 20);
+        spotService.getSpots(List.of("MOUNTAIN,SUNRISE_SUNSET"), "latest", 0, 20, null);
 
         verify(spotRepository).findAllByCategoriesAndStatusAndIsActiveTrue(
                 categoriesCaptor.capture(), eq(SpotStatus.APPROVED), any());
@@ -80,7 +80,7 @@ class SpotServiceCategoryTest {
         given(spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(any(), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        spotService.getSpots(List.of("MOUNTAIN", "INVALID_TEXT"), "latest", 0, 20);
+        spotService.getSpots(List.of("MOUNTAIN", "INVALID_TEXT"), "latest", 0, 20, null);
 
         verify(spotRepository).findAllByCategoriesAndStatusAndIsActiveTrue(
                 categoriesCaptor.capture(), eq(SpotStatus.APPROVED), any());
@@ -94,7 +94,7 @@ class SpotServiceCategoryTest {
                 .willReturn(new PageImpl<>(List.of()));
 
         // PORTRAIT는 삭제된 enum, INVALID_TEXT는 오타
-        spotService.getSpots(List.of("PORTRAIT", "INVALID_TEXT"), "latest", 0, 20);
+        spotService.getSpots(List.of("PORTRAIT", "INVALID_TEXT"), "latest", 0, 20, null);
 
         verify(spotRepository).findAllByStatusAndIsActiveTrue(eq(SpotStatus.APPROVED), any());
         verify(spotRepository, never()).findAllByCategoriesAndStatusAndIsActiveTrue(any(), any(), any());
@@ -106,7 +106,7 @@ class SpotServiceCategoryTest {
         given(spotRepository.findAllByStatusAndIsActiveTrue(eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot(Set.of()))));
 
-        var response = spotService.getSpots(List.of(), "latest", 0, 20);
+        var response = spotService.getSpots(List.of(), "latest", 0, 20, null);
 
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().get(0).categories()).containsExactly("ETC");

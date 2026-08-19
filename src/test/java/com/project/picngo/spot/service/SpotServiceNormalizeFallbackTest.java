@@ -75,7 +75,7 @@ class SpotServiceNormalizeFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        serviceWithFallback(true).searchSpots("갈산공원", null, 0, 20);
+        serviceWithFallback(true).searchSpots("갈산공원", null, 0, 20, null);
 
         verify(spotRepository, never()).searchSpotsNormalized(any(), any(), any());
         assertThat(stageCount("primary")).isEqualTo(1d);
@@ -89,7 +89,7 @@ class SpotServiceNormalizeFallbackTest {
         given(spotRepository.searchSpotsNormalized(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        var response = serviceWithFallback(true).searchSpots("갈 산공원", null, 0, 20);
+        var response = serviceWithFallback(true).searchSpots("갈 산공원", null, 0, 20, null);
 
         verify(spotRepository).searchSpotsNormalized(eq("\"갈산공원\""), eq("APPROVED"), any());
         assertThat(response.getTotalElements()).isEqualTo(1);
@@ -104,7 +104,7 @@ class SpotServiceNormalizeFallbackTest {
         given(spotRepository.searchSpotsNormalized(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        serviceWithFallback(true).searchSpots("강남마이스관광특구", null, 0, 20);
+        serviceWithFallback(true).searchSpots("강남마이스관광특구", null, 0, 20, null);
 
         verify(spotRepository).searchSpotsNormalized(eq("\"강남마이스관광특구\""), eq("APPROVED"), any());
     }
@@ -117,7 +117,7 @@ class SpotServiceNormalizeFallbackTest {
         given(spotRepository.searchSpotsNormalizedByCategories(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        serviceWithFallback(true).searchSpots("갈 산공원", List.of("PARK"), 0, 20);
+        serviceWithFallback(true).searchSpots("갈 산공원", List.of("PARK"), 0, 20, null);
 
         verify(spotRepository).searchSpotsNormalizedByCategories(
                 eq("\"갈산공원\""), eq(List.of("PARK")), eq("APPROVED"), any());
@@ -131,7 +131,7 @@ class SpotServiceNormalizeFallbackTest {
         given(spotRepository.searchSpotsNormalized(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        var response = serviceWithFallback(true).searchSpots("없는스팟", null, 0, 20);
+        var response = serviceWithFallback(true).searchSpots("없는스팟", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isZero();
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -144,7 +144,7 @@ class SpotServiceNormalizeFallbackTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        serviceWithFallback(false).searchSpots("갈 산공원", null, 0, 20);
+        serviceWithFallback(false).searchSpots("갈 산공원", null, 0, 20, null);
 
         verify(spotRepository, never()).searchSpotsNormalized(any(), any(), any());
         assertThat(stageCount("none")).isEqualTo(1d);

@@ -71,7 +71,7 @@ class SpotServiceFullTextTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        spotService.searchSpots("한라산", null, 0, 20);
+        spotService.searchSpots("한라산", null, 0, 20, null);
 
         verify(spotRepository).searchSpotsFullText(eq("\"한라산\""), eq("APPROVED"), any());
         verify(spotRepository, never()).searchSpots(any(), any(), any());
@@ -83,7 +83,7 @@ class SpotServiceFullTextTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        spotService.searchSpots("한라산", null, 0, 20);
+        spotService.searchSpots("한라산", null, 0, 20, null);
 
         verify(spotRepository).searchSpotsFullText(any(), any(), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getSort().isSorted()).isFalse();
@@ -95,7 +95,7 @@ class SpotServiceFullTextTest {
         given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        spotService.searchSpots("한라산", List.of("MOUNTAIN"), 0, 20);
+        spotService.searchSpots("한라산", List.of("MOUNTAIN"), 0, 20, null);
 
         verify(spotRepository).searchSpotsFullTextByCategories(
                 eq("\"한라산\""), eq(List.of("MOUNTAIN")), eq("APPROVED"), any());
@@ -104,7 +104,7 @@ class SpotServiceFullTextTest {
     @Test
     @DisplayName("전문검색식으로 바꿀 수 없는 검색어는 DB를 치지 않고 빈 결과를 준다")
     void returnsEmptyWithoutQueryingWhenPhraseIsUnbuildable() {
-        var response = spotService.searchSpots("+++", null, 0, 20);
+        var response = spotService.searchSpots("+++", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isZero();
         verify(spotRepository, never()).searchSpotsFullText(any(), any(), any());
@@ -116,7 +116,7 @@ class SpotServiceFullTextTest {
         given(spotRepository.searchSpotsFullText(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
-        spotService.searchSpots("한라산", null, 0, 20);
+        spotService.searchSpots("한라산", null, 0, 20, null);
 
         var timer = meterRegistry.find("spot.search.duration")
                 .tag("type", "keyword")
