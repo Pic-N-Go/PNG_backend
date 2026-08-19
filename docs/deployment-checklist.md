@@ -22,6 +22,18 @@ Flyway를 도입하면서 그 단계가 사라졌다.
 ---
 ## 1. 환경변수 확인 (`.env.prod`)
 
+> ⚠️ **`.env.prod`에 넣는 것만으로는 앱에 전달되지 않는다.**
+>
+> CI는 `--env-file .env.prod`로 배포하는데, 이 옵션은 `docker-compose.prod.yml` 안의
+> `${...}`를 치환할 뿐 컨테이너 환경변수로 넣어주지 않는다. 그래서 compose 파일의
+> `app.environment:`에 **이름이 적혀 있는 변수만** 앱에 닿는다.
+>
+> 실제로 `SEARCH_*`와 `OPENAI_API_KEY`가 빠져 있어, `.env.prod`에 값이 있는데도
+> 운영이 기본값(`LIKE`, 폴백 전부 `false`)으로 돌고 있었다. 에러가 나지 않고
+> 조용히 예전 검색으로 동작해서 드러나지 않았다.
+>
+> 새 설정을 추가할 때는 `.env.prod`와 `docker-compose.prod.yml` **양쪽**에 넣어야 한다.
+
 ```bash
 SEARCH_ENGINE=FULLTEXT
 SEARCH_NORMALIZE_FALLBACK=true
