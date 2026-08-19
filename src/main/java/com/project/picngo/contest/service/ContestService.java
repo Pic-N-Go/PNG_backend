@@ -135,7 +135,7 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
         ContestPhase phase = contest.getPhase(LocalDateTime.now());
-        boolean showRanking = canShowRanking(phase);
+        boolean showRanking = canShowCurrentRanking(phase);
 
         Page<ContestEntry> entries = contestEntryRepository.findAllByContest(
                 contest,
@@ -163,7 +163,7 @@ public class ContestService {
         ContestEntry entry = getEntryByContest(contest, entryId);
 
         ContestPhase phase = contest.getPhase(LocalDateTime.now());
-        boolean showRanking = canShowRanking(phase);
+        boolean showRanking = canShowCurrentRanking(phase);
         boolean voted = contestVoteRepository.existsByEntryAndUser(entry, user);
         boolean mine = isMine(entry, user);
         long remainingVoteCount = getRemainingVoteCount(contest, user);
@@ -176,7 +176,7 @@ public class ContestService {
                 showRanking ? calculateRank(contest, entry) : null,
                 voted,
                 mine,
-                phase == ContestPhase.VOTING && !mine,
+                phase == ContestPhase.VOTING,
                 mine && (phase == ContestPhase.SUBMITTING || phase == ContestPhase.VOTING),
                 contest.getVoteLimit(),
                 remainingVoteCount
@@ -287,7 +287,7 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
         ContestPhase phase = contest.getPhase(LocalDateTime.now());
-        boolean showRanking = canShowRanking(phase);
+        boolean showRanking = canShowCurrentRanking(phase);
 
         List<ContestEntryResponse> entries = contestEntryRepository.findAllByContestAndUser(contest, user).stream()
                 .map(entry -> toEntryResponse(contest, entry, user, showRanking))
@@ -342,7 +342,9 @@ public class ContestService {
         List<ContestMyHistoryResponse.HistoryItem> items = entries.stream()
                 .map(entry -> {
                     Contest contest = entry.getContest();
-                    Integer rank = canShowRanking(contest.getPhase(LocalDateTime.now()))
+                    ContestPhase phase = contest.getPhase(LocalDateTime.now());
+                    boolean showRanking = canShowCurrentRanking(phase);
+                    Integer rank = showRanking
                             ? calculateRank(contest, entry)
                             : null;
 
@@ -351,7 +353,7 @@ public class ContestService {
                             contest.getTitle(),
                             imageStorageService.getPresignedUrl(entry.getPhotoUrl()),
                             rank,
-                            canShowRanking(contest.getPhase(LocalDateTime.now())) ? entry.getVoteCount() : null,
+                            showRanking ? entry.getVoteCount() : null,
                             rank == null ? "PENDING" : "RANKED"
                     );
                 })
@@ -365,7 +367,7 @@ public class ContestService {
 
         LocalDateTime now = LocalDateTime.now();
         long totalVoteCount = entries.stream()
-                .filter(entry -> canShowRanking(entry.getContest().getPhase(now)))
+                .filter(entry -> canShowCurrentRanking(entry.getContest().getPhase(now)))
                 .mapToLong(ContestEntry::getVoteCount)
                 .sum();
 
@@ -556,6 +558,10 @@ public class ContestService {
 
     private boolean canShowRanking(ContestPhase phase) {
         return phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
+    }
+
+    private boolean canShowCurrentRanking(ContestPhase phase) {
+        return phase == ContestPhase.VOTING || phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
     }
 
     private boolean canShowRankingHistory(ContestPhase phase) {
