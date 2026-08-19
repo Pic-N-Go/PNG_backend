@@ -2,6 +2,7 @@ package com.project.picngo.course.service;
 
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.course.domain.Course;
+import com.project.picngo.course.dto.CourseCreateRequest;
 import com.project.picngo.course.dto.CourseSpotSyncItem;
 import com.project.picngo.course.dto.CourseSpotSyncRequest;
 import com.project.picngo.course.repository.CourseRepository;
@@ -117,6 +118,82 @@ class CourseSpotConcurrencyTest {
         return courseSpotRepository.findAll().stream()
                 .filter(cs -> cs.getCourse().getId().equals(courseId))
                 .count();
+    }
+
+    /** 두 작업을 동시에 실행하고, 그중 몇 건이 실패했는지 센다. */
+    private int runConcurrently(Runnable first, Runnable second) throws Exception {
+        CountDownLatch startLine = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(2);
+        AtomicInteger failures = new AtomicInteger();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        try {
+            for (Runnable task : List.of(first, second)) {
+                pool.submit(() -> {
+                    try {
+                        startLine.await();
+                        task.run();
+                    } catch (Exception e) {
+                        failures.incrementAndGet();
+                    } finally {
+                        finished.countDown();
+                    }
+                });
+            }
+            startLine.countDown();
+            assertThat(finished.await(10, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            pool.shutdownNow();
+        }
+        return failures.get();
+    }
+
+    @Test
+    @DisplayName("코스 제목을 동시에 두 번 수정하면 한쪽만 성공한다")
+    void concurrentTitleUpdateIsRejected() throws Exception {
+        // 코스 제목·기간은 Course 자신의 필드라, 강제 증가 없이도 JPA가 버전을 올린다.
+        // 스팟 동기화와 달리 별도 조치가 필요 없는지 실제로 확인한다.
+        int failures = runConcurrently(
+                () -> courseService.updateCourse(USER_ID, courseId, new CourseCreateRequest(
+                        "태블릿에서 바꾼 제목", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3))),
+                () -> courseService.updateCourse(USER_ID, courseId, new CourseCreateRequest(
+                        "휴대폰에서 바꾼 제목", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3)))
+        );
+
+        System.out.printf("[제목 동시 수정] 실패한 요청=%d%n", failures);
+        assertThat(failures)
+                .as("나중에 커밋한 쪽은 버전이 어긋나 거부되어야 한다")
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("제목 수정과 스팟 순서 변경을 동시에 하면 한쪽이 거부된다 - 의도한 보수적 동작")
+    void titleUpdateAndSpotReorderConflictWithEachOther() throws Exception {
+        // 두 작업은 논리적으로 겹치지 않는다(제목 vs 스팟 순서). 그런데 둘 다 같은 Course의
+        // 버전을 올리므로 서로 충돌한다. 사용자에게는 "관계없는 작업인데 왜 실패하지?"로 보인다.
+        //
+        // 그럼에도 이 동작을 유지하는 이유: 코스 저장은 사람이 화면에서 한 번씩 누르는 작업이라
+        // 충돌 빈도가 매우 낮고, 잘못 통과시켰을 때의 대가(데이터 유실)가 훨씬 크다.
+        // 필드별로 락을 쪼개면 구현이 복잡해지는 만큼의 이득이 없다.
+        List<CourseSpotSyncItem> reordered = new ArrayList<>();
+        List<CourseSpotSyncItem> snapshot = currentSnapshot();
+        for (int i = 0; i < snapshot.size(); i++) {
+            CourseSpotSyncItem s = snapshot.get(i);
+            reordered.add(new CourseSpotSyncItem(
+                    s.courseSpotId(), s.spotId(), 1, snapshot.size() - i, s.memo()));
+        }
+
+        int failures = runConcurrently(
+                () -> courseService.updateCourse(USER_ID, courseId, new CourseCreateRequest(
+                        "제목만 바꿈", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 3))),
+                () -> courseService.syncCourseSpots(USER_ID, courseId,
+                        new CourseSpotSyncRequest(reordered))
+        );
+
+        System.out.printf("[제목+순서 동시] 실패한 요청=%d (0이면 서로 간섭 안 함)%n", failures);
+
+        // 스팟은 그대로 3건이어야 한다. 어느 쪽이 이기든 데이터가 깨지면 안 된다.
+        assertThat(courseSpotCount()).isEqualTo(3);
     }
 
     @Test

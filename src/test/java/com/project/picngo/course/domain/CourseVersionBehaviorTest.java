@@ -1,6 +1,7 @@
 package com.project.picngo.course.domain;
 
 import com.project.picngo.common.domain.SpotCategory;
+import com.project.picngo.course.dto.CourseCreateRequest;
 import com.project.picngo.course.dto.CourseSpotSyncItem;
 import com.project.picngo.course.dto.CourseSpotSyncRequest;
 import com.project.picngo.course.repository.CourseRepository;
@@ -109,6 +110,25 @@ class CourseVersionBehaviorTest {
                 .map(cs -> new CourseSpotSyncItem(
                         cs.getId(), cs.getSpotId(), cs.getDayNumber(), cs.getSequenceOrder(), cs.getMemo()))
                 .toList();
+    }
+
+    @Test
+    @DisplayName("제목·기간만 바꿔도 코스 버전이 오른다 - 강제 증가 없이도")
+    void versionIncrementsWhenCourseOwnFieldsChange() {
+        long before = currentVersion();
+
+        // 스팟 동기화와 달리 이쪽은 Course 자신의 필드를 바꾼다.
+        // 엔티티가 실제로 더러워지므로 JPA가 알아서 버전을 올려야 한다.
+        courseService.updateCourse(USER_ID, courseId, new CourseCreateRequest(
+                "제목 변경", LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 3)));
+
+        long after = currentVersion();
+        System.out.printf("[버전 거동] 제목·기간 수정: before=%d, after=%d → %s%n",
+                before, after, after > before ? "올랐음" : "안 올랐음");
+
+        assertThat(after)
+                .as("자기 필드가 바뀌면 강제 증가 없이도 버전이 올라야 한다")
+                .isGreaterThan(before);
     }
 
     @Test
