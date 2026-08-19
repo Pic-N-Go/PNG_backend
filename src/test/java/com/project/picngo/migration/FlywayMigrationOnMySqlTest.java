@@ -125,6 +125,12 @@ class FlywayMigrationOnMySqlTest {
                         + "latitude DOUBLE NOT NULL,"
                         + "longitude DOUBLE NOT NULL"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                // 낙관적 락 도입 전의 course. version 컬럼이 아직 없는 상태다.
+                s.execute("CREATE TABLE course ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "title VARCHAR(100) NOT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                s.execute("INSERT INTO course (title) VALUES ('기존 코스')");
                 // 스팟 체크리스트가 코스로 통합되며 코드에서 사라졌지만 테이블은 남은 상태
                 s.execute("CREATE TABLE checklist_item ("
                         + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
@@ -155,6 +161,53 @@ class FlywayMigrationOnMySqlTest {
                     + "AND TABLE_NAME IN ('checklist_item','hidden_checklist_default')"))
                     .as("코드에서 사라진 고아 테이블은 V2가 지워야 한다")
                     .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'course' "
+                    + "AND COLUMN_NAME = 'version' AND IS_NULLABLE = 'NO'"))
+                    .as("V1을 건너뛴 DB에도 version 컬럼이 NOT NULL로 생겨야 한다")
+                    .isEqualTo(1);
+        } finally {
+            exec("DROP DATABASE IF EXISTS " + SCHEMA);
+        }
+    }
+
+    @Test
+    @DisplayName("ddl-auto가 먼저 만든 NULL 허용 version 컬럼을 V2가 바로잡는다")
+    void fixesNullableVersionColumnLeftByDdlAuto() throws Exception {
+        exec("DROP DATABASE IF EXISTS " + SCHEMA);
+        exec("CREATE DATABASE " + SCHEMA);
+
+        try {
+            // 앱을 먼저 켠 로컬의 모습이다. Hibernate는 컬럼을 NULL 허용으로 만들기 때문에
+            // 그 전에 저장돼 있던 코스가 version = NULL로 남는다. 그 코스를 수정하는 순간
+            // "NULL + 1"을 시도하다 500이 났다(Versioning.increment NPE). 실제로 겪은 일이다.
+            try (Connection c = DriverManager.getConnection(baseUrl() + "/" + SCHEMA, user(), password());
+                 Statement s = c.createStatement()) {
+                s.execute("CREATE TABLE spot (id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "name VARCHAR(100) NOT NULL, address VARCHAR(255) NOT NULL,"
+                        + "overview TEXT, status VARCHAR(20) NOT NULL, is_active BIT(1) NOT NULL,"
+                        + "latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                s.execute("CREATE TABLE course (id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "title VARCHAR(100) NOT NULL, `version` BIGINT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                s.execute("INSERT INTO course (title, `version`) VALUES ('락 도입 전 코스', NULL)");
+            }
+
+            migrate();
+
+            assertThat(count("SELECT COUNT(*) FROM course WHERE `version` IS NULL"))
+                    .as("NULL이 남아 있으면 그 코스를 수정할 때 NPE가 난다")
+                    .isZero();
+            assertThat(count("SELECT `version` FROM course WHERE title = '락 도입 전 코스'"))
+                    .as("기존 코스는 0에서 시작해야 한다")
+                    .isZero();
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'course' "
+                    + "AND COLUMN_NAME = 'version' AND IS_NULLABLE = 'NO'"))
+                    .as("다시 NULL이 들어오지 못하도록 NOT NULL로 바뀌어야 한다")
+                    .isEqualTo(1);
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }

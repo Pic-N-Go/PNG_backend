@@ -55,14 +55,18 @@ Migration checksum mismatch for migration version 2
 | 파일 | 내용 |
 |---|---|
 | `V1__baseline_schema.sql` | 기준 스키마 (테이블 37개) |
-| `V2__converge_schema.sql` | 검색 인덱스·생성 컬럼 추가, 고아 테이블 제거 |
+| `V2__converge_schema.sql` | 검색 인덱스·생성 컬럼 추가, 낙관적 락 `course.version` 정리, 고아 테이블 제거 |
 
 **V1은 빈 DB에서만 실행된다.** 이미 테이블이 있는 DB에서는
 `baseline-on-migrate` 설정이 "V1까지는 이미 적용됨"으로 기록하고 V2부터 시작한다.
 
 그래서 V2가 따로 필요했다. Flyway 도입 이전에 `docs/*.sql`을 실행하지 않은
-환경(실제로 팀원 한 명의 로컬이 그랬다)에 인덱스를 채워 넣고, 코드에서 사라진
-고아 테이블을 지워 모든 환경을 같은 상태로 맞춘다.
+환경(실제로 팀원 한 명의 로컬이 그랬다)에 인덱스를 채워 넣고, 낙관적 락용
+`course.version`을 맞추고, 코드에서 사라진 고아 테이블을 지운다.
+
+`course.version`이 V2에 있는 이유: V1에는 들어 있지만 V1은 빈 DB에서만 돌기 때문에
+기존 DB는 컬럼 없이 남는다. 운영은 `validate`라 그대로 두면 기동이 막히고, 로컬은
+`ddl-auto`가 NULL 허용으로 만들어 기존 코스를 수정할 때 NPE가 났다. V2가 둘 다 잡는다.
 
 ---
 

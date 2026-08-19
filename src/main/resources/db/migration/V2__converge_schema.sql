@@ -157,3 +157,51 @@ DROP PROCEDURE pngo_add_map_bounds_index;
 -- IF EXISTS라 없는 환경(빈 DB에서 V1으로 시작한 경우)에서도 그냥 넘어간다.
 DROP TABLE IF EXISTS checklist_item;
 DROP TABLE IF EXISTS hidden_checklist_default;
+
+
+-- ─────────────────────────────────────────────────────────────
+-- 5) 코스 낙관적 락용 version 컬럼
+--
+-- V1(기준 스키마)에는 이 컬럼이 들어 있지만 V1은 빈 DB에서만 실행된다.
+-- 이미 쓰던 DB는 baseline으로 V1을 건너뛰므로 컬럼이 없는 채로 남고,
+-- 운영은 ddl-auto=validate라 기동 자체가 막힌다:
+--   Schema-validation: missing column [version] in table [course]
+--
+-- 두 경우를 나눠 처리한다.
+--
+--   컬럼이 없음  → 운영처럼 앱을 아직 안 띄운 상태. 그냥 추가하면 된다.
+--   컬럼이 있음  → 로컬에서 ddl-auto=update가 먼저 만든 상태. Hibernate는
+--                  NULL 허용으로 만들기 때문에 기존 코스들이 version = NULL이 되고,
+--                  그 코스를 수정하는 순간 "NULL + 1"을 시도하다 터진다:
+--                    NullPointerException at Versioning.increment
+--                  실제로 로컬에서 이 500이 났다. 그래서 "없으면 추가"만으로는
+--                  부족하고, NULL을 채운 뒤 NOT NULL로 맞춰야 한다.
+--                  순서가 중요하다 — NULL이 남아 있으면 NOT NULL 변경이 실패한다.
+--
+-- 원본: docs/archive/course-version-column-migration.sql
+-- 이 컬럼은 JPA가 관리한다. 사람이 UPDATE하면 진행 중이던 요청이 엉뚱하게 충돌 처리된다.
+DROP PROCEDURE IF EXISTS pngo_converge_course_version;
+DELIMITER $$
+CREATE PROCEDURE pngo_converge_course_version()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'course'
+          AND COLUMN_NAME = 'version'
+    ) THEN
+        ALTER TABLE course
+            ADD COLUMN `version` BIGINT NOT NULL DEFAULT 0
+                COMMENT '낙관적 락 버전. JPA가 자동 증가시킨다(수동 변경 금지)';
+    ELSE
+        UPDATE course SET `version` = 0 WHERE `version` IS NULL;
+
+        ALTER TABLE course
+            MODIFY COLUMN `version` BIGINT NOT NULL DEFAULT 0
+                COMMENT '낙관적 락 버전. JPA가 자동 증가시킨다(수동 변경 금지)';
+    END IF;
+END$$
+DELIMITER ;
+
+CALL pngo_converge_course_version();
+DROP PROCEDURE pngo_converge_course_version;

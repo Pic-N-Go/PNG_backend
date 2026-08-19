@@ -72,26 +72,26 @@ class SpotServiceNormalizeFallbackTest {
     @Test
     @DisplayName("1차 검색에 결과가 있으면 폴백 쿼리를 치지 않는다")
     void skipsFallbackWhenPrimaryHasResults() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         serviceWithFallback(true).searchSpots("갈산공원", null, 0, 20, null);
 
-        verify(spotRepository, never()).searchSpotsNormalized(any(), any(), any());
+        verify(spotRepository, never()).searchSpotsNormalized(any(), any(), any(), any());
         assertThat(stageCount("primary")).isEqualTo(1d);
     }
 
     @Test
     @DisplayName("1차가 0건이면 공백을 지운 검색어로 폴백 쿼리를 친다")
     void fallsBackWithSpacelessKeyword() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
-        given(spotRepository.searchSpotsNormalized(any(), any(), any()))
+        given(spotRepository.searchSpotsNormalized(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         var response = serviceWithFallback(true).searchSpots("갈 산공원", null, 0, 20, null);
 
-        verify(spotRepository).searchSpotsNormalized(eq("\"갈산공원\""), eq("APPROVED"), any());
+        verify(spotRepository).searchSpotsNormalized(eq("\"갈산공원\""), eq("갈산공원"), eq("APPROVED"), any());
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(stageCount("normalized")).isEqualTo(1d);
     }
@@ -99,36 +99,36 @@ class SpotServiceNormalizeFallbackTest {
     @Test
     @DisplayName("이미 붙여 쓴 검색어도 그대로 폴백에 넘어간다")
     void handlesAlreadySpacelessKeyword() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
-        given(spotRepository.searchSpotsNormalized(any(), any(), any()))
+        given(spotRepository.searchSpotsNormalized(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         serviceWithFallback(true).searchSpots("강남마이스관광특구", null, 0, 20, null);
 
-        verify(spotRepository).searchSpotsNormalized(eq("\"강남마이스관광특구\""), eq("APPROVED"), any());
+        verify(spotRepository).searchSpotsNormalized(eq("\"강남마이스관광특구\""), eq("강남마이스관광특구"), eq("APPROVED"), any());
     }
 
     @Test
     @DisplayName("카테고리 필터가 있으면 폴백도 카테고리 버전을 쓴다")
     void fallsBackWithCategories() {
-        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any()))
+        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
-        given(spotRepository.searchSpotsNormalizedByCategories(any(), any(), any(), any()))
+        given(spotRepository.searchSpotsNormalizedByCategories(any(), any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         serviceWithFallback(true).searchSpots("갈 산공원", List.of("PARK"), 0, 20, null);
 
         verify(spotRepository).searchSpotsNormalizedByCategories(
-                eq("\"갈산공원\""), eq(List.of("PARK")), eq("APPROVED"), any());
+                eq("\"갈산공원\""), eq("갈산공원"), eq(List.of("PARK")), eq("APPROVED"), any());
     }
 
     @Test
     @DisplayName("두 단계 모두 0건이면 stage=none으로 기록한다")
     void recordsNoneWhenAllStagesEmpty() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
-        given(spotRepository.searchSpotsNormalized(any(), any(), any()))
+        given(spotRepository.searchSpotsNormalized(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
         var response = serviceWithFallback(true).searchSpots("없는스팟", null, 0, 20, null);
@@ -141,12 +141,12 @@ class SpotServiceNormalizeFallbackTest {
     @Test
     @DisplayName("폴백이 꺼져 있으면 1차가 0건이어도 폴백 쿼리를 치지 않는다")
     void neverQueriesNormalizedWhenDisabled() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
         serviceWithFallback(false).searchSpots("갈 산공원", null, 0, 20, null);
 
-        verify(spotRepository, never()).searchSpotsNormalized(any(), any(), any());
+        verify(spotRepository, never()).searchSpotsNormalized(any(), any(), any(), any());
         assertThat(stageCount("none")).isEqualTo(1d);
     }
 }

@@ -11,6 +11,7 @@
 | `spot-embedding-column-migration.sql` | `db/migration/V1__baseline_schema.sql` |
 | `comment-reply-and-like-migration.sql` | 〃 |
 | `spot-checklist-drop-migration.sql` | `db/migration/V2__converge_schema.sql` (고아 테이블 제거) |
+| `course-version-column-migration.sql` | 〃 (낙관적 락 version 컬럼) |
 
 ## 지우지 않고 남긴 이유
 

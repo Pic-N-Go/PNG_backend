@@ -18,6 +18,8 @@ import com.project.picngo.course.dto.TravelTimeResult;
 import com.project.picngo.spot.dto.NavigationInfo;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class CourseService {
     private final CourseChecklistRepository courseChecklistRepository;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
+    private final EntityManager entityManager;
 
 
     // ==================== 코스 CRUD ====================
@@ -121,6 +124,19 @@ public class CourseService {
 
         List<CourseSpotSyncItem> requestSpots = request.spots() != null ? request.spots() : List.of();
         validateDaySpotLimits(requestSpots);
+
+        // 코스 자체(제목·날짜)는 건드리지 않고 자식(CourseSpot)만 바꾸는 작업이라,
+        // 그냥 두면 Course의 @Version이 오르지 않는다. courseSpots는 mappedBy 쪽(비소유)
+        // 컬렉션이고 FK는 자식이 들고 있어서, 추가·삭제·순서변경 어느 경우에도
+        // Hibernate가 Course를 "변했다"고 보지 않기 때문이다.
+        // 실측으로 확인했다: 세 경우 모두 version 0 → 0 (CourseVersionBehaviorTest).
+        //
+        // 버전이 안 오르면 낙관적 락은 붙어만 있고 아무것도 막지 못한다. 그래서
+        // 커밋 시점에 버전을 강제로 올리도록 명시한다.
+        //
+        // 검증 뒤에 두는 이유: 요청이 거부될 것이면 버전을 건드릴 이유가 없다.
+        // (트랜잭션이 롤백되므로 결과는 같지만, 실패할 요청에 부수효과를 주지 않는 편이 읽기 쉽다.)
+        entityManager.lock(course, LockModeType.OPTIMISTIC_FORCE_INCREMENT);
 
         // 1. 기존 전체 스팟 조회
         List<CourseSpot> existingSpots = course.getCourseSpots();

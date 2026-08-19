@@ -9,11 +9,17 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import java.sql.SQLException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
 import com.project.picngo.common.exception.code.CommonErrorCode;
+import com.project.picngo.common.exception.code.CourseErrorCode;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -114,6 +120,52 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    /** MySQL duplicate entry. 이 값만 사용자가 고쳐서 해결할 수 있는 오류다. */
+    private static final int MYSQL_DUPLICATE_ENTRY = 1062;
+
+    /**
+     * 유니크 제약 위반. 닉네임처럼 "검사 후 저장" 구조인 값은 검사와 INSERT 사이에 다른 요청이
+     * 같은 값을 넣으면 여기로 온다(동시 가입 경합). 전역 Exception 핸들러에 걸리면 500이 되는데,
+     * 사용자 입장에서는 다른 값을 고르면 되는 400이다.
+     *
+     * 중복 키만 400으로 내린다. FK·NOT NULL 위반은 사용자가 고칠 수 없는 서버 버그인데,
+     * 같이 400으로 삼키면 스택트레이스까지 사라져 조사할 단서가 없어진다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        Throwable cause = e.getMostSpecificCause();
+        boolean duplicateEntry = cause instanceof SQLException sqlException
+                && sqlException.getErrorCode() == MYSQL_DUPLICATE_ENTRY;
+        if (!duplicateEntry) {
+            return handleException(e);
+        }
+
+        // 메시지는 찍지 않는다 — MySQL 1062 메시지에는 충돌한 값이 그대로 들어 있어
+        // (Duplicate entry 'a@b.com' for key ...) 이메일 같은 개인정보가 로그에 남는다.
+        log.warn("DataIntegrityViolationException(duplicate): errorCode={}", MYSQL_DUPLICATE_ENTRY);
+        return ResponseEntity
+                .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, "이미 사용 중인 값입니다. 다시 시도해 주세요."));
+    }
+
+    /**
+     * 낙관적 락 충돌(같은 코스를 거의 동시에 두 번 저장).
+     *
+     * <p>이 예외는 커밋 시점에 터지므로 서비스 메서드 안에서는 잡을 수 없다.
+     * 여기서 받지 않으면 아래 Exception 핸들러로 떨어져 500이 나가는데,
+     * 서버가 고장난 게 아니라 요청이 낡은 것이므로 409가 맞다.
+     *
+     * <p>스택트레이스는 남기지 않는다. 원인과 대응이 명확한 예외이고, 저장 버튼을
+     * 연타하면 짧은 시간에 반복해서 발생할 수 있어 로그만 비대해진다.
+     */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(ObjectOptimisticLockingFailureException e) {
+        log.warn("낙관적 락 충돌 - 동시 저장으로 요청을 거부했다: {}", e.getMessage());
+        return ResponseEntity
+                .status(CourseErrorCode.COURSE_MODIFIED_CONCURRENTLY.getStatus())
+                .body(ErrorResponse.of(CourseErrorCode.COURSE_MODIFIED_CONCURRENTLY));
     }
 
     @ExceptionHandler(Exception.class)

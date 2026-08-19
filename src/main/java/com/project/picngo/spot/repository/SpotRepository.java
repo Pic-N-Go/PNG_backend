@@ -80,7 +80,17 @@ and s.status = :status and s.isActive = true
             Pageable pageable
     );
 
-    // 키워드로 스팟 이름, 주소, 설명 검색 (카테고리 필터 없음)
+    // 키워드로 스팟 이름, 주소 검색 (카테고리 필터 없음)
+    //
+    // overview(설명)는 검색 대상에서 뺐다. 긴 산문이라 두 글자만 겹쳐도 걸려서,
+    // '테'로 검색하면 405건 중 396건이 설명만 맞은 결과였다('아로마테라피'의 '테').
+    // 정렬이 최신순이라 정작 이름이 맞는 47건(테미공원 등)이 첫 페이지 밖으로 밀려났다.
+    //
+    // 주소는 남긴다 — '해남'처럼 지역으로 찾는 검색이 흔하고, 이름에 지역명이 없는
+    // 스팟은 주소가 유일한 경로다. 대신 이름이 맞은 것을 항상 앞에 둔다.
+    //
+    // ORDER BY를 쿼리에 직접 박으므로 호출부는 정렬 없는 Pageable을 넘겨야 한다.
+    // Sort가 함께 오면 Spring이 절을 덧붙여 의도한 우선순위가 뒤로 밀린다.
     @Query("""
 select s
 from Spot s
@@ -89,8 +99,9 @@ and s.isActive = true
 and (
 lower(s.name) like lower(concat('%', :keyword, '%'))
 or lower(s.address) like lower(concat('%', :keyword, '%'))
-or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
 )
+order by case when lower(s.name) like lower(concat('%', :keyword, '%')) then 0 else 1 end,
+s.createdAt desc
 """)
     Page<Spot> searchSpots(
             @Param("keyword") String keyword,
@@ -109,8 +120,9 @@ and exists (select c from s.categories c where c in :categories)
 and (
 lower(s.name) like lower(concat('%', :keyword, '%'))
 or lower(s.address) like lower(concat('%', :keyword, '%'))
-or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
 )
+order by case when lower(s.name) like lower(concat('%', :keyword, '%')) then 0 else 1 end,
+s.createdAt desc
 """)
     Page<Spot> searchSpotsByCategories(
             @Param("keyword") String keyword,
@@ -136,18 +148,19 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
             select s.* from spot s
             where s.status = :status
             and s.is_active = true
-            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
-            order by s.created_at desc
+            and match(s.name, s.address) against (:keyword in boolean mode)
+            order by (lower(s.name) like lower(concat('%', :rawKeyword, '%'))) desc, s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
             where s.status = :status
             and s.is_active = true
-            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
+            and match(s.name, s.address) against (:keyword in boolean mode)
             """,
             nativeQuery = true)
     Page<Spot> searchSpotsFullText(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("status") String status,
             Pageable pageable
     );
@@ -160,8 +173,8 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
                 select 1 from spot_categories sc
                 where sc.spot_id = s.id and sc.category in (:categories)
             )
-            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
-            order by s.created_at desc
+            and match(s.name, s.address) against (:keyword in boolean mode)
+            order by (lower(s.name) like lower(concat('%', :rawKeyword, '%'))) desc, s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -171,11 +184,12 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
                 select 1 from spot_categories sc
                 where sc.spot_id = s.id and sc.category in (:categories)
             )
-            and match(s.name, s.address, s.overview) against (:keyword in boolean mode)
+            and match(s.name, s.address) against (:keyword in boolean mode)
             """,
             nativeQuery = true)
     Page<Spot> searchSpotsFullTextByCategories(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("categories") Collection<String> categories,
             @Param("status") String status,
             Pageable pageable
@@ -186,12 +200,25 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
     //
     //    엔티티에 매핑하지 않은 컬럼이라 JPQL로는 접근할 수 없어 네이티브 쿼리로 쓴다.
     //    나머지 제약(String status, 정렬 없는 Pageable)은 위 FULLTEXT 쿼리와 같은 이유다.
+    //
+    //    정렬용 rawKeyword는 검색식(:keyword)과 다른 값이다. :keyword는 BOOLEAN MODE 구문식이라
+    //    따옴표가 붙어 있어(FullTextKeyword.toSpacelessPhrase) LIKE 비교에 쓰면 아무것도 맞지 않는다.
+    //    비교 대상도 s.name이 아니라 s.search_norm이다 — 이 경로에 온 이유가 띄어쓰기 불일치라,
+    //    공백이 남아 있는 s.name과는 짝이 맞지 않는다.
+    //
+    //    이름 먼저 정렬은 search_norm 전체가 아니라 앞 조각으로 따로 본다. search_norm은
+    //    CONCAT_WS(' ', 정규화한 name, 정규화한 address)라 이름만 맞은 결과와 주소만 맞은 결과가
+    //    같은 값을 받아버리고, 그러면 주소만 맞은 최신 스팟이 이름이 맞는 옛 스팟보다 앞에 온다.
+    //    정규화한 name에는 공백이 없으므로 첫 조각(substring_index(..., ' ', 1))이 곧 이름이다.
+    //    REGEXP_REPLACE를 다시 쓰지 않는 이유 = 정규화 규칙을 세 곳에 복제하지 않기 위해서다.
     @Query(value = """
             select s.* from spot s
             where s.status = :status
             and s.is_active = true
             and match(s.search_norm) against (:keyword in boolean mode)
-            order by s.created_at desc
+            order by (substring_index(s.search_norm, ' ', 1) like concat('%', :rawKeyword, '%')) desc,
+                     (s.search_norm like concat('%', :rawKeyword, '%')) desc,
+                     s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -202,6 +229,7 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
             nativeQuery = true)
     Page<Spot> searchSpotsNormalized(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("status") String status,
             Pageable pageable
     );
@@ -215,7 +243,9 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
                 where sc.spot_id = s.id and sc.category in (:categories)
             )
             and match(s.search_norm) against (:keyword in boolean mode)
-            order by s.created_at desc
+            order by (substring_index(s.search_norm, ' ', 1) like concat('%', :rawKeyword, '%')) desc,
+                     (s.search_norm like concat('%', :rawKeyword, '%')) desc,
+                     s.created_at desc
             """,
             countQuery = """
             select count(*) from spot s
@@ -230,6 +260,7 @@ or lower(coalesce(s.overview, '')) like lower(concat('%', :keyword, '%'))
             nativeQuery = true)
     Page<Spot> searchSpotsNormalizedByCategories(
             @Param("keyword") String keyword,
+            @Param("rawKeyword") String rawKeyword,
             @Param("categories") Collection<String> categories,
             @Param("status") String status,
             Pageable pageable

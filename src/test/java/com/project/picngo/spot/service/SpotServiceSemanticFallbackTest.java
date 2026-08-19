@@ -83,7 +83,7 @@ class SpotServiceSemanticFallbackTest {
     @Test
     @DisplayName("앞 세 단계가 모두 0건이면 임베딩 코사인 유사도로 검색한다")
     void fallsBackToSemanticSearch() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(embeddingClient.embed("해질녘 걷기 좋은 곳"))
                 .willReturn(Optional.of(new float[]{1f, 0f}));
@@ -102,7 +102,7 @@ class SpotServiceSemanticFallbackTest {
     @Test
     @DisplayName("후보를 코사인 유사도 내림차순으로 정렬해서 돌려준다")
     void ranksCandidatesByCosineSimilarityDescending() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(embeddingClient.embed(any())).willReturn(Optional.of(new float[]{1f, 0f}));
         given(spotRepository.findEmbeddingCandidates(SpotStatus.APPROVED)).willReturn(List.of(
@@ -123,7 +123,7 @@ class SpotServiceSemanticFallbackTest {
     @Test
     @DisplayName("1차에서 결과가 나오면 임베딩 검색을 하지 않는다")
     void skipsWhenPrimaryHasResults() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot(1L, "갈산공원"))));
 
         service(true).searchSpots("갈산공원", null, 0, 20, null);
@@ -134,7 +134,7 @@ class SpotServiceSemanticFallbackTest {
     @Test
     @DisplayName("의미 검색 폴백이 꺼져 있으면 임베딩 API를 부르지 않는다")
     void neverCallsEmbeddingWhenDisabled() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
         service(false).searchSpots("없는스팟", null, 0, 20, null);
@@ -146,7 +146,7 @@ class SpotServiceSemanticFallbackTest {
     @Test
     @DisplayName("임베딩 클라이언트가 빈 값을 돌려주면 stage=none으로 기록한다")
     void recordsNoneWhenEmbeddingClientReturnsEmpty() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(embeddingClient.embed(any())).willReturn(Optional.empty());
 
@@ -160,7 +160,7 @@ class SpotServiceSemanticFallbackTest {
     @Test
     @DisplayName("후보 임베딩이 없으면 stage=none으로 기록한다")
     void recordsNoneWhenNoCandidates() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(embeddingClient.embed(any())).willReturn(Optional.of(new float[]{1f, 0f}));
         given(spotRepository.findEmbeddingCandidates(SpotStatus.APPROVED)).willReturn(List.of());

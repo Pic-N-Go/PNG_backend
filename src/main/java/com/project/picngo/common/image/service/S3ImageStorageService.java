@@ -127,11 +127,52 @@ public class S3ImageStorageService implements ImageStorageService {
         return file.getContentType() == null ? "application/octet-stream" : file.getContentType();
     }
 
-    private void validateImageFile(MultipartFile file) {
+    /**
+     * Content-Type은 클라이언트가 보내는 값이라 그것만 믿을 수 없다. 앞부분 바이트도 함께 본다.
+     *
+     * 허용 목록 방식이다. {@code URLConnection.guessContentTypeFromStream}을 쓰지 않는 이유는
+     * RIFF로 시작하면 전부 audio/x-wav로 판정해서, RIFF 컨테이너인 webp가 통째로 막히기 때문이다.
+     */
+    // 인스턴스 상태를 쓰지 않으므로 static — S3 목 없이 검증만 테스트한다(ReviewService.countUploadable과 같은 방식).
+    static void validateImageFile(MultipartFile file) {
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new CustomException(ImageErrorCode.INVALID_IMAGE_FILE);
         }
+
+        byte[] header;
+        try (InputStream inputStream = file.getInputStream()) {
+            header = inputStream.readNBytes(IMAGE_HEADER_LENGTH);
+        } catch (IOException e) {
+            throw new CustomException(ImageErrorCode.INVALID_IMAGE_FILE);
+        }
+        if (!looksLikeImage(header)) {
+            throw new CustomException(ImageErrorCode.INVALID_IMAGE_FILE);
+        }
+    }
+
+    /** 시그니처를 읽는 데 필요한 최소 길이. heic/avif는 4~11번째 바이트까지 봐야 한다. */
+    private static final int IMAGE_HEADER_LENGTH = 12;
+
+    private static boolean looksLikeImage(byte[] header) {
+        if (header.length < IMAGE_HEADER_LENGTH) {
+            return false;
+        }
+        return matches(header, 0, (byte) 0xFF, (byte) 0xD8, (byte) 0xFF)              // jpeg
+                || matches(header, 0, (byte) 0x89, 'P', 'N', 'G')                     // png
+                || matches(header, 0, 'G', 'I', 'F', '8')                             // gif
+                || (matches(header, 0, 'R', 'I', 'F', 'F')
+                        && matches(header, 8, 'W', 'E', 'B', 'P'))                    // webp
+                || matches(header, 4, 'f', 't', 'y', 'p');                            // heic/heif/avif
+    }
+
+    private static boolean matches(byte[] header, int offset, int... signature) {
+        for (int i = 0; i < signature.length; i++) {
+            if (header[offset + i] != (byte) signature[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void deleteQuietly(String objectKey) {

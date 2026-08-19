@@ -6,9 +6,13 @@ import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.user.dto.*;
 import com.project.picngo.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -50,11 +54,47 @@ public class UserController implements UserControllerApiSpec {
 	@PutMapping("/me")
 	public ResponseEntity<UserResponse> updateMe(
 			@AuthenticationPrincipal CustomUserDetails userDetails,
-			@RequestBody UserProfileUpdateRequest request
+			@Valid @RequestBody UserProfileUpdateRequest request
 			){
 		return ResponseEntity.ok(
 				userService.updateMyProfile(userDetails.getId(), request)
 		);
+	}
+
+	// 프로필 사진 교체 API (multipart) — 게시글·리뷰 업로드와 같은 저장소를 쓴다.
+	@PatchMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<UserResponse> updateProfileImage(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@RequestPart("image") MultipartFile image
+	) {
+		return ResponseEntity.ok(userService.updateProfileImage(userDetails.getId(), image));
+	}
+
+	// 프로필 사진 삭제 API (기본 이미지로 되돌리기)
+	@DeleteMapping("/me/profile-image")
+	public ResponseEntity<UserResponse> deleteProfileImage(
+			@AuthenticationPrincipal CustomUserDetails userDetails
+	) {
+		return ResponseEntity.ok(userService.deleteProfileImage(userDetails.getId()));
+	}
+
+	// 비밀번호 변경 API (설정 > 비밀번호 변경)
+	@PatchMapping("/me/password")
+	public ResponseEntity<Void> changePassword(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@Valid @RequestBody PasswordChangeRequest request
+	) {
+		userService.changePassword(userDetails.getId(), request);
+		return ResponseEntity.noContent().build();
+	}
+
+	// 회원 탈퇴 API (소프트 삭제 — 30일 이내 /auth/restore로 복구 가능)
+	@DeleteMapping("/me")
+	public ResponseEntity<Void> withdraw(
+			@AuthenticationPrincipal CustomUserDetails userDetails
+	){
+		userService.withdraw(userDetails.getId());
+		return ResponseEntity.noContent().build();
 	}
 
 	// 타 유저 프로필 조회 API
@@ -81,6 +121,16 @@ public class UserController implements UserControllerApiSpec {
 	){
 		userService.unfollow(userDetails.getId(), id);
 		return ResponseEntity.ok().build();
+	}
+
+	// 사용자 검색 API — 파라미터는 GET /spots/search와 같은 형태로 맞춘다
+	@GetMapping("/search")
+	public ResponseEntity<Page<FollowUserResponse>> searchUsers(
+			@RequestParam String keyword,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "20") int size
+	){
+		return ResponseEntity.ok(userService.searchUsers(keyword, page, size));
 	}
 
 	// 팔로워 목록 조회 API
