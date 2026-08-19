@@ -138,8 +138,13 @@ class CourseSpotConcurrencyTest {
 
         // 4) A의 목록에 없던 스팟이 "요청에 없으니 지우라는 뜻"으로 해석되어 삭제된다.
         //    A는 순서만 바꿨을 뿐인데 B의 작업이 사라졌고, 아무도 에러를 보지 못했다.
+        //
+        //    ⚠️ 이 경우는 낙관적 락을 붙여도 아직 막히지 않는다. 서버가 저장 직전에
+        //    코스를 새로 읽어 항상 최신 버전을 보기 때문이다. A가 "내가 본 건 버전 5"라고
+        //    알려주지 않는 한, 서버는 A의 목록이 낡았다는 사실을 알 방법이 없다.
+        //    → 다음 단계: 요청에 클라이언트가 본 버전을 실어 보내고 서버가 대조한다.
         assertThat(courseSpotCount())
-                .as("갱신 유실: 기기 B가 추가한 스팟이 조용히 삭제된다")
+                .as("갱신 유실: 기기 B가 추가한 스팟이 조용히 삭제된다 (클라이언트 버전 전달 전까지 남는 문제)")
                 .isEqualTo(3);
     }
 
@@ -163,10 +168,11 @@ class CourseSpotConcurrencyTest {
     }
 
     @Test
-    @DisplayName("[현재 동작] 신규 스팟 추가를 동시에 두 번 보내면 같은 스팟이 중복 생성된다")
-    void doubleSubmitCreatesDuplicateSpot() throws Exception {
+    @DisplayName("신규 스팟 추가를 동시에 두 번 보내면 한쪽만 성공한다 - 중복 생성 차단")
+    void doubleSubmitIsRejectedByOptimisticLock() throws Exception {
         // 신규 스팟은 courseSpotId가 null이라 서버가 매번 "새로 만들어라"로 해석한다.
-        // 두 요청이 서로의 결과를 보기 전에 처리되면 둘 다 새로 만든다.
+        // 낙관적 락이 없을 때는 두 요청이 둘 다 새로 만들어 스팟이 5개가 됐다
+        // (실측: 코스 스팟 수=5, 실패한 요청=0).
         List<CourseSpotSyncItem> request = new ArrayList<>(currentSnapshot());
         request.add(new CourseSpotSyncItem(null, spotIds.get(3), 1, 4, null));
 
@@ -194,15 +200,15 @@ class CourseSpotConcurrencyTest {
             pool.shutdownNow();
         }
 
-        // 스팟 4개(기존 3 + 신규 1)가 되어야 정상이다. 5개면 중복 생성된 것이다.
-        // 타이밍에 따라 두 요청이 겹치지 않을 수도 있어, 여기서는 결과를 출력만 하고
-        // 단언은 "충돌이 감지되지 않았다"에만 건다.
         long actual = courseSpotCount();
         System.out.printf("[동시 저장 결과] 코스 스팟 수=%d (정상=4, 중복=5), 실패한 요청=%d%n",
                 actual, failures.get());
 
+        assertThat(actual)
+                .as("기존 3개 + 신규 1개. 5개면 두 요청이 각각 새로 만든 것이다")
+                .isEqualTo(4);
         assertThat(failures.get())
-                .as("지금은 동시 저장을 막는 장치가 없어 두 요청 모두 성공한다")
-                .isZero();
+                .as("나중에 커밋한 쪽은 버전이 어긋나 거부되어야 한다")
+                .isEqualTo(1);
     }
 }
