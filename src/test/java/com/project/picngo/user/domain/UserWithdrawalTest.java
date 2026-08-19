@@ -123,6 +123,19 @@ class UserWithdrawalTest {
     }
 
     @Test
+    @DisplayName("표시 이름은 파기 전에도 쓰인다 — 30일 동안 원래 닉네임이 노출되면 안 된다")
+    void displayNameIsUsedBeforePurge() {
+        User user = newUser();
+        user.withdraw(LocalDateTime.now());
+
+        // 응답 매핑(PostAuthorResponse·UserProfileResponse)이 이 값으로 치환한다.
+        // DB의 닉네임은 그대로 남아 있어야 복구할 수 있다.
+        assertTrue(user.isWithdrawn());
+        assertEquals("테스터", user.getNickname(), "파기 전에는 DB 값이 유지된다(복구용)");
+        assertEquals("탈퇴한 사용자", User.WITHDRAWN_DISPLAY_NAME);
+    }
+
+    @Test
     @DisplayName("파기 닉네임은 살아 있는 사용자가 가질 수 없는 형태다")
     void purgedNicknameCannotCollideWithLiveUser() {
         User user = newUser();

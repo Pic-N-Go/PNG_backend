@@ -206,14 +206,21 @@ public class User extends BaseTimeEntity {
 	// ── 탈퇴 / 복구 / 파기 ──────────────────────────────────────────
 
 	/**
-	 * 파기된 계정의 표시 이름 접두사. nickname은 NOT NULL이고 유니크라 빈 값도, 고정값도 넣을 수 없다
+	 * 탈퇴 계정의 표시 이름. 파기(30일)를 기다리지 않고 탈퇴 시점부터 이 이름으로 보여준다 —
+	 * 기다리면 30일 동안 탈퇴한 사람의 닉네임과 사진이 그대로 노출된다.
+	 * DB는 건드리지 않고 응답에서만 치환하므로 복구하면 원래 닉네임이 그대로 돌아온다.
+	 */
+	public static final String WITHDRAWN_DISPLAY_NAME = "탈퇴한 사용자";
+
+	/**
+	 * 파기된 계정의 닉네임 접두사. nickname은 NOT NULL이고 유니크라 빈 값도, 고정값도 넣을 수 없다
 	 * — 고정값이면 두 번째 계정을 파기할 때 제약 위반으로 배치가 통째로 실패한다.
 	 * 그래서 뒤에 id를 붙여 유일하게 만든다(작성자 id는 게시글 응답에 이미 실려 있어 새로 드러나는 정보가 없다).
 	 *
 	 * 공백이 들어 있어 살아 있는 사용자와 절대 겹치지 않는다 — NICKNAME_REGEX가
 	 * `^[가-힣a-zA-Z0-9]{2,10}$`라 공백을 허용하지 않으므로 이 이름을 직접 가질 수 없다.
 	 */
-	public static final String PURGED_NICKNAME_PREFIX = "탈퇴한 사용자 ";
+	public static final String PURGED_NICKNAME_PREFIX = WITHDRAWN_DISPLAY_NAME + " ";
 
 	public boolean isWithdrawn() {
 		return this.deletedAt != null;

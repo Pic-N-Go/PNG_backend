@@ -332,8 +332,16 @@ public class UserService {
 
 	// 타 유저 프로필 조회
 	public UserProfileResponse getUserProfile(Long userId) {
+		// 탈퇴 계정은 404로 막지 않고 툼스톤을 돌려준다 — 게시글·댓글의 작성자 탭으로 닿을 수 있고,
+		// 404면 "없는 사용자"와 구별되지 않아 오류로 읽힌다. getById는 탈퇴를 걸러내므로 쓰지 않는다.
+		User withdrawnOrActive = findByIdIncludingWithdrawn(userId)
+				.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+		if (withdrawnOrActive.isWithdrawn()) {
+			return UserProfileResponse.withdrawn(withdrawnOrActive);
+		}
+
 		// 타 유저 프로필은 공개 가능한 정보만 응답
-		User user = getById(userId);
+		User user = withdrawnOrActive;
 		return UserProfileResponse.from(
 				user,
 				profileImageUrlOf(user),
