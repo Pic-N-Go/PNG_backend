@@ -18,6 +18,7 @@ import com.project.picngo.user.domain.Follow;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.*;
+import com.project.picngo.community.repository.PostRepository;
 import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class UserService {
 
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
+	private final PostRepository postRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final ImageStorageService imageStorageService;
 	private final RefreshTokenService refreshTokenService;
@@ -467,6 +469,7 @@ public class UserService {
         long followingCount = followRepository.countByFollower(user);
 
         // TODO: 리뷰/방문 장소 기준은 아직 확정되지 않아 임시로 0을 반환한다
+        //  (방문 스팟은 "리뷰를 쓴 스팟 ∪ 게시글에 태그한 스팟" 정도로 정의하면 지금 데이터로 셀 수 있다)
         long reviewCount = 0;
         long visitedSpotCount = 0;
 
@@ -474,7 +477,8 @@ public class UserService {
                 followerCount,
                 followingCount,
                 reviewCount,
-                visitedSpotCount
+                visitedSpotCount,
+                postRepository.countByAuthorId(userId)
         );
     }
 }

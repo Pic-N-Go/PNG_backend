@@ -132,7 +132,8 @@ public interface UserControllerApiSpec {
 
     @Operation(
             summary = "내 활동 통계 조회",
-            description = "현재 인증된 사용자의 팔로워 수, 팔로잉 수, 리뷰 수, 방문 장소 수를 조회합니다."
+            description = "현재 인증된 사용자의 팔로워 수, 팔로잉 수, 리뷰 수, 방문 장소 수, 게시글 수를 조회합니다.\n\n"
+                    + "리뷰 수와 방문 장소 수는 집계 기준이 확정되지 않아 아직 0을 반환합니다."
     )
     ResponseEntity<UserStatsResponse> getMyStats(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
