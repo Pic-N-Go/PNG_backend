@@ -47,7 +47,7 @@ public record ContestEntryDetailResponse(
                 entry.getSpot() != null ? entry.getSpot().getId() : null,
                 entry.getSpotName(),
                 phase,
-                showRanking ? entry.getVoteCount() : 0, // 공개 기간에만 득표 수 노출
+                entry.getVoteCount(),
                 showRanking ? rank : null,              // 공개 기간에만 순위 노출
                 voted,
                 mine,

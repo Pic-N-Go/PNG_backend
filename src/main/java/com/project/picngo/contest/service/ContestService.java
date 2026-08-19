@@ -139,7 +139,7 @@ public class ContestService {
 
         Page<ContestEntry> entries = contestEntryRepository.findAllByContest(
                 contest,
-                PageRequest.of(page, size, resolveEntrySort(sort, showRanking))
+                PageRequest.of(page, size, resolveEntrySort(sort))
         );
 
         List<ContestEntryResponse> responses = entries.getContent().stream()
@@ -549,8 +549,8 @@ public class ContestService {
         return responses;
     }
 
-    private Sort resolveEntrySort(String sort, boolean showRanking) {
-        if (showRanking && "votes".equalsIgnoreCase(sort)) {
+    private Sort resolveEntrySort(String sort) {
+        if ("votes".equalsIgnoreCase(sort)) {
             return Sort.by(Sort.Direction.DESC, "voteCount")
                     .and(Sort.by(Sort.Direction.ASC, "createdAt"));
         }

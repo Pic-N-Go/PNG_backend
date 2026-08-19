@@ -35,7 +35,7 @@ public record ContestEntryResponse(
                 entry.getCaption(),
                 entry.getSpot() != null ? entry.getSpot().getId() : null,
                 entry.getSpotName(),
-                showRanking ? entry.getVoteCount() : 0, // 투표수 공개 여부
+                entry.getVoteCount(),
                 showRanking ? rank : null,              // 순위 공개 여부
                 voted,
                 mine,
