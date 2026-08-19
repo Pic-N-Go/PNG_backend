@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -57,6 +58,18 @@ public class User extends BaseTimeEntity {
 	// 자기소개. 프로필 수정에서만 채워지고 가입 시에는 비어 있어 빌더 인자로 두지 않는다.
 	@Column(length = 100)
 	private String bio;
+
+	/**
+	 * 탈퇴 시각. null이면 정상 계정이다.
+	 *
+	 * 탈퇴는 소프트 삭제다 — row를 지우면 FK 때문에 게시글·댓글이 딸려 나가고, 남이 쓴 글에
+	 * 달린 대화가 뒤늦게 끊긴다. 대신 이 값이 있으면 로그인·조회에서 제외하고,
+	 * 유예 기간이 지나면 개인정보만 파기한다(purgePersonalData).
+	 *
+	 * 유예 기간에는 개인정보를 그대로 남긴다 — 마스킹하면 복구할 원본이 사라진다.
+	 */
+	@Column(name = "deleted_at")
+	private LocalDateTime deletedAt;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
@@ -188,5 +201,58 @@ public class User extends BaseTimeEntity {
 	public void updateProfile(String nickname, String bio){
 		this.nickname = nickname;
 		this.bio = bio;
+	}
+
+	// ── 탈퇴 / 복구 / 파기 ──────────────────────────────────────────
+
+	/**
+	 * 파기된 계정의 표시 이름 접두사. nickname은 NOT NULL이고 유니크라 빈 값도, 고정값도 넣을 수 없다
+	 * — 고정값이면 두 번째 계정을 파기할 때 제약 위반으로 배치가 통째로 실패한다.
+	 * 그래서 뒤에 id를 붙여 유일하게 만든다(작성자 id는 게시글 응답에 이미 실려 있어 새로 드러나는 정보가 없다).
+	 *
+	 * 공백이 들어 있어 살아 있는 사용자와 절대 겹치지 않는다 — NICKNAME_REGEX가
+	 * `^[가-힣a-zA-Z0-9]{2,10}$`라 공백을 허용하지 않으므로 이 이름을 직접 가질 수 없다.
+	 */
+	public static final String PURGED_NICKNAME_PREFIX = "탈퇴한 사용자 ";
+
+	public boolean isWithdrawn() {
+		return this.deletedAt != null;
+	}
+
+	public void withdraw(LocalDateTime now) {
+		this.deletedAt = now;
+	}
+
+	public void restore() {
+		this.deletedAt = null;
+	}
+
+	/** 유예 기간이 남았는지. 지난 계정은 복구할 수 없고 파기 배치의 대상이 된다. */
+	public boolean isRestorableAt(LocalDateTime now, int graceDays) {
+		return this.deletedAt != null && this.deletedAt.plusDays(graceDays).isAfter(now);
+	}
+
+	/**
+	 * 개인정보 파기. row는 남긴다 — 게시글·댓글이 "탈퇴한 사용자"로 계속 보이려면
+	 * 작성자 row가 있어야 한다.
+	 *
+	 * email은 unique NOT NULL이라 빈 값을 넣을 수 없어 id로 유일한 자리표를 만든다.
+	 * providerId까지 지워야 같은 카카오 계정으로 새로 가입할 수 있다.
+	 */
+	public void purgePersonalData() {
+		this.email = "deleted_" + this.id + "@deleted.local";
+		this.nickname = PURGED_NICKNAME_PREFIX + this.id;
+		this.password = null;
+		this.providerId = null;
+		this.profileImageUrl = null;
+		this.socialProfileImageUrl = null;
+		this.bio = null;
+		this.spotCategories.clear();
+	}
+
+	/** 파기 배치가 이미 처리한 계정인지. 배치를 여러 번 돌려도 안전하도록 이 값으로 걸러낸다. */
+	public boolean isPurged() {
+		return this.nickname != null && this.nickname.startsWith(PURGED_NICKNAME_PREFIX)
+				&& this.password == null && this.providerId == null;
 	}
 }

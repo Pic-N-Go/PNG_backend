@@ -88,6 +88,15 @@ public class UserController implements UserControllerApiSpec {
 		return ResponseEntity.noContent().build();
 	}
 
+	// 회원 탈퇴 API (소프트 삭제 — 30일 이내 /auth/restore로 복구 가능)
+	@DeleteMapping("/me")
+	public ResponseEntity<Void> withdraw(
+			@AuthenticationPrincipal CustomUserDetails userDetails
+	){
+		userService.withdraw(userDetails.getId());
+		return ResponseEntity.noContent().build();
+	}
+
 	// 타 유저 프로필 조회 API
 	@GetMapping("/{id}/profile")
 	public ResponseEntity<UserProfileResponse> getUserProfile(@PathVariable Long id){

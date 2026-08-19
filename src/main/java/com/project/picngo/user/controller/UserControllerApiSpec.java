@@ -95,6 +95,16 @@ public interface UserControllerApiSpec {
 	);
 
 	@Operation(
+			summary = "회원 탈퇴",
+			description = "소프트 삭제입니다. 30일 동안은 로그인·조회에서 제외되기만 하고 개인정보는 남아 있어 "
+					+ "POST /auth/restore(소셜은 /auth/restore/social)로 복구할 수 있습니다. "
+					+ "30일이 지나면 배치가 개인정보를 파기하며, 작성한 게시글·댓글은 '탈퇴한 사용자' 이름으로 유지됩니다."
+	)
+	ResponseEntity<Void> withdraw(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+	);
+
+	@Operation(
 			summary = "사용자 검색",
 			description = "닉네임 부분일치로 사용자를 검색합니다. 대소문자를 구분하지 않습니다."
 	)
