@@ -66,13 +66,4 @@ public class ContestEntry {
         return entry;
     }
 
-    public void increaseVoteCount() {
-        this.voteCount++;
-    }
-
-    public void decreaseVoteCount() {
-        if (this.voteCount > 0) {
-            this.voteCount--;
-        }
-    }
 }

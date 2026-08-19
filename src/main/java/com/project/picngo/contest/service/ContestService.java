@@ -317,10 +317,11 @@ public class ContestService {
         }
 
         contestVoteRepository.save(ContestVote.create(contest, entry, user));
-        entry.increaseVoteCount();
+        contestEntryRepository.increaseVoteCount(entry.getId());
+        ContestEntry updatedEntry = getEntryByContest(contest, entryId);
 
         long updatedUsedVoteCount = usedVoteCount + 1;
-        return toVoteResponse(entry, contest, updatedUsedVoteCount, true);
+        return toVoteResponse(updatedEntry, contest, updatedUsedVoteCount, true);
     }
 
     // 투표 취소
@@ -337,10 +338,11 @@ public class ContestService {
 
         long usedVoteCount = contestVoteRepository.countByContestAndUser(contest, user);
         contestVoteRepository.delete(vote);
-        entry.decreaseVoteCount();
+        contestEntryRepository.decreaseVoteCount(entry.getId());
+        ContestEntry updatedEntry = getEntryByContest(contest, entryId);
 
         long updatedUsedVoteCount = Math.max(0, usedVoteCount - 1);
-        return toVoteResponse(entry, contest, updatedUsedVoteCount, false);
+        return toVoteResponse(updatedEntry, contest, updatedUsedVoteCount, false);
     }
 
     // 내 출품 현황 조회

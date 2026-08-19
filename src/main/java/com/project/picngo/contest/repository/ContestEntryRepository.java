@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -103,4 +104,21 @@ public interface ContestEntryRepository extends JpaRepository<ContestEntry, Long
             where e.id in :entryIds
             """)
     List<ContestEntryRankSummary> findRanksByEntryIds(@Param("entryIds") List<Long> entryIds);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update ContestEntry e
+            set e.voteCount = e.voteCount + 1
+            where e.id = :entryId
+            """)
+    int increaseVoteCount(@Param("entryId") Long entryId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update ContestEntry e
+            set e.voteCount = e.voteCount - 1
+            where e.id = :entryId
+              and e.voteCount > 0
+            """)
+    int decreaseVoteCount(@Param("entryId") Long entryId);
 }
