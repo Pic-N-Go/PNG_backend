@@ -35,7 +35,11 @@ public class User extends BaseTimeEntity {
 	@Column(length = 255)
 	private String password;
 
-	@Column(nullable = false, length = 50)
+	/**
+	 * 유니크다 — 서비스 계층의 existsByNickname 검사만으로는 동시 가입 경합을 막지 못한다
+	 * (검사와 INSERT 사이에 다른 요청이 같은 값을 넣을 수 있다).
+	 */
+	@Column(nullable = false, unique = true, length = 50)
 	private String nickname;
 
 	/** 사용자가 앱에서 올린 프로필 사진의 S3 objectKey. 안 올렸으면 null이다. */

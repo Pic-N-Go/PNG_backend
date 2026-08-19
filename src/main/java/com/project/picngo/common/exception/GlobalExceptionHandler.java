@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -114,6 +115,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    /**
+     * 유니크 제약 위반. 닉네임처럼 "검사 후 저장" 구조인 값은 검사와 INSERT 사이에 다른 요청이
+     * 같은 값을 넣으면 여기로 온다(동시 가입 경합). 전역 Exception 핸들러에 걸리면 500이 되는데,
+     * 사용자 입장에서는 다른 값을 고르면 되는 400이다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        log.warn("DataIntegrityViolationException: {}", e.getMostSpecificCause().getMessage());
+        return ResponseEntity
+                .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, "이미 사용 중인 값입니다. 다시 시도해 주세요."));
     }
 
     @ExceptionHandler(Exception.class)
