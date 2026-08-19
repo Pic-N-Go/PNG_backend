@@ -18,6 +18,11 @@ public record UserResponse(
 	 * 본인 응답에만 담긴다(UserResponse는 /users/me·로그인 전용).
 	 */
 	String socialProfileImageUrl,
+	/**
+	 * 사용자가 직접 올린 사진이 있는지. profileImageUrl은 "보여줄 사진"이라 올린 사진을 지워도
+	 * 소셜 사진이 그 자리를 채워 non-null이 된다 — 그 값으로는 삭제할 대상이 있는지 알 수 없다.
+	 */
+	boolean hasUploadedProfileImage,
 	String bio,
 	Role role,
 	SocialProvider provider,
@@ -37,6 +42,7 @@ public record UserResponse(
 			profileImageUrl,
 			// 소셜 사진은 외부 URL이라 presign이 필요 없다(getPresignedUrl도 그대로 통과시킨다).
 			user.getSocialProfileImageUrl(),
+			user.hasUploadedProfileImage(),
 			user.getBio(),
 			user.getRole(),
 			user.getProvider(),

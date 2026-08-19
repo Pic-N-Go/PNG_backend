@@ -21,7 +21,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -123,6 +125,7 @@ class ProfileImageTest {
 
         assertEquals("https://s3/presigned", response.profileImageUrl());
         assertEquals("https://k.kakaocdn.net/profile.jpg", response.socialProfileImageUrl());
+        assertTrue(response.hasUploadedProfileImage());
     }
 
     @Test
@@ -135,6 +138,9 @@ class ProfileImageTest {
 
         assertNull(user.getProfileImageUrl());
         assertEquals("https://k.kakaocdn.net/profile.jpg", response.profileImageUrl());
+        // 표시값은 카카오 사진이라 non-null이다 — 이 플래그가 없으면 클라이언트가
+        // "지울 사진이 아직 있다"고 잘못 판단한다.
+        assertFalse(response.hasUploadedProfileImage());
         verify(imageStorageService).delete("profile/7/mine.jpg");
     }
 
