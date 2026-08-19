@@ -1,6 +1,8 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.auth.domain.AccessTokenValidationResult;
+import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.AuthErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;
@@ -105,7 +107,7 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
         String authorization = accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION);
 
         if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
-            throw new AccessDeniedException("WebSocket 인증 토큰이 필요합니다.");
+            throw new CustomException(AuthErrorCode.ACCESS_TOKEN_REQUIRED);
         }
 
         String token = authorization.substring(BEARER_PREFIX.length());
@@ -113,11 +115,11 @@ public class JwtStompChannelInterceptor implements ChannelInterceptor {
         AccessTokenValidationResult validationResult = jwtTokenProvider.validateAccessTokenResult(token);
 
         if (validationResult == AccessTokenValidationResult.EXPIRED) {
-            throw new AccessDeniedException("만료된 WebSocket Access Token입니다.");
+            throw new CustomException(AuthErrorCode.ACCESS_TOKEN_EXPIRED);
         }
 
         if (validationResult != AccessTokenValidationResult.VALID) {
-            throw new AccessDeniedException("유효하지 않은 WebSocket 인증 토큰입니다.");
+            throw new CustomException(AuthErrorCode.ACCESS_TOKEN_INVALID);
         }
 
         Long userId = jwtTokenProvider.getUserId(token);
