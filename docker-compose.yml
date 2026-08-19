@@ -29,7 +29,7 @@ services:
       - "--collect.perf_schema.eventsstatements.digest_text_limit=120"
       - "--collect.perf_schema.tablelocks"
     environment:
-      MYSQLD_EXPORTER_PASSWORD: ${DB_PASSWORD:1234}
+      MYSQLD_EXPORTER_PASSWORD: ${DB_PASSWORD:-1234}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
