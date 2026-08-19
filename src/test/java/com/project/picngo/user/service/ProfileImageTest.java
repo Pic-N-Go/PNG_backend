@@ -112,6 +112,20 @@ class ProfileImageTest {
     }
 
     @Test
+    @DisplayName("응답에 소셜 사진을 함께 담는다 — 삭제 미리보기가 결과를 맞게 보여주려면 필요하다")
+    void exposesSocialImageForPreview() {
+        User user = kakaoUser("https://k.kakaocdn.net/profile.jpg");
+        user.updateProfileImage("profile/7/mine.jpg");
+        when(imageStorageService.upload(any(), anyString()))
+                .thenReturn(new ImageUploadResult("profile/7/new.jpg", "https://s3/presigned"));
+
+        var response = service.updateProfileImage(7L, file);
+
+        assertEquals("https://s3/presigned", response.profileImageUrl());
+        assertEquals("https://k.kakaocdn.net/profile.jpg", response.socialProfileImageUrl());
+    }
+
+    @Test
     @DisplayName("올린 사진을 지우면 카카오 사진으로 되돌아간다")
     void fallsBackToSocialImageOnDelete() {
         User user = kakaoUser("https://k.kakaocdn.net/profile.jpg");

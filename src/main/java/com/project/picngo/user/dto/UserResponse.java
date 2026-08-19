@@ -12,6 +12,12 @@ public record UserResponse(
 	String email,
 	String nickname,
 	String profileImageUrl,
+	/**
+	 * 소셜에서 받은 프로필 사진. 올린 사진을 지웠을 때 되돌아갈 값이라 클라이언트가 미리보기에
+	 * 쓴다 — 이게 없으면 삭제 미리보기가 "사진 없음"으로 보이는데 실제로는 이 사진이 나온다.
+	 * 본인 응답에만 담긴다(UserResponse는 /users/me·로그인 전용).
+	 */
+	String socialProfileImageUrl,
 	String bio,
 	Role role,
 	SocialProvider provider,
@@ -29,6 +35,8 @@ public record UserResponse(
 			user.getEmail(),
 			user.getNickname(),
 			profileImageUrl,
+			// 소셜 사진은 외부 URL이라 presign이 필요 없다(getPresignedUrl도 그대로 통과시킨다).
+			user.getSocialProfileImageUrl(),
 			user.getBio(),
 			user.getRole(),
 			user.getProvider(),
