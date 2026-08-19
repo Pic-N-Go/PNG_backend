@@ -2,11 +2,13 @@ package com.project.picngo.contest.repository;
 
 import com.project.picngo.contest.domain.Contest;
 import com.project.picngo.contest.domain.ContestEntry;
+import com.project.picngo.contest.dto.ContestEntryRankSummary;
 import com.project.picngo.contest.dto.ContestMyRankSummary;
 import com.project.picngo.contest.dto.ContestPastSummary;
 import com.project.picngo.user.domain.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,7 @@ import java.util.Optional;
 public interface ContestEntryRepository extends JpaRepository<ContestEntry, Long> {
 
     // 콘테스트별 출품작 목록 조회
+    @EntityGraph(attributePaths = {"user", "spot"})
     Page<ContestEntry> findAllByContest(Contest contest, Pageable pageable);
 
     // 콘테스트별 내 출품작 목록 조회
@@ -85,4 +88,19 @@ public interface ContestEntryRepository extends JpaRepository<ContestEntry, Long
             @Param("contestIds") List<Long> contestIds,
             @Param("user") User user
     );
+
+    @Query("""
+            select new com.project.picngo.contest.dto.ContestEntryRankSummary(
+                e.id,
+                (
+                    select count(higher) + 1
+                    from ContestEntry higher
+                    where higher.contest = e.contest
+                      and higher.voteCount > e.voteCount
+                )
+            )
+            from ContestEntry e
+            where e.id in :entryIds
+            """)
+    List<ContestEntryRankSummary> findRanksByEntryIds(@Param("entryIds") List<Long> entryIds);
 }

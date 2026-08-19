@@ -14,6 +14,7 @@ import com.project.picngo.contest.domain.ContestReport;
 import com.project.picngo.contest.domain.ContestSubscription;
 import com.project.picngo.contest.domain.ContestVote;
 import com.project.picngo.contest.dto.ContestCreateEntryRequest;
+import com.project.picngo.contest.dto.ContestEntryRankSummary;
 import com.project.picngo.contest.dto.ContestEntryDetailResponse;
 import com.project.picngo.contest.dto.ContestEntryPageResponse;
 import com.project.picngo.contest.dto.ContestEntryResponse;
@@ -54,6 +55,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -178,8 +180,31 @@ public class ContestService {
                 PageRequest.of(page, size, resolveEntrySort(sort))
         );
 
+        List<Long> entryIds = entries.getContent().stream()
+                .map(ContestEntry::getId)
+                .toList();
+        Set<Long> votedEntryIds = entryIds.isEmpty()
+                ? Set.of()
+                : contestVoteRepository.findVotedEntryIdsByEntryIdsAndUser(entryIds, user)
+                .stream()
+                .collect(Collectors.toSet());
+        Map<Long, Integer> rankMap = showRanking && !entryIds.isEmpty()
+                ? contestEntryRepository.findRanksByEntryIds(entryIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        ContestEntryRankSummary::entryId,
+                        rankSummary -> (int) rankSummary.rank()
+                ))
+                : Map.of();
+
         List<ContestEntryResponse> responses = entries.getContent().stream()
-                .map(entry -> toEntryResponse(contest, entry, user, showRanking))
+                .map(entry -> toEntryResponse(
+                        entry,
+                        showRanking,
+                        rankMap.get(entry.getId()),
+                        votedEntryIds.contains(entry.getId()),
+                        isMine(entry, user)
+                ))
                 .toList();
 
         return new ContestEntryPageResponse(
@@ -531,13 +556,45 @@ public class ContestService {
             User user,
             boolean showRanking
     ) {
+        return toEntryResponse(
+                contest,
+                entry,
+                user,
+                showRanking,
+                contestVoteRepository.existsByEntryAndUser(entry, user)
+        );
+    }
+
+    private ContestEntryResponse toEntryResponse(
+            Contest contest,
+            ContestEntry entry,
+            User user,
+            boolean showRanking,
+            boolean voted
+    ) {
+        return toEntryResponse(
+                entry,
+                showRanking,
+                showRanking ? calculateRank(contest, entry) : null,
+                voted,
+                isMine(entry, user)
+        );
+    }
+
+    private ContestEntryResponse toEntryResponse(
+            ContestEntry entry,
+            boolean showRanking,
+            Integer rank,
+            boolean voted,
+            boolean mine
+    ) {
         return ContestEntryResponse.from(
                 entry,
                 imageStorageService.getPresignedUrl(entry.getPhotoUrl()),
                 showRanking,
-                showRanking ? calculateRank(contest, entry) : null,
-                contestVoteRepository.existsByEntryAndUser(entry, user),
-                isMine(entry, user)
+                rank,
+                voted,
+                mine
         );
     }
 

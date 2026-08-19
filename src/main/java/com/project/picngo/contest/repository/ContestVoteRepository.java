@@ -5,6 +5,8 @@ import com.project.picngo.contest.domain.ContestEntry;
 import com.project.picngo.contest.domain.ContestVote;
 import com.project.picngo.user.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,17 @@ public interface ContestVoteRepository extends JpaRepository<ContestVote, Long> 
 
     // 콘테스트 전체 투표 수 조회
     long countByContest(Contest contest);
+
+    @Query("""
+            select v.entry.id
+            from ContestVote v
+            where v.entry.id in :entryIds
+              and v.user = :user
+            """)
+    List<Long> findVotedEntryIdsByEntryIdsAndUser(
+            @Param("entryIds") List<Long> entryIds,
+            @Param("user") User user
+    );
 
     // 출품작의 투표 내역 삭제
     void deleteAllByEntry(ContestEntry entry);
