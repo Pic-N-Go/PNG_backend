@@ -262,4 +262,10 @@ public class User extends BaseTimeEntity {
 		return this.nickname != null && this.nickname.startsWith(PURGED_NICKNAME_PREFIX)
 				&& this.password == null && this.providerId == null;
 	}
+
+	public void updateRole(Role role) {
+		if (role != null) {
+			this.role = role;
+		}
+	}
 }
