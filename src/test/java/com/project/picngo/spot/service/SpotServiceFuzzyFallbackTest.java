@@ -78,7 +78,7 @@ class SpotServiceFuzzyFallbackTest {
     }
 
     private void primaryReturnsNothing() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
     }
 
@@ -162,7 +162,7 @@ class SpotServiceFuzzyFallbackTest {
     @Test
     @DisplayName("1차에서 결과가 나오면 편집거리 검색을 하지 않는다")
     void skipsWhenPrimaryHasResults() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot(5L, "협재해수욕장"))));
 
         service(false, true).searchSpots("협재", null, 0, 20, null);
@@ -198,7 +198,7 @@ class SpotServiceFuzzyFallbackTest {
     @Test
     @DisplayName("카테고리 필터가 있으면 카테고리 버전으로 후보를 좁힌다")
     void usesCategoryVariant() {
-        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any()))
+        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(spotRepository.findFuzzyCandidatesByCategories(List.of(SpotCategory.BEACH), SpotStatus.APPROVED))
                 .willReturn(List.of(candidate(5L, "협재해수욕장", "제주")));

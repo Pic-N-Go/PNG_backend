@@ -51,11 +51,13 @@ public class PostService {
 
     /**
      * @param authorId 지정하면 그 사용자가 쓴 글만 준다(프로필 화면의 게시글 탭).
-     *                 MY_POSTS는 "내 글"이라는 뜻이 이미 정해져 있어 이 값을 무시한다.
+     *                 POPULAR·LATEST에만 적용된다. MY_POSTS·FOLLOWING·BOOKMARKED는 대상 글이
+     *                 "내 글"·"팔로우한 사람의 글"·"내가 저장한 글"로 이미 정해져 있어 이 값을 무시한다
+     *                 (섞어 쓸 화면이 없다 — 프로필 게시글 탭은 LATEST + authorId로 조회한다).
      */
     public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, Long authorId, int page, int size) {
 
-        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING) && userId == null) {
+        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING || sort == PostSort.BOOKMARKED) && userId == null) {
             throw new CustomException(AuthErrorCode.LOGIN_REQUIRED);
         }
         // 너무 큰 사이즈 요청이 올 경우 100으로 조정
@@ -67,6 +69,7 @@ public class PostService {
             case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
             case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, pageable);
             case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
+            case BOOKMARKED -> postRepository.searchBookmarked(normalizedKeyword, userId, pageable);
         };
         List<PostResponse> posts = toFeedResponses(result.getContent(), userId);
 
@@ -370,7 +373,7 @@ public class PostService {
                 post.getCameraModel(),
                 post.getLensModel(),
                 List.copyOf(post.getTags()),
-                PostAuthorResponse.from(post.getAuthor()),
+                PostAuthorResponse.from(post.getAuthor(), imageStorageService.getPresignedUrl(post.getAuthor().getDisplayProfileImage())),
                 images,
                 post.getLikeCount(),
                 post.getCommentCount(),
@@ -390,7 +393,7 @@ public class PostService {
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
-            case MY_POSTS, LATEST, FOLLOWING -> Sort.by(
+            case MY_POSTS, LATEST, FOLLOWING, BOOKMARKED -> Sort.by(
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );

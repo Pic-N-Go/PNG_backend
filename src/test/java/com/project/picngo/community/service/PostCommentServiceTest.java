@@ -1,5 +1,6 @@
 package com.project.picngo.community.service;
 
+import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.CommunityErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
@@ -41,6 +42,7 @@ class PostCommentServiceTest {
     @Mock PostCommentRepository commentRepository;
     @Mock PostCommentLikeRepository commentLikeRepository;
     @Mock UserRepository userRepository;
+    @Mock ImageStorageService imageStorageService;
 
     @InjectMocks PostCommentService service;
 

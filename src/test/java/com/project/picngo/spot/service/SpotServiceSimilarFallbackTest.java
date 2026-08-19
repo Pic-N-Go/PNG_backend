@@ -67,9 +67,9 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("앞 두 단계가 모두 0건이면 따옴표 없는 검색어로 유사도 검색을 한다")
     void fallsBackToSimilaritySearch() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
-        given(spotRepository.searchSpotsNormalized(any(), any(), any()))
+        given(spotRepository.searchSpotsNormalized(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
@@ -85,7 +85,7 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("1차에서 결과가 나오면 유사도 검색을 하지 않는다")
     void skipsWhenPrimaryHasResults() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         service(true, true).searchSpots("갈산공원", null, 0, 20, null);
@@ -97,9 +97,9 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("띄어쓰기 폴백에서 결과가 나오면 유사도 검색까지 가지 않는다")
     void skipsWhenNormalizedStageSucceeds() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
-        given(spotRepository.searchSpotsNormalized(any(), any(), any()))
+        given(spotRepository.searchSpotsNormalized(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
 
         service(true, true).searchSpots("갈 산공원", null, 0, 20, null);
@@ -111,7 +111,7 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("유사도 검색어에서도 공백과 문장부호를 지운다 - 색인과 같은 규칙")
     void normalizesSimilarityKeyword() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
@@ -124,7 +124,7 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("카테고리 필터가 있으면 유사도 검색도 카테고리 버전을 쓴다")
     void usesCategoryVariant() {
-        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any()))
+        given(spotRepository.searchSpotsFullTextByCategories(any(), any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(spotRepository.searchSpotsSimilarByCategories(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(spot())));
@@ -138,7 +138,7 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("유사도 폴백이 꺼져 있으면 세 번째 쿼리를 치지 않는다")
     void neverQueriesWhenDisabled() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
         service(false, false).searchSpots("갈산공줜", null, 0, 20, null);
@@ -150,7 +150,7 @@ class SpotServiceSimilarFallbackTest {
     @Test
     @DisplayName("유사도 검색도 0건이면 stage=none으로 기록한다")
     void recordsNoneWhenAllStagesEmpty() {
-        given(spotRepository.searchSpotsFullText(any(), any(), any()))
+        given(spotRepository.searchSpotsFullText(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));
         given(spotRepository.searchSpotsSimilar(any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of()));

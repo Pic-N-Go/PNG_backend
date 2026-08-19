@@ -435,17 +435,23 @@ public class SpotService {
             return Page.empty(pageable);
         }
 
+        // 정렬용 키워드는 검색식과 따로 넘긴다. phrase는 따옴표가 붙은 구문식이라 LIKE로 쓰면
+        // 아무것도 맞지 않는다. 비교 대상이 search_norm이므로 공백을 뺀 원본을 준다.
+        String sortKeyword = FullTextKeyword.toSimilarityTerms(keyword);
+
         if (categories == null) {
-            return spotRepository.searchSpotsNormalized(phrase, SpotStatus.APPROVED.name(), pageable);
+            return spotRepository.searchSpotsNormalized(phrase, sortKeyword, SpotStatus.APPROVED.name(), pageable);
         }
 
         List<String> categoryNames = categories.stream().map(SpotCategory::name).toList();
         return spotRepository.searchSpotsNormalizedByCategories(
-                phrase, categoryNames, SpotStatus.APPROVED.name(), pageable);
+                phrase, sortKeyword, categoryNames, SpotStatus.APPROVED.name(), pageable);
     }
 
+    // 이름 우선 정렬이 쿼리 안에 있으므로 정렬 없는 Pageable을 넘긴다
+    // (Sort를 얹으면 Spring이 ORDER BY를 덧붙여 이름 우선순위가 뒤로 밀린다).
     private Page<Spot> searchByLike(String keyword, List<SpotCategory> categories, int page, int size) {
-        Pageable pageable = createPageable(page, size, "latest");
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
 
         return (categories == null)
                 ? spotRepository.searchSpots(keyword, SpotStatus.APPROVED, pageable)
@@ -465,13 +471,15 @@ public class SpotService {
             return Page.empty(pageable);
         }
 
+        // 정렬용 키워드는 검색식과 따로 넘긴다 — phrase는 따옴표가 붙은 BOOLEAN MODE 구문식이라
+        // LIKE 비교에 쓰면 '%"한라산"%'이 되어 어떤 이름에도 맞지 않는다(이름 우선 정렬이 무동작).
         if (categories == null) {
-            return spotRepository.searchSpotsFullText(phrase, SpotStatus.APPROVED.name(), pageable);
+            return spotRepository.searchSpotsFullText(phrase, keyword, SpotStatus.APPROVED.name(), pageable);
         }
 
         List<String> categoryNames = categories.stream().map(SpotCategory::name).toList();
         return spotRepository.searchSpotsFullTextByCategories(
-                phrase, categoryNames, SpotStatus.APPROVED.name(), pageable);
+                phrase, keyword, categoryNames, SpotStatus.APPROVED.name(), pageable);
     }
 
     private Pageable createPageable(int page, int size, String sort) {

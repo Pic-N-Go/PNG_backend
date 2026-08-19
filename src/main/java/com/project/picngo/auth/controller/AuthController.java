@@ -30,6 +30,17 @@ public class AuthController implements AuthControllerApiSpec {
 		return ResponseEntity.ok(authService.loginWithKakao(request));
 	}
 
+	// 탈퇴 계정 복구. 탈퇴 계정은 토큰을 못 받으므로 인증 없이 자격증명으로 시작한다.
+	@PostMapping("/restore")
+	public ResponseEntity<TokenResponse> restore(@Valid @RequestBody LoginRequest request) {
+		return ResponseEntity.ok(authService.restore(request));
+	}
+
+	@PostMapping("/restore/social")
+	public ResponseEntity<TokenResponse> restoreWithKakao(@Valid @RequestBody KakaoLoginRequest request) {
+		return ResponseEntity.ok(authService.restoreWithKakao(request));
+	}
+
 	@PostMapping("/email/verify")
 	public ResponseEntity<EmailVerificationResponse> sendEmailVerificationCode(@Valid @RequestBody EmailVerificationRequest request) {
 		return ResponseEntity.ok(authService.sendEmailVerificationCode(request));

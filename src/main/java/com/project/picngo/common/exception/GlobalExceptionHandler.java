@@ -9,6 +9,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import java.sql.SQLException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -117,6 +120,34 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    /** MySQL duplicate entry. 이 값만 사용자가 고쳐서 해결할 수 있는 오류다. */
+    private static final int MYSQL_DUPLICATE_ENTRY = 1062;
+
+    /**
+     * 유니크 제약 위반. 닉네임처럼 "검사 후 저장" 구조인 값은 검사와 INSERT 사이에 다른 요청이
+     * 같은 값을 넣으면 여기로 온다(동시 가입 경합). 전역 Exception 핸들러에 걸리면 500이 되는데,
+     * 사용자 입장에서는 다른 값을 고르면 되는 400이다.
+     *
+     * 중복 키만 400으로 내린다. FK·NOT NULL 위반은 사용자가 고칠 수 없는 서버 버그인데,
+     * 같이 400으로 삼키면 스택트레이스까지 사라져 조사할 단서가 없어진다.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        Throwable cause = e.getMostSpecificCause();
+        boolean duplicateEntry = cause instanceof SQLException sqlException
+                && sqlException.getErrorCode() == MYSQL_DUPLICATE_ENTRY;
+        if (!duplicateEntry) {
+            return handleException(e);
+        }
+
+        // 메시지는 찍지 않는다 — MySQL 1062 메시지에는 충돌한 값이 그대로 들어 있어
+        // (Duplicate entry 'a@b.com' for key ...) 이메일 같은 개인정보가 로그에 남는다.
+        log.warn("DataIntegrityViolationException(duplicate): errorCode={}", MYSQL_DUPLICATE_ENTRY);
+        return ResponseEntity
+                .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, "이미 사용 중인 값입니다. 다시 시도해 주세요."));
     }
 
     /**
