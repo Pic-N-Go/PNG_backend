@@ -1,6 +1,27 @@
 -- ============================================================
 -- 전국 주요 스팟 초기 데이터 (총 135건: 서울 100건 + 6대 광역시 및 세종 35건)
 -- ============================================================
+--
+-- ⚠️ 이 파일은 앱이 기동할 때마다 실행된다(spring.sql.init.mode=always).
+--    스키마를 바꾸는 db/migration의 파일들과 성격이 다르다 - 그쪽은 한 번만 돌지만
+--    여기는 매번 돈다.
+--
+-- 그래서 지켜야 할 규칙이 하나 있다:
+--
+--    UPDATE 문을 넣지 말 것. 재시작할 때마다 기존 값을 덮어쓴다.
+--
+-- 아래 INSERT들은 ON DUPLICATE KEY UPDATE id=id 로 감싸져 있어 안전하다.
+-- "이미 있으면 아무것도 바꾸지 마라"는 뜻이다(id를 id로 대입 = 무변경).
+-- 그런데 이 보호는 INSERT에만 붙는다. 따로 쓴 UPDATE는 조건 없이 그대로 실행된다.
+--
+-- 실제로 그런 일이 있었다. 스팟 설명문(overview)을 채우려고 UPDATE 135줄을 여기에
+-- 넣었는데, 재시작마다 덮어쓰는 구조가 됐다. 관광공사에서 실제 설명문을 받아와도
+-- 앱을 한 번 켜면 되돌아갔을 것이다(2026-08-19에 발견해 분리).
+-- 그 UPDATE들은 지금 docs/spot-overview-backfill-migration.sql에 있고,
+-- 필요할 때 한 번만 직접 실행한다.
+--
+-- 데이터를 고쳐야 한다면: 여기가 아니라 별도 SQL 파일로 만들어 한 번만 실행하거나,
+-- 한 번만 돌아야 하는 성격이면 db/migration에 넣는다.
 INSERT INTO spot (id, name, address, latitude, longitude, source, badge, status, bookmark_count, review_count, photogenic_score, is_active, review_average, toilet, created_at, updated_at)
 VALUES
 (1, '가회동성당', '서울특별시 종로구 북촌로 57 (가회동)', 37.5820858828, 126.9846616856, 'TOUR_API', true, 'APPROVED', 150, 42, 95, true, 4.5, true, NOW(), NOW()),
