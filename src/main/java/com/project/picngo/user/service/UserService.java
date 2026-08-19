@@ -1,6 +1,7 @@
 package com.project.picngo.user.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.auth.service.RefreshTokenService;
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.service.ImageStorageService;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -36,10 +38,17 @@ import java.util.Set;
 @Slf4j
 public class UserService {
 
+	/**
+	 * 탈퇴 후 복구 가능 기간(일). 개인정보처리방침에 적은 보관 기간과 같아야 한다.
+	 * ponytail: 상수로 둔다 — 운영 중 조정할 값이 아니고, 바꿀 일이 생기면 이 한 줄이다.
+	 */
+	public static final int WITHDRAWAL_GRACE_DAYS = 30;
+
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final ImageStorageService imageStorageService;
+	private final RefreshTokenService refreshTokenService;
 
 	/**
 	 * 프로필 사진은 S3 objectKey로 저장돼 있어 그대로는 열리지 않는다 — 응답에 담기 전에
@@ -55,9 +64,26 @@ public class UserService {
 			.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 	}
 
+	/**
+	 * 탈퇴 계정은 없는 것으로 취급한다. 이 메서드를 거치는 모든 기능(프로필·팔로우·글쓰기 등)이
+	 * 한 번에 막히므로 기능마다 검사를 흩뿌리지 않는다.
+	 *
+	 * 복구·파기 경로는 탈퇴 계정을 찾아야 하므로 이걸 쓰지 않는다(findByIdIncludingWithdrawn).
+	 */
 	public User getById(Long userId) {
 		return userRepository.findById(userId)
+			.filter(user -> !user.isWithdrawn())
 			.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+	}
+
+	/** 탈퇴 계정까지 포함해 찾는다. 복구 경로 전용. */
+	public Optional<User> findByIdIncludingWithdrawn(Long userId) {
+		return userRepository.findById(userId);
+	}
+
+	/** 소셜 계정 조회. 탈퇴 여부를 걸러내지 않는다 — 복구 경로가 탈퇴 계정을 찾아야 한다. */
+	public Optional<User> findByProviderAndProviderId(SocialProvider provider, String providerId) {
+		return userRepository.findByProviderAndProviderId(provider, providerId);
 	}
 
 	public boolean existsByEmail(String email) {
@@ -79,9 +105,13 @@ public class UserService {
 
 	@Transactional
 	public User createLocalUser(String email, String encodedPassword, String nickname, Set<SpotCategory> spotCategories) {
-		if (userRepository.existsByEmail(email)) {
-			throw new CustomException(UserErrorCode.EMAIL_ALREADY_EXISTS);
-		}
+		// 유예 기간에는 탈퇴 계정이 이메일을 선점하고 있다. "이미 가입된 이메일"로만 알리면
+		// 본인인데 원인을 알 수 없으니, 복구로 안내할 수 있게 코드를 나눈다.
+		userRepository.findByEmail(email).ifPresent(existing -> {
+			throw new CustomException(existing.isWithdrawn()
+					? AuthErrorCode.EMAIL_RESERVED_BY_WITHDRAWN_ACCOUNT
+					: UserErrorCode.EMAIL_ALREADY_EXISTS);
+		});
 
 		if (userRepository.existsByNickname(nickname)) {
 			throw new CustomException(UserErrorCode.NICKNAME_ALREADY_EXISTS);
@@ -105,6 +135,10 @@ public class UserService {
 	) {
 		return userRepository.findByProviderAndProviderId(provider, providerId)
 			.map(user -> {
+				// 탈퇴 계정은 토큰을 받지 못한다. 복구는 /auth/restore/social로만 가능하다.
+				if (user.isWithdrawn()) {
+					throw new CustomException(AuthErrorCode.ACCOUNT_WITHDRAWN);
+				}
 				// 닉네임은 덮지 않는다 — 사용자가 프로필 편집에서 바꾼 값이 매 로그인마다 카카오
 				// 이름으로 원복된다. 사진은 카카오가 유일한 출처라 계속 동기화한다
 				// (앱 자체 업로드가 생기면 그때 직접 올린 사진을 지키는 분기가 필요하다).
@@ -112,8 +146,11 @@ public class UserService {
 				return new SocialUserResult(user, false);
 			})
 			.orElseGet(() -> {
-				if (userRepository.existsByEmail(email)) {
-					throw new CustomException(AuthErrorCode.SOCIAL_EMAIL_ALREADY_EXISTS);
+				Optional<User> byEmail = userRepository.findByEmail(email);
+				if (byEmail.isPresent()) {
+					throw new CustomException(byEmail.get().isWithdrawn()
+							? AuthErrorCode.EMAIL_RESERVED_BY_WITHDRAWN_ACCOUNT
+							: AuthErrorCode.SOCIAL_EMAIL_ALREADY_EXISTS);
 				}
 
 				String resolved = resolveUniqueNickname(sanitizeNickname(nickname, providerId), providerId);
@@ -164,9 +201,11 @@ public class UserService {
 	 * 이미 쓰이는 닉네임이면 뒤에 숫자를 붙인다. 정상 경로는 온보딩에서 사용자가 직접 고르는
 	 * 것이고, 이건 온보딩을 마치지 못한 계정도 유효한 닉네임을 갖게 하는 안전망이다.
 	 *
-	 * ⚠️ `users.nickname`에 unique 제약이 추가되면 이 사전 검사만으로는 부족하다.
-	 * 검사와 INSERT 사이에 다른 요청이 같은 값을 넣을 수 있어, save 지점에서
-	 * DataIntegrityViolationException을 잡아 재시도해야 한다.
+	 * ⚠️ `users.nickname`에 unique 제약이 있으므로 이 사전 검사만으로는 부족하다. 검사와
+	 * INSERT 사이에 다른 요청이 같은 값을 넣으면 저장 시점에 DataIntegrityViolationException이
+	 * 난다. 지금은 GlobalExceptionHandler가 400으로 바꿔 "다시 시도해 주세요"로 안내한다 —
+	 * 사용자가 값을 고르는 경로(가입·프로필 수정)는 그걸로 충분하다. 다만 소셜 로그인은
+	 * 사용자가 고른 값이 아니라, 경합이 실제로 관측되면 여기서 재시도를 넣어야 한다.
 	 * `createLocalUser`·`updateMyProfile`도 같은 check-then-write 구조다.
 	 */
 	private String resolveUniqueNickname(String base, String providerId) {
@@ -240,6 +279,9 @@ public class UserService {
 		}
 
 		user.updatePassword(passwordEncoder.encode(request.newPassword()));
+		// 이전 비밀번호로 만들어진 세션은 끊는다 — 비밀번호를 바꾸는 이유가 보통
+		// "남이 쓰고 있을지도 모른다"라서, 기존 리프레시 토큰이 살아 있으면 의미가 반감된다.
+		refreshTokenService.revokeAllByUserId(userId);
 	}
 
 	/**
@@ -335,8 +377,11 @@ public class UserService {
 	public List<FollowUserResponse> getFollowers(Long userId) {
 		User user = getById(userId);
 
+		// 탈퇴 계정은 Follow row가 남아 있어도 목록에서 빼야 한다 — 파기 전에는 닉네임이 그대로다.
 		return followRepository.findAllByFollowing(user).stream()
-				.map(follow -> FollowUserResponse.from(follow.getFollower(), profileImageUrlOf(follow.getFollower())))
+				.map(Follow::getFollower)
+				.filter(follower -> !follower.isWithdrawn())
+				.map(follower -> FollowUserResponse.from(follower, profileImageUrlOf(follower)))
 				.toList();
 	}
 
@@ -345,8 +390,54 @@ public class UserService {
 		User user = getById(userId);
 
 		return followRepository.findAllByFollower(user).stream()
-				.map(follow -> FollowUserResponse.from(follow.getFollowing(), profileImageUrlOf(follow.getFollowing())))
+				.map(Follow::getFollowing)
+				.filter(following -> !following.isWithdrawn())
+				.map(following -> FollowUserResponse.from(following, profileImageUrlOf(following)))
 				.toList();
+	}
+
+	// ── 회원 탈퇴 / 복구 / 파기 ─────────────────────────────────────
+
+	/**
+	 * 회원 탈퇴(소프트 삭제). 개인정보는 유예 기간 동안 그대로 남긴다 — 마스킹하면
+	 * 복구할 원본이 사라진다. 실제 파기는 UserPurgeScheduler가 기간 경과 후에 한다.
+	 */
+	@Transactional
+	public void withdraw(Long userId) {
+		getById(userId).withdraw(LocalDateTime.now());
+	}
+
+	/**
+	 * 탈퇴 취소. 자격증명 검증은 호출부(AuthService)가 이미 마쳤다.
+	 * 유예 기간이 지났으면 되돌리지 않는다 — 이미 파기됐거나 곧 파기될 데이터다.
+	 */
+	@Transactional
+	public void restore(User user) {
+		if (!user.isWithdrawn()) {
+			return;
+		}
+		if (!user.isRestorableAt(LocalDateTime.now(), WITHDRAWAL_GRACE_DAYS)) {
+			throw new CustomException(AuthErrorCode.RESTORE_PERIOD_EXPIRED);
+		}
+		user.restore();
+	}
+
+	/**
+	 * 유예 기간이 지난 탈퇴 계정의 개인정보를 파기한다. row는 남긴다.
+	 * 이미 파기된 계정은 건너뛰므로 여러 번 돌려도(다중 인스턴스 포함) 안전하다.
+	 */
+	@Transactional
+	public int purgeExpiredAccounts() {
+		LocalDateTime cutoff = LocalDateTime.now().minusDays(WITHDRAWAL_GRACE_DAYS);
+		int purged = 0;
+		for (User user : userRepository.findByDeletedAtBefore(cutoff)) {
+			if (user.isPurged()) {
+				continue;
+			}
+			user.purgePersonalData();
+			purged++;
+		}
+		return purged;
 	}
 
 	// 사용자 검색 — 팔로우할 사람을 찾는 경로다. 응답은 팔로워·팔로잉 목록과 같은 DTO를 쓴다(항목이 동일).
@@ -356,7 +447,7 @@ public class UserService {
 		}
 
 		return userRepository
-				.findByNicknameContainingIgnoreCase(keyword.trim(), PageRequest.of(page, size))
+				.findByNicknameContainingIgnoreCaseAndDeletedAtIsNull(keyword.trim(), PageRequest.of(page, size))
 				.map(user -> FollowUserResponse.from(user, profileImageUrlOf(user)));
 	}
 

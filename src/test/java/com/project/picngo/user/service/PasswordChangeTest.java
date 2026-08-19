@@ -21,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -39,6 +40,7 @@ class PasswordChangeTest {
     @Mock UserRepository userRepository;
     @Mock FollowRepository followRepository;
     @Mock PasswordEncoder passwordEncoder;
+    @Mock com.project.picngo.auth.service.RefreshTokenService refreshTokenService;
 
     @InjectMocks UserService service;
 
@@ -60,6 +62,8 @@ class PasswordChangeTest {
         service.changePassword(7L, new PasswordChangeRequest("old-password", "new-password"));
 
         verify(user).updatePassword("encoded-new");
+        // 이전 비밀번호로 만들어진 세션이 살아 있으면 비밀번호를 바꾼 의미가 반감된다.
+        verify(refreshTokenService).revokeAllByUserId(7L);
     }
 
     @Test
@@ -75,6 +79,7 @@ class PasswordChangeTest {
 
         assertEquals(AuthErrorCode.INVALID_CURRENT_PASSWORD, exception.getErrorCode());
         verify(user, never()).updatePassword(anyString());
+        verify(refreshTokenService, never()).revokeAllByUserId(anyLong());
     }
 
     @Test

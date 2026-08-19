@@ -5,6 +5,7 @@ import com.project.picngo.auth.dto.*;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.common.exception.code.AuthErrorCode;
+import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.UserResponse;
@@ -45,14 +46,51 @@ public class AuthService {
 	}
 
 	public TokenResponse login(LoginRequest request) {
+		User user = verifyCredentials(request);
+
+		// 탈퇴 계정에는 토큰을 발급하지 않는다. 복구는 /auth/restore로만 가능하다 —
+		// 토큰을 주고 나머지 API를 필터로 막는 방식은 화이트리스트가 필요하고 우회 위험이 있다.
+		if (user.isWithdrawn()) {
+			throw new CustomException(AuthErrorCode.ACCOUNT_WITHDRAWN);
+		}
+
+		return createTokenResponse(user, false);
+	}
+
+	/**
+	 * 탈퇴 취소. 로그인과 같은 자격증명을 받아 검증한 뒤 되돌린다 — 탈퇴 계정은 토큰을 받을 수
+	 * 없으므로, 인증이 필요한 경로로는 복구를 시작할 수 없다.
+	 */
+	@Transactional
+	public TokenResponse restore(LoginRequest request) {
+		User user = verifyCredentials(request);
+		userService.restore(user);
+		return createTokenResponse(user, false);
+	}
+
+	/** 카카오 계정 복구. 소셜 계정은 비밀번호가 없어 accessToken으로 본인 확인한다. */
+	@Transactional
+	public TokenResponse restoreWithKakao(KakaoLoginRequest request) {
+		KakaoProfile profile = kakaoAuthClient.getProfile(request.accessToken());
+		User user = userService.findByProviderAndProviderId(SocialProvider.KAKAO, profile.providerId())
+				.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+		userService.restore(user);
+		return createTokenResponse(user, false);
+	}
+
+	/**
+	 * 이메일·비밀번호 검증만 한다(탈퇴 여부는 보지 않는다). 로그인과 복구가 같은 검증을 쓰되
+	 * 탈퇴 계정 처리만 다르기 때문이다.
+	 */
+	private User verifyCredentials(LoginRequest request) {
 		User user = userService.findByEmail(request.email())
 				.orElseThrow(() -> new CustomException(AuthErrorCode.INVALID_LOGIN));
 
 		if (user.getPassword() == null || !passwordEncoder.matches(request.password(), user.getPassword())) {
 			throw new CustomException(AuthErrorCode.INVALID_LOGIN);
 		}
-
-		return createTokenResponse(user, false);
+		return user;
 	}
 
 	@Transactional
@@ -147,6 +185,8 @@ public class AuthService {
 		// 코드 발송을 막아도 이미 받아둔 코드로 여기만 호출할 수 있다 — 실제 교체 지점에서도 검사한다.
 		requireLocalAccount(user);
 		user.updatePassword(passwordEncoder.encode(request.newPassword()));
+		// 설정에서 바꾸는 경로와 같은 이유로 기존 세션을 끊는다.
+		refreshTokenService.revokeAllByUserId(user.getId());
 	}
 
 }
