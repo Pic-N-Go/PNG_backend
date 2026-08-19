@@ -34,17 +34,36 @@ WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'spot';
 
 -- ngram 토큰 크기 (2가 아니면 2글자 검색어가 색인에 잡히지 않는다)
 SELECT @@ngram_token_size;
+
+-- FULLTEXT 인덱스의 컬럼 목록. 이름만 봐서는 부족하다 — 코드가 MATCH하는 컬럼과
+-- 인덱스 컬럼이 다르면 ERROR 1191로 검색이 전부 실패한다.
+SELECT INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'spot' AND INDEX_TYPE = 'FULLTEXT'
+GROUP BY INDEX_NAME;
+
+-- users 컬럼·제약 (사용자 계정 기능)
+SELECT COLUMN_NAME FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+  AND COLUMN_NAME IN ('bio', 'social_profile_image_url', 'deleted_at');
+
+SELECT INDEX_NAME FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND INDEX_NAME = 'uk_users_nickname';
 ```
 
 기대값:
 
 | 항목 | 있어야 하는 값 |
 |---|---|
-| 컬럼 | `embedding`, `search_norm` |
-| 인덱스 | `ft_spot_search`, `ft_spot_search_norm`, `idx_spot_map_bounds` |
+| `spot` 컬럼 | `embedding`, `search_norm` |
+| `spot` 인덱스 | `ft_spot_search`, `ft_spot_search_norm`, `idx_spot_map_bounds` |
+| **`ft_spot_search` 컬럼 목록** | **`name,address`** (`overview`가 있으면 🔴 아래 2-1 참고) |
+| `users` 컬럼 | `bio`, `social_profile_image_url`, `deleted_at` |
+| `users` 인덱스 | `uk_users_nickname` |
 | `@@ngram_token_size` | `2` |
 
 없는 것만 아래에서 적용하면 된다. 모든 마이그레이션은 재실행해도 안전하다(멱등).
+단 `ft_spot_search`는 **이미 있어도 컬럼 목록이 다르면 손으로 DROP해야 한다**(2-1).
 
 ---
 
@@ -57,7 +76,7 @@ docker exec -i picngo-mysql mysql -uroot -p"$DB_PASSWORD" --default-character-se
   < docs/spot-embedding-column-migration.sql
 ```
 
-순서대로 아래 네 개를 적용한다.
+순서대로 아래를 적용한다.
 
 | 순서 | 파일 | 안 하면 |
 |---|---|---|
@@ -65,9 +84,37 @@ docker exec -i picngo-mysql mysql -uroot -p"$DB_PASSWORD" --default-character-se
 | 2 | `search-fulltext-index-migration.sql` | 🔴 `SEARCH_ENGINE=FULLTEXT`일 때 **검색 전부 실패** (ERROR 1191) |
 | 3 | `search-normalized-column-migration.sql` | 🟠 2·3단계 폴백 쿼리 실패 |
 | 4 | `search-map-bounds-index-migration.sql` | 🟡 지도 조회가 느려짐 (기능은 동작) |
+| 5 | `user-bio-column-migration.sql` | 🔴 **앱이 기동하지 않는다** (`missing column [bio]`) |
+| 6 | `user-social-profile-image-migration.sql` | 🔴 **앱이 기동하지 않는다** (`missing column [social_profile_image_url]`) |
+| 7 | `user-nickname-unique-migration.sql` | 🟠 닉네임 중복이 동시 가입 경합으로 계속 뚫린다 (기동은 된다) |
+
+5·6·7은 사용자 계정 기능(자기소개·프로필 사진·닉네임)에 딸린 것으로, **이번 배포에서
+새로 적용해야 한다.** 6은 컬럼 추가에 더해 기존 값을 옮기는 백필이 들어 있어, 건너뛰면
+카카오 사진이 "사용자가 올린 사진"으로 잡혀 재로그인 갱신·삭제가 어긋난다.
+7은 중복이 있으면 ALTER가 실패하므로 파일 안의 확인 쿼리를 먼저 볼 것.
 
 1번은 **이번 배포에서 반드시 새로 적용해야 한다.** 나머지는 이전에 적용했다면 건너뛴다
 (0번에서 확인한 결과대로).
+
+### 2-1. `ft_spot_search` 컬럼 목록이 다르면 — 🔴 스킵하면 장애
+
+검색 쿼리가 `MATCH(name, address)`로 바뀌었다(`SpotRepository`). 운영에 이미 있는 인덱스가
+`(name, address, overview)` 3컬럼이면 **컬럼 목록이 맞지 않아 검색이 전부 실패한다**
+(`ERROR 1191: Can't find FULLTEXT index matching the column list`).
+
+`search-fulltext-index-migration.sql`은 **인덱스 이름만 보고 건너뛰므로 이 경우를 고치지
+못한다.** 0번에서 컬럼 목록에 `overview`가 보이면 손으로 지운 뒤 마이그레이션을 다시 돌린다.
+
+```sql
+ALTER TABLE spot DROP INDEX ft_spot_search;
+```
+```bash
+docker exec -i picngo-mysql mysql -uroot -p"$DB_PASSWORD" --default-character-set=utf8mb4 picngo \
+  < docs/search-fulltext-index-migration.sql
+```
+
+인덱스 재생성은 행 수에 비례해 시간이 걸린다. 그 사이 FULLTEXT 검색은 실패하므로
+`SEARCH_ENGINE=LIKE`로 잠시 내려두거나 트래픽이 적은 시간에 할 것.
 
 > 각 파일 안에 검증 쿼리가 들어 있다. 실행 후 출력에서 컬럼·인덱스가 생겼는지 확인할 것.
 > 특히 FULLTEXT는 `EXPLAIN` 결과가 `type: fulltext, key: ft_spot_search`로 나와야 한다.

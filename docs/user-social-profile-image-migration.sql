@@ -44,6 +44,19 @@ PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- 지금까지 소셜 사진이 profile_image_url에 들어 있었다. http로 시작하면 외부 URL이므로
 -- (S3 objectKey는 'profile/...' 형태라 http로 시작하지 않는다) 소셜 칸으로 옮기고 원래 칸은 비운다.
 -- 그래야 "올린 사진 없음" 상태가 되어 삭제·업로드 판정이 맞는다.
+--
+-- ⚠️ 전제 확인: "http로 시작하면 카카오 URL"이 항상 참은 아니다. 분리 전에는
+--    UserProfileUpdateRequest.profileImageUrl로 클라이언트가 보낸 임의 문자열을 그대로
+--    저장했으므로, LOCAL 계정에도 http 값이 들어가 있을 수 있다. 그 값이 소셜 칸으로 옮겨지면
+--    LOCAL은 재로그인 갱신 대상이 아니고 hasUploadedProfileImage=false라
+--    "사용자가 지울 수도 없는 사진"이 된다.
+--
+--    아래가 0건이어야 그대로 진행할 수 있다. 있으면 개별 판단이 필요하다
+--    (대개 그냥 NULL로 비우는 게 맞다 — 만료된 URL일 가능성이 높다).
+--    개발 DB 기준 0건이었다(2026-08-19 확인).
+
+SELECT COUNT(*) AS local_http_profile_image
+FROM users WHERE profile_image_url LIKE 'http%' AND provider = 'LOCAL';
 
 UPDATE users
 SET social_profile_image_url = profile_image_url,

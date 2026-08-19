@@ -27,6 +27,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -300,7 +302,7 @@ public class UserService {
 
 		// 새 사진이 올라간 뒤에 지운다 — 먼저 지우면 업로드가 실패했을 때 사진 없는 계정이 된다.
 		// 소셜 사진은 다른 칸에 있어 여기서 지워지지 않는다.
-		deletePreviousImage(previousKey);
+		deleteAfterCommit(previousKey);
 
 		return UserResponse.from(user, uploaded.url());
 	}
@@ -315,9 +317,34 @@ public class UserService {
 		String previousKey = user.getProfileImageUrl();
 
 		user.updateProfileImage(null);
-		deletePreviousImage(previousKey);
+		deleteAfterCommit(previousKey);
 
 		return UserResponse.from(user, profileImageUrlOf(user));
+	}
+
+	/**
+	 * 커밋이 끝난 뒤에 저장소에서 지운다.
+	 *
+	 * 트랜잭션 안에서 바로 지우면, 이후 flush·commit이 실패했을 때 DB는 이전 키를 그대로
+	 * 가리키는데 파일은 이미 없어 사진이 깨진다. 커밋 후로 미루면 실패 시 고아 객체만 남고
+	 * 사용자에게 보이는 손상은 없다 — 둘 중에는 후자가 낫다.
+	 *
+	 * 트랜잭션 밖에서 호출된 경우(테스트 등)에는 즉시 지운다.
+	 */
+	private void deleteAfterCommit(String objectKey) {
+		if (objectKey == null) {
+			return;
+		}
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			deletePreviousImage(objectKey);
+			return;
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				deletePreviousImage(objectKey);
+			}
+		});
 	}
 
 	/** 저장소에서 지우는 데 실패해도 사용자 동작은 성공이다 — 남은 객체는 정리 작업의 몫이다. */
