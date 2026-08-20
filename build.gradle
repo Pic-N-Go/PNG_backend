@@ -26,7 +26,11 @@ dependencies {
 	//
 	// flyway-mysql을 따로 넣는 이유: Flyway 10부터 DB별 지원이 코어에서 분리됐다.
 	// 이게 없으면 기동 시 "MySQL을 지원하지 않는다"며 실패한다.
-	implementation 'org.flywaydb:flyway-core'
+	//
+	// spring-boot-flyway: Boot 4.0부터 Flyway 자동설정이 spring-boot-autoconfigure에서
+	// 별도 모듈로 분리됐다. 이게 없으면 flyway-core가 클래스패스에 있어도 마이그레이션이
+	// 아예 실행되지 않는다(로그도 안 남고 ddl-auto: validate만 실패한다).
+	implementation 'org.springframework.boot:spring-boot-flyway'
 	implementation 'org.flywaydb:flyway-mysql'
 
 	// Redis

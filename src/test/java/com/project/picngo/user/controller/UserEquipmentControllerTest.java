@@ -5,6 +5,8 @@ import com.project.picngo.user.domain.EquipmentType;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.domain.UserEquipment;
 import com.project.picngo.user.repository.UserEquipmentRepository;
+import com.project.picngo.user.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -19,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -42,18 +45,34 @@ class UserEquipmentControllerTest {
     @Autowired
     private UserEquipmentRepository userEquipmentRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    private Long userId;
+
+    // 등록 API가 사용자 존재를 확인하므로(장비 등록 직렬화) 실제 사용자 행이 필요하다.
+    @BeforeEach
+    void setUp() {
+        userId = userRepository.saveAndFlush(User.createLocalUser(
+                "equipment-controller@test.com",
+                "encoded-password",
+                "장비테스터",
+                Set.of()
+        )).getId();
+    }
+
     @Test
     @DisplayName("인증 없이 내 장비 API를 호출하면 접근을 거부한다")
     void rejectsUnauthenticatedRequest() throws Exception {
         mockMvc.perform(get("/users/me/equipments"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
     @DisplayName("장비를 등록하고 내 장비 목록에서 조회한다")
     void createsAndGetsEquipment() throws Exception {
         mockMvc.perform(post("/users/me/equipments")
-                        .with(authentication(authenticationOf(1L)))
+                        .with(authentication(authenticationOf(userId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -66,7 +85,7 @@ class UserEquipmentControllerTest {
                 .andExpect(jsonPath("$.equipmentName").value("Sony A7IV"));
 
         mockMvc.perform(get("/users/me/equipments")
-                        .with(authentication(authenticationOf(1L))))
+                        .with(authentication(authenticationOf(userId))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].equipmentType").value("CAMERA"))
                 .andExpect(jsonPath("$[0].equipmentName").value("Sony A7IV"));
@@ -76,7 +95,7 @@ class UserEquipmentControllerTest {
     @DisplayName("장비 이름이 비어 있거나 지원하지 않는 종류이면 400을 반환한다")
     void validatesCreateRequest() throws Exception {
         mockMvc.perform(post("/users/me/equipments")
-                        .with(authentication(authenticationOf(1L)))
+                        .with(authentication(authenticationOf(userId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -87,7 +106,7 @@ class UserEquipmentControllerTest {
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/users/me/equipments")
-                        .with(authentication(authenticationOf(1L)))
+                        .with(authentication(authenticationOf(userId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -102,11 +121,11 @@ class UserEquipmentControllerTest {
     @DisplayName("같은 장비를 중복 등록하면 409를 반환한다")
     void rejectsDuplicateEquipment() throws Exception {
         userEquipmentRepository.saveAndFlush(
-                UserEquipment.create(1L, EquipmentType.CAMERA, "Sony A7IV")
+                UserEquipment.create(userId, EquipmentType.CAMERA, "Sony A7IV")
         );
 
         mockMvc.perform(post("/users/me/equipments")
-                        .with(authentication(authenticationOf(1L)))
+                        .with(authentication(authenticationOf(userId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -122,11 +141,11 @@ class UserEquipmentControllerTest {
     @DisplayName("본인 장비를 수정하고 삭제한다")
     void updatesAndDeletesOwnedEquipment() throws Exception {
         UserEquipment equipment = userEquipmentRepository.saveAndFlush(
-                UserEquipment.create(1L, EquipmentType.CAMERA, "Sony A7IV")
+                UserEquipment.create(userId, EquipmentType.CAMERA, "Sony A7IV")
         );
 
         mockMvc.perform(put("/users/me/equipments/{equipmentId}", equipment.getId())
-                        .with(authentication(authenticationOf(1L)))
+                        .with(authentication(authenticationOf(userId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -139,7 +158,7 @@ class UserEquipmentControllerTest {
                 .andExpect(jsonPath("$.equipmentName").value("24-70mm F2.8"));
 
         mockMvc.perform(delete("/users/me/equipments/{equipmentId}", equipment.getId())
-                        .with(authentication(authenticationOf(1L))))
+                        .with(authentication(authenticationOf(userId))))
                 .andExpect(status().isNoContent());
 
         assertThat(userEquipmentRepository.findById(equipment.getId())).isEmpty();
@@ -153,7 +172,7 @@ class UserEquipmentControllerTest {
         );
 
         mockMvc.perform(put("/users/me/equipments/{equipmentId}", otherUsersEquipment.getId())
-                        .with(authentication(authenticationOf(1L)))
+                        .with(authentication(authenticationOf(userId)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -165,7 +184,7 @@ class UserEquipmentControllerTest {
                 .andExpect(jsonPath("$.code").value("USER_EQUIPMENT_NOT_FOUND"));
 
         mockMvc.perform(delete("/users/me/equipments/{equipmentId}", otherUsersEquipment.getId())
-                        .with(authentication(authenticationOf(1L))))
+                        .with(authentication(authenticationOf(userId))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("USER_EQUIPMENT_NOT_FOUND"));
 

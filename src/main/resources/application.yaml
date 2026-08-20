@@ -53,7 +53,9 @@ spring:
     time-zone: Asia/Seoul
 
   jpa:
-    defer-datasource-initialization: true
+    # defer-datasource-initialization은 뺐다. ddl-auto: update 시절 Hibernate가 테이블을
+    # 만든 뒤에 data.sql을 돌리려고 켰던 설정인데, 이제 스키마는 Flyway가 먼저 만든다.
+    # 켜둔 채로 두면 flyway <-> entityManagerFactory 사이에 depends-on 순환이 생겨 기동 실패한다.
     hibernate:
       # 스키마는 이제 Flyway가 만든다(src/main/resources/db/migration).
       # validate는 "엔티티와 실제 테이블이 맞는지 검사만" 한다 - 만들지도 고치지도 않는다.
