@@ -10,7 +10,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: 1. 레포지토리 코드 체크아웃
         uses: actions/checkout@v4
