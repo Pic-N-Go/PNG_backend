@@ -21,6 +21,14 @@ dependencies {
 	// Spring Data JPA
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+	// Flyway (DB 마이그레이션). 앱이 뜰 때 db/migration의 SQL을 순서대로 적용하고
+	// 적용 이력을 flyway_schema_history 테이블에 남긴다.
+	//
+	// flyway-mysql을 따로 넣는 이유: Flyway 10부터 DB별 지원이 코어에서 분리됐다.
+	// 이게 없으면 기동 시 "MySQL을 지원하지 않는다"며 실패한다.
+	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.flywaydb:flyway-mysql'
+
 	// Redis
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 

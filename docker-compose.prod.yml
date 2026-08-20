@@ -55,6 +55,20 @@ services:
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
       WEBSOCKET_ALLOWED_ORIGIN_PATTERNS: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
+      # 검색 설정.
+      #
+      # --env-file은 이 파일 안의 ${...}를 치환할 뿐, 컨테이너 안으로 전달하지 않는다.
+      # 여기 이름을 적어두지 않으면 .env.prod에 값이 있어도 앱에는 닿지 않는다.
+      # 그러면 아래 기본값이 적용돼 에러 없이 조용히 LIKE 검색으로 돌아간다.
+      #
+      # 기본값을 붙여두는 이유: .env.prod에 항목이 빠져도 배포가 깨지지 않게 하려는 것이다.
+      # 값의 의미는 application.yaml의 picngo.search 주석 참고.
+      SEARCH_ENGINE: ${SEARCH_ENGINE:-LIKE}
+      SEARCH_NORMALIZE_FALLBACK: ${SEARCH_NORMALIZE_FALLBACK:-false}
+      SEARCH_SIMILAR_FALLBACK: ${SEARCH_SIMILAR_FALLBACK:-false}
+      SEARCH_FUZZY_FALLBACK: ${SEARCH_FUZZY_FALLBACK:-false}
+      SEARCH_SEMANTIC_FALLBACK: ${SEARCH_SEMANTIC_FALLBACK:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # firebase-key.json을 이미지에 굽지 않고 아래 volumes로 마운트한 파일을 가리킨다.
       FIREBASE_CONFIG_PATH: file:/app/secrets/firebase-key.json
     volumes:
