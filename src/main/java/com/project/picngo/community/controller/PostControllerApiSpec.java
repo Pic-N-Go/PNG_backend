@@ -30,9 +30,13 @@ public interface PostControllerApiSpec {
             summary = "게시글 목록 조회",
             description = """
                     게시글 목록을 조회합니다. 인증은 선택 사항이며, 인증된 경우 좋아요·북마크 여부가 함께 반환됩니다.
-                    sort는 POPULAR(기본), LATEST, MY_POSTS, FOLLOWING을 지원합니다.
-                    MY_POSTS와 FOLLOWING은 로그인이 필요합니다.
+                    sort는 POPULAR(기본), LATEST, MY_POSTS, FOLLOWING, BOOKMARKED를 지원합니다.
+                    MY_POSTS·FOLLOWING·BOOKMARKED는 로그인이 필요합니다.
+                    BOOKMARKED는 내가 저장한 글이며, 정렬은 저장 시각이 아니라 작성 시각입니다.
                     keyword는 게시글 내용과 스팟 이름을 검색합니다.
+                    authorId를 주면 그 사용자가 쓴 글만 조회합니다(프로필 화면의 게시글 탭).
+                    POPULAR·LATEST에서만 적용되며, MY_POSTS·FOLLOWING·BOOKMARKED는 대상 글이
+                    "내 글"·"팔로우한 사람의 글"·"내가 저장한 글"로 이미 정해져 있어 authorId를 무시합니다.
                     """
     )
     ResponseEntity<PostPageResponse> getPosts(
@@ -41,6 +45,8 @@ public interface PostControllerApiSpec {
             @RequestParam(defaultValue = "POPULAR") PostSort sort,
             @Parameter(description = "게시글 내용 또는 스팟 이름 검색어", example = "한강")
             @RequestParam(required = false) String keyword,
+            @Parameter(description = "작성자 ID로 필터링", example = "108")
+            @RequestParam(required = false) Long authorId,
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기(1~100)", example = "20")

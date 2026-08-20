@@ -1,6 +1,8 @@
 package com.project.picngo.auth.config;
 
 import com.project.picngo.auth.service.JwtAuthenticationFilter;
+import com.project.picngo.auth.service.JwtAuthenticationEntryPoint;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -44,16 +46,14 @@ public class SecurityConfig {
             "/swagger-resources/**",
             "/ws",
             "/ws/**",
-            "/notifications/test/**",
             // Docker HEALTHCHECK·로드밸런서가 인증 없이 때린다. management.endpoints에서
             // health만 노출하도록 이미 제한해뒀다(application-prod.yaml).
             "/actuator/health",
             "/actuator/prometheus"
     };
 
-
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
 	// loadtest 프로파일에서만 존재하는 빈. 운영에서는 비어 있어 아무 엔드포인트도 열리지 않는다.
 	private final ObjectProvider<LoadTestPublicEndpoints> loadTestPublicEndpoints;
@@ -68,6 +68,8 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> {
 				auth
+					// 관리자 전용 API (/admin/**) - 임베딩 백필 및 관광공사 데이터 동기화 포함.
+					.requestMatchers("/admin/**").hasRole("ADMIN")
 					.requestMatchers(HttpMethod.GET, "/posts", "/posts/**").permitAll()
 					// 관심테마 기반 개인화 추천이라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 					.requestMatchers(HttpMethod.GET, "/spots/recommended").authenticated()
@@ -77,8 +79,7 @@ public class SecurityConfig {
 					// 북마크는 사용자별 데이터라 로그인 필요. PUBLIC_ENDPOINTS의 /spots/** 보다 먼저 와야 적용된다.
 					.requestMatchers("/spots/*/bookmark-collections").authenticated()
 					.requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll()
-					.requestMatchers("/tour-api/**").permitAll(); // Spot Detail: 로컬 Swagger 테스트용, 배포 전 hasRole("ADMIN") 으로 변경 필요
+					.requestMatchers(HttpMethod.GET, "/reviews/*/exif").permitAll();
 
 				// loadtest 프로파일일 때만 부하테스트/관리자용 엔드포인트를 추가로 연다.
 				LoadTestPublicEndpoints extra = loadTestPublicEndpoints.getIfAvailable();
@@ -90,6 +91,15 @@ public class SecurityConfig {
 
 				auth.anyRequest().authenticated();
 			})
+			.exceptionHandling(exception -> exception
+				.authenticationEntryPoint(jwtAuthenticationEntryPoint)
+				.accessDeniedHandler(
+					(request, response, accessDeniedException) ->
+						response.sendError(
+							HttpServletResponse.SC_FORBIDDEN, "접근 권한이 없습니다."
+						)
+				)
+			)
 			.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 			.build();
 	}

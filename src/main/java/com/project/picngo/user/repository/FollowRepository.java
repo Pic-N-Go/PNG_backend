@@ -25,9 +25,20 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     @Query("select f from Follow f join fetch f.following where f.follower = :follower")
     List<Follow> findAllByFollower(@Param("follower") User follower);
 
-    // 팔로워 수 조회 -> user를 팔로우하는 사람 수(팔로워 수)
-    long countByFollowing(User following);
+    // 특정 사용자를 팔로우하는 사람들의 User ID 목록 조회 (탈퇴 계정 제외)
+    @Query("select f.follower.id from Follow f where f.following.id = :followingId and f.follower.deletedAt is null")
+    List<Long> findFollowerUserIdsByFollowingId(@Param("followingId") Long followingId);
 
-    // 팔로잉 수 조회 -> user가 팔로우하는 사람 수(팔로잉 수)
-    long countByFollower(User follower);
+    /*
+     * 팔로워·팔로잉 수. 목록(findAllBy*)은 탈퇴 계정을 걸러내므로 수도 같이 걸러야 한다 —
+     * 안 맞추면 "팔로워 12명"인데 목록에는 10명만 나온다.
+     */
+
+    // user를 팔로우하는 사람 수 (탈퇴 계정 제외)
+    @Query("select count(f) from Follow f where f.following = :following and f.follower.deletedAt is null")
+    long countByFollowing(@Param("following") User following);
+
+    // user가 팔로우하는 사람 수 (탈퇴 계정 제외)
+    @Query("select count(f) from Follow f where f.follower = :follower and f.following.deletedAt is null")
+    long countByFollower(@Param("follower") User follower);
 }

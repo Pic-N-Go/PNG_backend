@@ -15,11 +15,21 @@ public interface AuthControllerApiSpec {
 	@Operation(summary = "일반 회원가입", description = "이메일 인증이 완료된 사용자 정보를 바탕으로 일반 회원을 생성하고 액세스 토큰을 반환합니다.")
 	ResponseEntity<TokenResponse> signUp(@Valid @RequestBody SignUpRequest request);
 
-	@Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 일반 회원을 인증하고 액세스 토큰을 반환합니다.")
+	@Operation(summary = "일반 로그인", description = "이메일과 비밀번호로 일반 회원을 인증하고 액세스 토큰을 반환합니다.\n\n"
+			+ "탈퇴 대기 중인 계정이면 토큰 대신 403 ACCOUNT_WITHDRAWN을 반환합니다. 이때 클라이언트는 복구 안내를 띄우고 "
+			+ "같은 자격증명으로 POST /auth/restore를 호출하면 됩니다.")
 	ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request);
 
 	@Operation(summary = "카카오 로그인", description = "카카오 SDK에서 발급받은 accessToken으로 사용자를 인증하고, 가입 이력이 없으면 소셜 회원을 생성한 뒤 서비스 액세스 토큰을 반환합니다.")
 	ResponseEntity<TokenResponse> loginWithKakao(@Valid @RequestBody KakaoLoginRequest request);
+
+	@Operation(summary = "탈퇴 계정 복구", description = "탈퇴 후 30일 이내인 계정을 되돌리고 액세스 토큰을 반환합니다.\n\n"
+			+ "탈퇴 계정은 토큰을 받을 수 없어 인증이 필요한 경로로는 복구를 시작할 수 없으므로, 로그인과 같은 자격증명을 받습니다. "
+			+ "기간이 지났으면 410 RESTORE_PERIOD_EXPIRED를 반환합니다.")
+	ResponseEntity<TokenResponse> restore(@Valid @RequestBody LoginRequest request);
+
+	@Operation(summary = "탈퇴 계정 복구 (카카오)", description = "소셜 계정은 비밀번호가 없어 카카오 accessToken으로 본인 확인 후 복구합니다.")
+	ResponseEntity<TokenResponse> restoreWithKakao(@Valid @RequestBody KakaoLoginRequest request);
 
 	@Operation(summary = "이메일 인증 코드 발송", description = "아직 가입되지 않은 이메일 주소로 인증 코드를 발송합니다.")
 	ResponseEntity<EmailVerificationResponse> sendEmailVerificationCode(@Valid @RequestBody EmailVerificationRequest request);
@@ -41,4 +51,9 @@ public interface AuthControllerApiSpec {
 	ResponseEntity<Void> resetPassword(
 			@Valid @RequestBody PasswordResetRequest request
 	);
+
+    @Operation(summary = "토큰 재발급", description = "유효한 리프레시 토큰으로 엑세스 토큰과 리프레시 토큰을 재발급합니다.")
+    ResponseEntity<TokenResponse> refreshTokens(
+            @Valid @RequestBody RefreshTokenRequest request
+    );
 }

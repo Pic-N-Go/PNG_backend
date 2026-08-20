@@ -7,10 +7,15 @@ import com.project.picngo.spot.repository.SpotRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.project.picngo.spot.config.SearchEngine;
+import com.project.picngo.spot.config.SearchProperties;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 
@@ -29,6 +34,14 @@ class SpotServiceCategoryTest {
 
     @Mock
     private SpotRepository spotRepository;
+
+    // 검색 계측용 MeterRegistry. mock을 넣으면 register()가 null을 돌려줘서
+    // Timer.Sample.stop(null)에서 NPE가 난다 - 실제 동작하는 인메모리 구현을 주입한다.
+    @Spy
+    private MeterRegistry meterRegistry = new SimpleMeterRegistry();
+
+    @Spy
+    private SearchProperties searchProperties = new SearchProperties(SearchEngine.LIKE, false, false, false, false);
 
     @InjectMocks
     private SpotService spotService;
@@ -53,7 +66,7 @@ class SpotServiceCategoryTest {
         given(spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(any(), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot(Set.of(SpotCategory.MOUNTAIN, SpotCategory.SUNRISE_SUNSET)))));
 
-        spotService.getSpots(List.of("MOUNTAIN,SUNRISE_SUNSET"), "latest", 0, 20);
+        spotService.getSpots(List.of("MOUNTAIN,SUNRISE_SUNSET"), "latest", 0, 20, null);
 
         verify(spotRepository).findAllByCategoriesAndStatusAndIsActiveTrue(
                 categoriesCaptor.capture(), eq(SpotStatus.APPROVED), any());
@@ -67,7 +80,7 @@ class SpotServiceCategoryTest {
         given(spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(any(), eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of()));
 
-        spotService.getSpots(List.of("MOUNTAIN", "INVALID_TEXT"), "latest", 0, 20);
+        spotService.getSpots(List.of("MOUNTAIN", "INVALID_TEXT"), "latest", 0, 20, null);
 
         verify(spotRepository).findAllByCategoriesAndStatusAndIsActiveTrue(
                 categoriesCaptor.capture(), eq(SpotStatus.APPROVED), any());
@@ -81,7 +94,7 @@ class SpotServiceCategoryTest {
                 .willReturn(new PageImpl<>(List.of()));
 
         // PORTRAIT는 삭제된 enum, INVALID_TEXT는 오타
-        spotService.getSpots(List.of("PORTRAIT", "INVALID_TEXT"), "latest", 0, 20);
+        spotService.getSpots(List.of("PORTRAIT", "INVALID_TEXT"), "latest", 0, 20, null);
 
         verify(spotRepository).findAllByStatusAndIsActiveTrue(eq(SpotStatus.APPROVED), any());
         verify(spotRepository, never()).findAllByCategoriesAndStatusAndIsActiveTrue(any(), any(), any());
@@ -93,7 +106,7 @@ class SpotServiceCategoryTest {
         given(spotRepository.findAllByStatusAndIsActiveTrue(eq(SpotStatus.APPROVED), any()))
                 .willReturn(new PageImpl<>(List.of(spot(Set.of()))));
 
-        var response = spotService.getSpots(List.of(), "latest", 0, 20);
+        var response = spotService.getSpots(List.of(), "latest", 0, 20, null);
 
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().get(0).categories()).containsExactly("ETC");

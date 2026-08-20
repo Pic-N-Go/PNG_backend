@@ -27,10 +27,11 @@ public class PostController implements PostControllerApiSpec {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @RequestParam(defaultValue = "POPULAR") PostSort sort,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long authorId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(postService.getPosts(userId(userDetails), sort, keyword, page, size));
+        return ResponseEntity.ok(postService.getPosts(userId(userDetails), sort, keyword, authorId, page, size));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

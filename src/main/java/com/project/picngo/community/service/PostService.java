@@ -13,7 +13,9 @@ import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.community.domain.*;
 import com.project.picngo.community.dto.*;
 import com.project.picngo.community.repository.*;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
+import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
@@ -43,14 +45,23 @@ public class PostService {
     private final PostLikeRepository likeRepository;
     private final PostBookmarkRepository bookmarkRepository;
     private final PostCommentRepository commentRepository;
+    private final PostCommentLikeRepository commentLikeRepository;
     private final UserRepository userRepository;
+    private final FollowRepository followRepository;
     private final SpotRepository spotRepository;
     private final ExifExtractor exifExtractor;
     private final ImageStorageService imageStorageService;
+    private final NotificationService notificationService;
 
-    public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, int page, int size) {
+    /**
+     * @param authorId 지정하면 그 사용자가 쓴 글만 준다(프로필 화면의 게시글 탭).
+     *                 POPULAR·LATEST에만 적용된다. MY_POSTS·FOLLOWING·BOOKMARKED는 대상 글이
+     *                 "내 글"·"팔로우한 사람의 글"·"내가 저장한 글"로 이미 정해져 있어 이 값을 무시한다
+     *                 (섞어 쓸 화면이 없다 — 프로필 게시글 탭은 LATEST + authorId로 조회한다).
+     */
+    public PostPageResponse getPosts(Long userId, PostSort sort, String keyword, Long authorId, int page, int size) {
 
-        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING) && userId == null) {
+        if ((sort == PostSort.MY_POSTS || sort == PostSort.FOLLOWING || sort == PostSort.BOOKMARKED) && userId == null) {
             throw new CustomException(AuthErrorCode.LOGIN_REQUIRED);
         }
         // 너무 큰 사이즈 요청이 올 경우 100으로 조정
@@ -60,8 +71,9 @@ public class PostService {
 
         Page<Post> result = switch (sort) {
             case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
-            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, null, pageable);
+            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, pageable);
             case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
+            case BOOKMARKED -> postRepository.searchBookmarked(normalizedKeyword, userId, pageable);
         };
         List<PostResponse> posts = toFeedResponses(result.getContent(), userId);
 
@@ -112,6 +124,10 @@ public class PostService {
                 imageRepository.save(image);
             }
             imageRepository.flush();
+
+            // 🔔 팔로워(구독자) 대상 새 글 알림 비동기 큐 Fan-out
+            sendNewPostNotificationsToFollowers(author, post);
+
             return toResponse(post, userId);
             //오류 발생 시 s3 업로드 삭제, 트랜잭션 롤백으로 데이터 정합성 보장
         } catch (RuntimeException exception) {
@@ -126,6 +142,24 @@ public class PostService {
         if (!likeRepository.existsByPostIdAndUserId(postId, userId)) {
             likeRepository.save(new PostLike(post, userId));
             postRepository.changeLikeCount(postId, 1);
+
+            // 🔔 게시글 좋아요 알림 (본인 좋아요 제외)
+            if (post.getAuthor() != null && !post.getAuthor().getId().equals(userId)) {
+                User liker = userRepository.findById(userId).orElse(null);
+                String likerNickname = liker != null ? liker.getNickname() : "회원";
+                Long spotId = post.getSpot() != null ? post.getSpot().getId() : null;
+                String dedupeKey = "LIKE:" + userId + ":" + postId + ":" + java.time.LocalDate.now();
+
+                notificationService.sendPushNotification(
+                        post.getAuthor().getId(),
+                        "COMMUNITY_LIKE",
+                        "게시글 좋아요",
+                        likerNickname + "님이 회원님의 게시글을 좋아합니다.",
+                        "/community/post/" + postId,
+                        spotId,
+                        dedupeKey
+                );
+            }
         }
         return new ReactionResponse(true, findPost(postId).getLikeCount());
     }
@@ -243,6 +277,8 @@ public class PostService {
         List<String> imageObjectKeys = imageRepository.findObjectKeysByPostId(postId);
 
         // 댓글·좋아요·북마크는 데이터가 많아질 수 있으므로 JPA Cascade 대신 게시글 ID 기준 일괄 삭제 쿼리를 사용
+        // 댓글 좋아요는 댓글을 참조하므로 반드시 댓글보다 먼저 지운다(FK 위반 방지).
+        commentLikeRepository.deleteAllByPostId(postId);
         commentRepository.deleteAllByPostId(postId);
         likeRepository.deleteAllByPostId(postId);
         bookmarkRepository.deleteAllByPostId(postId);
@@ -363,7 +399,7 @@ public class PostService {
                 post.getCameraModel(),
                 post.getLensModel(),
                 List.copyOf(post.getTags()),
-                PostAuthorResponse.from(post.getAuthor()),
+                PostAuthorResponse.from(post.getAuthor(), imageStorageService.getPresignedUrl(post.getAuthor().getDisplayProfileImage())),
                 images,
                 post.getLikeCount(),
                 post.getCommentCount(),
@@ -383,7 +419,7 @@ public class PostService {
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
-            case MY_POSTS, LATEST, FOLLOWING -> Sort.by(
+            case MY_POSTS, LATEST, FOLLOWING, BOOKMARKED -> Sort.by(
                     Sort.Order.desc("createdAt"),
                     Sort.Order.desc("id")
             );
@@ -502,6 +538,31 @@ public class PostService {
                         cleanupException
                 );
             }
+        }
+    }
+
+    private void sendNewPostNotificationsToFollowers(User author, Post post) {
+        try {
+            List<Long> followerIds = followRepository.findFollowerUserIdsByFollowingId(author.getId());
+            if (!followerIds.isEmpty()) {
+                String postSnippet = post.getContent().length() > 30
+                        ? post.getContent().substring(0, 30) + "..."
+                        : post.getContent();
+                Long spotId = post.getSpot() != null ? post.getSpot().getId() : null;
+
+                for (Long followerId : followerIds) {
+                    notificationService.sendPushNotification(
+                            followerId,
+                            "COMMUNITY_NEW_POST",
+                            "새 게시글 알림",
+                            author.getNickname() + "님이 새 글을 등록했습니다: " + postSnippet,
+                            "/community/post/" + post.getId(),
+                            spotId
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.warn("게시글 등록 알림 발송 중 예외 발생 (authorId: {}, postId: {})", author.getId(), post.getId(), e);
         }
     }
 }

@@ -278,7 +278,7 @@ public class NotificationScheduler {
             if (Math.abs(diffMinutes) <= 5) {
                 log.info("유저 {} 의 스팟 {} 에 대해 {} 골든아워 임박 알림 발송 조건 충족! (D-{})", userId, spot.getId(), timeCondition, dDay);
                 String dayStr = dDay == 0 ? "오늘" : dDay + "일 뒤";
-                String title = "🌅 골든아워 알림";
+                String title = "골든아워 알림";
                 String content = String.format("%s %s %s 시간은 %02d시 %02d분 입니다.", dayStr, spot.getName(), timeCondition == TimeCondition.SUNRISE ? "일출" : "일몰", targetKst.getHour(), targetKst.getMinute());
                 // 멱등키: 같은 날·같은 스팟·같은 일출/일몰 알림 중복 방지
                 String ghDedupeKey = String.format("GOLDEN_HOUR:%d:%d:%s:%s", userId, spot.getId(), targetDate, timeCondition);
@@ -352,7 +352,7 @@ public class NotificationScheduler {
                     // 시간대별로 메시지를 구분해 유저가 어느 촬영 시간대 알림인지 알 수 있게 한다.
                     String whenStr = targetOffset == 0 ? "오늘" : (targetOffset == 1 ? "내일" : targetOffset + "일 뒤");
                     String timeLabel = timeConditionLabel(timeCondition);
-                    String title = String.format("☁️ %s 날씨 조건 알림", timeLabel);
+                    String title = String.format("%s 날씨 조건 알림", timeLabel);
                     String content = String.format("%s %s %s의 날씨가 설정하신 조건과 일치할 예정입니다!", whenStr, timeLabel, spot.getName());
                     // 멱등키: 같은 날·같은 스팟이라도 촬영 시간대별로 별개 알림 → timeCondition까지 포함
                     String dedupeKey = String.format("WEATHER_MATCH:%d:%d:%s:%s", userId, spot.getId(), targetDateStr, timeCondition);
@@ -401,10 +401,4 @@ public class NotificationScheduler {
                 .toList();
     }
 
-    // TODO: 운영 배포 전 또는 프론트엔드 알림 테스트 완료 후 테스트용 수동 스케줄러 강제 실행 메서드 삭제 필요
-    public void triggerAllSchedulersManually() {
-        log.info("테스트용 수동 스케줄러 강제 실행 (오전 날씨 알림 1회)...");
-        processFixedTimeNotification(TimeCondition.MORNING);
-        log.info("테스트용 수동 스케줄러 강제 실행 완료.");
-    }
 }

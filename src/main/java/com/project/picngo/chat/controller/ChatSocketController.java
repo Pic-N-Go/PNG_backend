@@ -29,9 +29,11 @@ public class ChatSocketController {
     public void sendMessage(
             @DestinationVariable Long spotId,
             @Valid ChatMessageSendRequest request,
-            Principal principal
+            Principal principal,
+            SimpMessageHeaderAccessor headerAccessor
     ) {
         CustomUserDetails userDetails = getUserDetails(principal);
+        validateSessionAttributes(spotId, headerAccessor);
 
         ChatMessageResponse response = chatMessageService.sendMessage(
                 spotId,
@@ -110,7 +112,7 @@ public class ChatSocketController {
         }
 
         if (!sessionSpotId.equals(requestSpotId)) {
-            throw new AccessDeniedException("현재 참여 중인 채팅방과 퇴장 요청 채팅방이 일치하지 않습니다.");
+            throw new AccessDeniedException("현재 참여 중인 채팅방과 요청한 채팅방이 일치하지 않습니다.");
         }
         return sessionAttributes;
     }

@@ -7,7 +7,6 @@ import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.dto.NotificationResponse;
 import com.project.picngo.notification.dto.NotificationSettingResponse;
 import com.project.picngo.notification.dto.NotificationSettingUpdateRequest;
-import com.project.picngo.notification.dto.NotificationTestRequest;
 import com.project.picngo.notification.repository.NotificationRepository;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import lombok.RequiredArgsConstructor;
@@ -144,25 +143,10 @@ public class NotificationService {
             return !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
         } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "SPOT_ALERT".equalsIgnoreCase(type)) {
             return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled());
-        } else if ("COMMUNITY".equalsIgnoreCase(type)) {
+        } else if (type != null && type.toUpperCase().startsWith("COMMUNITY")) {
             return !Boolean.FALSE.equals(setting.isCommunityPushEnabled());
-        } else if ("TEST".equalsIgnoreCase(type)) {
-            // 테스트 알림 발송 시: 출사알림 + 골든아워 알림 검사 (null은 기본 true 처리)
-            return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled()) && !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
         }
         return true;
-    }
-
-    // TODO: 운영 배포 전 또는 프론트엔드 알림 테스트 완료 후 테스트용 알림 발송 메서드 삭제 필요
-    public void sendTestPushNotification(Long userId, NotificationTestRequest request) {
-        String title = (request != null && request.title() != null && !request.title().isBlank())
-                ? request.title() : "픽앤고 테스트 알림 🔔";
-        String content = (request != null && request.content() != null && !request.content().isBlank())
-                ? request.content() : "프론트엔드 푸시 알림 수신 성공 테스트 메시지입니다!";
-        String deepLink = (request != null && request.deepLink() != null && !request.deepLink().isBlank())
-                ? request.deepLink() : "/spot-alerts/1";
-
-        sendPushNotification(userId, "TEST", title, content, deepLink);
     }
 
     @Scheduled(cron = "0 0 3 * * *")

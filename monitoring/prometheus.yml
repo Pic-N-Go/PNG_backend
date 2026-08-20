@@ -1,8 +1,5 @@
-# app 타겟은 지금 주석 처리되어 있다. Spring Boot 프로젝트에 아직
-# spring-boot-starter-actuator + micrometer-registry-prometheus 의존성이 없어서
-# /actuator/prometheus 엔드포인트 자체가 없다 (build.gradle 확인 결과).
-# 그 두 의존성을 추가하고 management.endpoints.web.exposure.include에
-# prometheus를 넣은 뒤 아래 주석을 풀면 서킷브레이커 상태 등을 실시간으로 수집할 수 있다.
+# 스크레이프 타겟은 docker-compose.prod.yml의 picngo-net 안에서 서비스명으로 해석된다.
+# 로컬(docker-compose.yml)에는 app/mysql 컨테이너가 없으므로, 이 파일은 prod 스택 기준이다.
 
 global:
   scrape_interval: 15s
@@ -12,8 +9,26 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
+  # Spring Boot 앱 지표. build.gradle에 actuator + micrometer-registry-prometheus가 있고
+  # application.yaml에서 prometheus 엔드포인트를 노출해둔 상태다.
+  # http_server_requests_seconds_bucket / hikaricp_* / spot_search_* 가 여기서 나온다.
   - job_name: 'picngo-app'
     metrics_path: '/actuator/prometheus'
     static_configs:
       - targets: ['app:8080']
 
+  # MySQL 내부 상태. 앱 지표가 "얼마나 느린가"를 보여준다면 여기서는 "왜 느린가"가 나온다.
+  # 검색 성능 분석에 쓰는 주요 지표:
+  #   mysql_global_status_handler_read_rnd_next          - 풀스캔으로 읽은 행 수
+  #   mysql_global_status_innodb_buffer_pool_reads       - 버퍼풀 미스(디스크 읽기)
+  #   mysql_global_status_created_tmp_disk_tables        - 디스크 임시테이블 생성
+  #   mysql_global_status_threads_running                - 동시 실행 스레드
+  #   mysql_perf_schema_events_statements_rows_examined_total
+  #     / mysql_perf_schema_events_statements_rows_sent_total  - 다이제스트별 선택도
+  #   mysql_perf_schema_events_statements_no_index_used_total  - 인덱스 미사용 실행 횟수
+  #
+  # 다이제스트 계열은 라벨(digest_text)이 길어 스크레이프가 무거우므로 간격을 벌린다.
+  - job_name: 'picngo-mysql'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['mysqld-exporter:9104']

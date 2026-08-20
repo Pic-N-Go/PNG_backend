@@ -21,6 +21,8 @@ import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.notification.service.NotificationService;
+import com.project.picngo.user.repository.FollowRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,10 +53,13 @@ class PostServiceTest {
     @Mock PostLikeRepository likeRepository;
     @Mock PostBookmarkRepository bookmarkRepository;
     @Mock PostCommentRepository commentRepository;
+    @Mock PostCommentLikeRepository commentLikeRepository;
     @Mock UserRepository userRepository;
+    @Mock FollowRepository followRepository;
     @Mock SpotRepository spotRepository;
     @Mock ExifExtractor exifExtractor;
     @Mock ImageStorageService imageStorageService;
+    @Mock NotificationService notificationService;
 
     @InjectMocks PostService service;
 
@@ -107,7 +113,7 @@ class PostServiceTest {
     void followingFeedRequiresAuthentication() {
         CustomException exception = assertThrows(
                 CustomException.class,
-                () -> service.getPosts(null, PostSort.FOLLOWING, null, 0, 20)
+                () -> service.getPosts(null, PostSort.FOLLOWING, null, null, 0, 20)
         );
 
         assertEquals(AuthErrorCode.LOGIN_REQUIRED, exception.getErrorCode());
@@ -123,7 +129,7 @@ class PostServiceTest {
                     return new PageImpl<>(List.of(), pageable, 0);
                 });
 
-        var response = service.getPosts(9L, PostSort.FOLLOWING, null, 0, 20);
+        var response = service.getPosts(9L, PostSort.FOLLOWING, null, null, 0, 20);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(postRepository).searchFollowing(isNull(), eq(9L), pageableCaptor.capture());
@@ -646,7 +652,7 @@ class PostServiceTest {
                     return new PageImpl<>(List.of(), pageable, 0);
                 });
 
-        service.getPosts(null, PostSort.LATEST, "  ", -5, 1000);
+        service.getPosts(null, PostSort.LATEST, "  ", null, -5, 1000);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(postRepository).search(isNull(), isNull(), pageableCaptor.capture());
@@ -660,7 +666,7 @@ class PostServiceTest {
         when(postRepository.search(isNull(), eq(9L), any(Pageable.class)))
                 .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(2), 0));
 
-        service.getPosts(9L, PostSort.MY_POSTS, null, 0, 20);
+        service.getPosts(9L, PostSort.MY_POSTS, null, null, 0, 20);
 
         verify(postRepository).search(isNull(), eq(9L), any(Pageable.class));
     }
@@ -670,7 +676,7 @@ class PostServiceTest {
     void myPostsRequiresAuthentication() {
         CustomException exception = assertThrows(
                 CustomException.class,
-                () -> service.getPosts(null, PostSort.MY_POSTS, null, 0, 20)
+                () -> service.getPosts(null, PostSort.MY_POSTS, null, null, 0, 20)
         );
 
         assertEquals(AuthErrorCode.LOGIN_REQUIRED, exception.getErrorCode());
@@ -693,7 +699,7 @@ class PostServiceTest {
         when(likeRepository.findLikedPostIds(9L, List.of(1L, 2L))).thenReturn(List.of(1L));
         when(bookmarkRepository.findBookmarkedPostIds(9L, List.of(1L, 2L))).thenReturn(List.of(2L));
 
-        var response = service.getPosts(9L, PostSort.LATEST, null, 0, 20);
+        var response = service.getPosts(9L, PostSort.LATEST, null, null, 0, 20);
 
         assertEquals(true, response.posts().get(0).liked());
         assertEquals(false, response.posts().get(0).bookmarked());
@@ -744,5 +750,28 @@ class PostServiceTest {
         when(post.getTags()).thenReturn(List.of());
         when(post.getAuthor()).thenReturn(mock(User.class));
         return post;
+    }
+
+    @Test
+    @DisplayName("authorId를 주면 그 작성자의 글만 조회한다")
+    void authorIdFiltersPostsByAuthor() {
+        when(postRepository.search(isNull(), eq(108L), any(Pageable.class)))
+                .thenAnswer(i -> new PageImpl<>(List.of(), i.getArgument(2), 0));
+
+        service.getPosts(9L, PostSort.LATEST, null, 108L, 0, 20);
+
+        verify(postRepository).search(isNull(), eq(108L), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("MY_POSTS는 내 글이라는 뜻이 정해져 있어 authorId를 무시한다")
+    void myPostsIgnoresAuthorId() {
+        when(postRepository.search(isNull(), eq(9L), any(Pageable.class)))
+                .thenAnswer(i -> new PageImpl<>(List.of(), i.getArgument(2), 0));
+
+        service.getPosts(9L, PostSort.MY_POSTS, null, 108L, 0, 20);
+
+        // authorId(108)가 아니라 로그인 사용자(9)로 조회해야 한다.
+        verify(postRepository).search(isNull(), eq(9L), any(Pageable.class));
     }
 }
