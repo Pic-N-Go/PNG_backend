@@ -19,6 +19,7 @@ public record InquiryCreateRequest(
 
         @Schema(description = "문의 내용", example = "제주도 코스 생성 시 특정 스팟이 포함되지 않는데 확인 부탁드립니다.")
         @NotBlank(message = "내용은 필수입니다.")
+        @Size(max = 1000, message = "내용은 최대 1000자까지 입력 가능합니다.")
         String content
 ) {
 }
