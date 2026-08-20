@@ -30,18 +30,21 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     List<Spot> findNearbySpots(@Param("lat") Double lat, @Param("lng") Double lng,
                                @Param("radiusKm") Double radiusKm, @Param("limit") int limit);
 
-    // 유저 관심테마와 겹치는 스팟을 앞으로, 나머지는 기존 인기순.
-    // 관심테마가 없는 유저(소셜 가입 등)는 EXISTS가 전부 0이라 인기순으로 자연 폴백된다.
-    // ponytail: 행마다 EXISTS + 전체 정렬. 스팟 수천 건 규모에선 충분, 수십만 건 되면 매칭 스팟만 먼저 뽑아 합치는 방식으로 교체
+    // 유저 관심테마와 겹치는 스팟만 반환한다. 겹치는 테마가 많은 순 → 인기순.
+    // INNER JOIN이라 관심테마가 없는 유저(소셜 가입 등)는 빈 목록이 되고, 클라이언트가
+    // 그걸 근거로 "관심 테마 설정" 안내를 띄운다 — 인기순으로 채우면 "관심 스팟" 제목 아래
+    // 무관한 스팟이 섞이고 사용자는 구분할 방법이 없다.
+    // 정렬 마지막이 RAND()가 아니라 s.id인 이유: 새로고침마다 순서가 바뀌면 캐시가 무의미하고
+    // 목록이 흔들려 보인다.
+    // ponytail: 매칭 스팟 전체를 정렬한다. 스팟 수천 건 규모에선 충분, 수십만 건 되면
+    // 카테고리별 상위 N만 미리 뽑아 합치는 방식으로 교체
     @Query(value = """
             SELECT s.* FROM spot s
-            WHERE s.is_active = true
-            ORDER BY EXISTS (
-                SELECT 1 FROM spot_categories sc
-                JOIN user_spot_categories uc ON uc.category = sc.category
-                WHERE sc.spot_id = s.id AND uc.user_id = :userId
-            ) DESC,
-            (s.review_count + s.bookmark_count) DESC, RAND()
+            JOIN spot_categories sc ON sc.spot_id = s.id
+            JOIN user_spot_categories uc ON uc.category = sc.category AND uc.user_id = :userId
+            WHERE s.is_active = true AND s.status = 'APPROVED'
+            GROUP BY s.id
+            ORDER BY COUNT(uc.category) DESC, (s.review_count + s.bookmark_count) DESC, s.id DESC
             LIMIT :limit
             """, nativeQuery = true)
     List<Spot> findRecommendedSpots(@Param("userId") Long userId, @Param("limit") int limit);

@@ -12,7 +12,7 @@
 | 회원가입 | GET | /categories | 관심 카테고리 목록 조회 | 소영재 | 미시작 |
 | 회원가입 | PUT | /users/me/preferences | 관심 카테고리 저장 | 소영재 | 미시작 |
 | 홈/지도 | GET | /spots/nearby | 내 위치 기반 주변 스팟 조회 | 박예은 | 미시작 |
-| 홈/지도 | GET | /spots/recommended | 오늘의 추천 스팟 | 박예은 | 미시작 |
+| 홈/지도 | GET | /spots/recommended | 관심 테마 기반 추천 스팟 | 박예은 | 완료 |
 | 홈/지도 | GET | /weather/current | 현재 위치 날씨 조회 | 박예은 | 미시작 |
 | 홈/지도 | GET | /weather/golden-hour | 골든아워 시간 계산 | 모정민 | 미시작 |
 | 홈/지도 | GET | /spots | 카테고리 필터 스팟 목록 | 이예인 | 미시작 |

@@ -112,8 +112,10 @@ public interface SpotControllerApiSpec {
 
     @Operation(
             summary = "추천 스팟 조회",
-            description = "로그인 유저의 관심테마와 겹치는 스팟을 우선 노출하고, 나머지는 리뷰+북마크 합산 인기순으로 채웁니다. "
-                    + "관심테마를 등록하지 않은 유저는 인기순만 반환됩니다. 로그인 필요. limit 기본값 10, 최대 20."
+            description = "로그인 유저의 관심테마와 카테고리가 겹치는 승인 스팟만 반환합니다. "
+                    + "겹치는 테마가 많은 순 → 리뷰+북마크 합산 인기순으로 정렬합니다. "
+                    + "관심테마를 등록하지 않았거나 겹치는 스팟이 없으면 빈 배열입니다(클라이언트가 관심테마 설정을 안내). "
+                    + "로그인 필요. limit 기본값 10, 최대 20."
     )
     ResponseEntity<List<RecommendedSpotResponse>> getRecommendedSpots(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,

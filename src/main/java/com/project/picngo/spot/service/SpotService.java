@@ -110,9 +110,10 @@ public class SpotService {
     }
 
     public List<RecommendedSpotResponse> getRecommendedSpots(Long userId, int limit) {
-        return spotRepository.findRecommendedSpots(userId, Math.min(limit, 20))
-                .stream()
-                .map(RecommendedSpotResponse::from)
+        List<Spot> spots = spotRepository.findRecommendedSpots(userId, Math.min(limit, 20));
+        Set<Long> bookmarked = bookmarkedSpotIds(userId, spots);
+        return spots.stream()
+                .map(spot -> RecommendedSpotResponse.from(spot, isBookmarked(bookmarked, spot)))
                 .toList();
     }
 
