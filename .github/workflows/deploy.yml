@@ -6,10 +6,10 @@ on:
       - main
   workflow_dispatch:
 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: 1. 레포지토리 코드 체크아웃
         uses: actions/checkout@v4
@@ -26,10 +26,6 @@ jobs:
           chmod +x gradlew
           ./gradlew bootJar -x test
 
-      # docs를 넣는 이유: 마이그레이션 SQL이 여기 있는데, EC2에는 git 저장소가 없어
-      # 서버에서 받을 방법이 없다. 이게 없으면 스키마를 바꿀 때마다 scp로 따로 옮겨야 한다.
-      # 배포 후 /home/ubuntu/docs/*.sql 로 풀린다. 자동 실행되지는 않는다 -
-      # 적용 순서와 방법은 docs/deployment-checklist.md 참고.
       - name: 4. 배포용 파일 압축
         run: |
           tar -cvf deploy.tar \
@@ -54,23 +50,17 @@ jobs:
           target: "/home/ubuntu"
 
       - name: 6. EC2 서버에서 .env.prod 생성 및 도커 배포 재실행 (SSH)
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          set -e
-
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
             cd /home/ubuntu
 
-            # 이전 배포에서 남은 소스 제거
-            # .env.prod와 secrets 디렉터리는 보존
-            rm -rf \
-              /home/ubuntu/src \
-              /home/ubuntu/gradle \
-              /home/ubuntu/monitoring \
-              /home/ubuntu/build
+            # 이전 배포에서 남은 소스 제거 (.env.prod 보존)
+            rm -rf /home/ubuntu/src /home/ubuntu/gradle /home/ubuntu/monitoring /home/ubuntu/build
 
             tar -xvf deploy.tar
 
