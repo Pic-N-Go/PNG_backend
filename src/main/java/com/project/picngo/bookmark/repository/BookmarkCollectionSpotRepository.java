@@ -22,4 +22,17 @@ public interface BookmarkCollectionSpotRepository extends JpaRepository<Bookmark
     @Query("select distinct bcs.spotId from BookmarkCollectionSpot bcs "
             + "where bcs.collection.userId = :userId and bcs.spotId in :spotIds")
     List<Long> findBookmarkedSpotIds(@Param("userId") Long userId, @Param("spotIds") Collection<Long> spotIds);
+
+    // 컬렉션 상세용. 멤버십 id가 담은 순서라 desc면 최근 담은 것부터가 된다
+    // (BookmarkCollectionSpot은 BaseTimeEntity를 상속하지 않아 createdAt이 없다).
+    @Query("select bcs.spotId from BookmarkCollectionSpot bcs "
+            + "where bcs.collection.id = :collectionId order by bcs.id desc")
+    List<Long> findSpotIdsByCollectionId(@Param("collectionId") Long collectionId);
+
+    // MY 탭의 "북마크한 스팟" — 컬렉션 구분 없이 전부. 같은 스팟이 여러 컬렉션에 있으면 한 번만 센다.
+    // 정렬 기준이 max(id)라 여러 컬렉션에 담긴 스팟은 가장 최근에 담은 시점으로 줄을 선다.
+    @Query("select bcs.spotId from BookmarkCollectionSpot bcs "
+            + "where bcs.collection.userId = :userId "
+            + "group by bcs.spotId order by max(bcs.id) desc")
+    List<Long> findSpotIdsByUserId(@Param("userId") Long userId);
 }

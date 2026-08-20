@@ -4,6 +4,7 @@ import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.bookmark.dto.BookmarkCollectionResponse;
 import com.project.picngo.bookmark.dto.CreateCollectionRequest;
 import com.project.picngo.bookmark.dto.SyncCollectionsRequest;
+import com.project.picngo.spot.dto.SpotResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -28,6 +29,27 @@ public interface BookmarkCollectionControllerApiSpec {
     ResponseEntity<List<BookmarkCollectionResponse>> getCollections(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "소속 여부를 확인할 스팟 ID (선택)") @RequestParam(required = false) Long spotId
+    );
+
+    @Operation(
+            summary = "북마크한 스팟 전체 조회",
+            description = "컬렉션 구분 없이 담아둔 스팟을 최근 담은 순으로 반환합니다. 여러 컬렉션에 담긴 스팟은 한 번만 나옵니다. "
+                    + "응답의 isBookmarked는 항상 true입니다. 로그인 필요.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    ResponseEntity<List<SpotResponse>> getBookmarkedSpots(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
+
+    @Operation(
+            summary = "컬렉션에 담긴 스팟 목록 조회",
+            description = "컬렉션에 담긴 스팟을 최근 담은 순으로 반환합니다. 응답의 isBookmarked는 항상 true입니다. "
+                    + "본인 컬렉션이 아니거나 없으면 404. 로그인 필요.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    ResponseEntity<List<SpotResponse>> getCollectionSpots(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "컬렉션 ID") @PathVariable Long collectionId
     );
 
     @Operation(
