@@ -53,6 +53,19 @@ class FlywayMigrationOnMySqlTest {
         }
     }
 
+    /** 인덱스의 컬럼 목록을 순서대로 이어붙여 돌려준다. MATCH()와 정확히 같아야 하므로 순서까지 본다. */
+    private String fulltextColumns(String indexName) throws Exception {
+        try (Connection c = DriverManager.getConnection(baseUrl() + "/" + SCHEMA, user(), password());
+             Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery(
+                     "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) "
+                             + "FROM information_schema.STATISTICS "
+                             + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
+                             + "AND INDEX_NAME = '" + indexName + "'")) {
+            return rs.next() ? rs.getString(1) : null;
+        }
+    }
+
     private MigrateResult migrate() {
         return Flyway.configure()
                 .dataSource(baseUrl() + "/" + SCHEMA, user(), password())
@@ -99,6 +112,12 @@ class FlywayMigrationOnMySqlTest {
                     + "WHERE ROUTINE_SCHEMA = '" + SCHEMA + "' AND ROUTINE_NAME LIKE 'pngo_%'"))
                     .as("V2가 쓴 프로시저는 스스로 정리해야 한다")
                     .isZero();
+
+            // 빈 DB는 V1(3컬럼) → V4(2컬럼으로 재생성) 순서로 지나간다.
+            // 최종 상태가 코드의 MATCH(name, address)와 맞아야 검색이 500을 내지 않는다.
+            assertThat(fulltextColumns("ft_spot_search"))
+                    .as("새로 만든 DB의 인덱스도 코드가 요구하는 컬럼과 같아야 한다")
+                    .isEqualTo("name,address");
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }
@@ -115,6 +134,11 @@ class FlywayMigrationOnMySqlTest {
             // 검색 인덱스가 없고 고아 테이블은 남아 있는, 팀원 로컬의 모습이다.
             try (Connection c = DriverManager.getConnection(baseUrl() + "/" + SCHEMA, user(), password());
                  Statement s = c.createStatement()) {
+                // V3의 inquiries가 외래키로 참조한다. 실제 DB에는 당연히 있는 테이블이다.
+                s.execute("CREATE TABLE users ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "email VARCHAR(100) NOT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
                 s.execute("CREATE TABLE spot ("
                         + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
                         + "name VARCHAR(100) NOT NULL,"
@@ -142,13 +166,25 @@ class FlywayMigrationOnMySqlTest {
                         + "spot_id BIGINT NOT NULL,"
                         + "CONSTRAINT fk_hcd_spot FOREIGN KEY (spot_id) REFERENCES spot(id)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                // 사진 저장이 photo_url에서 object_key로 바뀌기 전의 review_photo.
+                // 옛 컬럼이 NOT NULL로 남아 있으면 지금 코드로는 INSERT가 전부 거부된다.
+                s.execute("CREATE TABLE review_photo ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "photo_url VARCHAR(500) NOT NULL,"
+                        + "object_key VARCHAR(500) NOT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+                // 이름이 비슷하지만 이쪽 photo_url은 지금도 쓰는 컬럼이다. 같이 지우면 안 된다.
+                s.execute("CREATE TABLE spot_photo ("
+                        + "id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "photo_url VARCHAR(500) NOT NULL"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             }
 
             MigrateResult result = migrate();
 
             assertThat(result.migrationsExecuted)
-                    .as("V1은 baseline으로 건너뛰고 V2만 실행되어야 한다")
-                    .isEqualTo(1);
+                    .as("V1은 baseline으로 건너뛰고 V2부터 끝까지 실행되어야 한다")
+                    .isEqualTo(3);
 
             assertThat(count("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS "
                     + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
@@ -167,6 +203,22 @@ class FlywayMigrationOnMySqlTest {
                     + "AND COLUMN_NAME = 'version' AND IS_NULLABLE = 'NO'"))
                     .as("V1을 건너뛴 DB에도 version 컬럼이 NOT NULL로 생겨야 한다")
                     .isEqualTo(1);
+
+            assertThat(fulltextColumns("ft_spot_search"))
+                    .as("V2가 3컬럼으로 만든 인덱스를 V4가 코드에 맞춰 다시 만들어야 한다")
+                    .isEqualTo("name,address");
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'review_photo' "
+                    + "AND COLUMN_NAME = 'photo_url'"))
+                    .as("업로드를 막던 옛 컬럼은 사라져야 한다")
+                    .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot_photo' "
+                    + "AND COLUMN_NAME = 'photo_url'"))
+                    .as("spot_photo.photo_url은 지금도 쓰는 컬럼이라 남아 있어야 한다")
+                    .isEqualTo(1);
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }
@@ -184,6 +236,9 @@ class FlywayMigrationOnMySqlTest {
             // "NULL + 1"을 시도하다 500이 났다(Versioning.increment NPE). 실제로 겪은 일이다.
             try (Connection c = DriverManager.getConnection(baseUrl() + "/" + SCHEMA, user(), password());
                  Statement s = c.createStatement()) {
+                // V3의 inquiries가 외래키로 참조한다.
+                s.execute("CREATE TABLE users (id BIGINT PRIMARY KEY AUTO_INCREMENT,"
+                        + "email VARCHAR(100) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
                 s.execute("CREATE TABLE spot (id BIGINT PRIMARY KEY AUTO_INCREMENT,"
                         + "name VARCHAR(100) NOT NULL, address VARCHAR(255) NOT NULL,"
                         + "overview TEXT, status VARCHAR(20) NOT NULL, is_active BIT(1) NOT NULL,"
@@ -233,8 +288,8 @@ class FlywayMigrationOnMySqlTest {
             MigrateResult result = migrate();
 
             assertThat(result.migrationsExecuted)
-                    .as("V2가 다시 실행되어야 상황이 성립한다")
-                    .isEqualTo(1);
+                    .as("이력을 지웠으니 V2부터 끝까지 다시 실행되어야 한다")
+                    .isEqualTo(3);
             assertThat(count("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS "
                     + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
                     + "AND INDEX_NAME IN ('ft_spot_search','ft_spot_search_norm','idx_spot_map_bounds')"))
