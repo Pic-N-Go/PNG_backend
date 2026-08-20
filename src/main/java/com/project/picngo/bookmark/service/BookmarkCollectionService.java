@@ -82,6 +82,10 @@ public class BookmarkCollectionService {
     // ponytail: 심사 상태·활성 여부로 걸러내지 않는다 — 담아둔 스팟을 말없이 빼면 컬렉션 카드의
     // spotCount와 목록 개수가 어긋난다. 비활성 스팟을 감춰야 하면 카운트 쿼리도 같이 맞출 것.
     // isBookmarked는 항상 true — 담겨 있다는 게 조회 조건 자체다.
+    //
+    // 아래 nonNull 필터도 같은 어긋남을 만든다: bookmark_collection_spot.spot_id에는 spot FK가
+    // 없어(collection_id만 있음) 스팟이 하드 삭제되면 멤버십 행이 남는다. 그 행은 여기서 조용히
+    // 빠지므로 countByCollectionId > 목록 길이가 된다. 카운트를 맞추려면 멤버십 정리가 선행이다.
     private List<SpotResponse> toSpotResponses(List<Long> spotIds) {
         if (spotIds.isEmpty()) {
             return List.of();

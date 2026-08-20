@@ -34,20 +34,36 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     // INNER JOIN이라 관심테마가 없는 유저(소셜 가입 등)는 빈 목록이 되고, 클라이언트가
     // 그걸 근거로 "관심 테마 설정" 안내를 띄운다 — 인기순으로 채우면 "관심 스팟" 제목 아래
     // 무관한 스팟이 섞이고 사용자는 구분할 방법이 없다.
+    //
+    // 집계를 파생 테이블로 분리한 이유: spot을 직접 GROUP BY하면 SELECT s.*가 임시 테이블로
+    // 들어가면서 embedding(MEDIUMBLOB)과 TEXT 컬럼들을 끌고 가 디스크로 넘어간다.
+    // 좁은 조인 테이블만 묶고 spot은 뒤에 붙인다 (findEmbeddingCandidates와 같은 판단).
+    // COUNT(DISTINCT)인 이유: user_spot_categories에 (user_id, category) 유니크 제약이 없어
+    // 중복 행이 한 카테고리의 가중치를 두 배로 만들 수 있다.
     // 정렬 마지막이 RAND()가 아니라 s.id인 이유: 새로고침마다 순서가 바뀌면 캐시가 무의미하고
     // 목록이 흔들려 보인다.
-    // ponytail: 매칭 스팟 전체를 정렬한다. 스팟 수천 건 규모에선 충분, 수십만 건 되면
-    // 카테고리별 상위 N만 미리 뽑아 합치는 방식으로 교체
+    // status를 String으로 받는 이유는 위 FULLTEXT 쿼리들과 같다(네이티브 enum 바인딩 문제).
+    // 조인 조건 uc.category = sc.category는 spot_categories의 유니크 키(spot_id, category)로는
+    // 커버되지 않아 idx_spot_categories_category(category, spot_id)를 V4에서 추가했다.
+    //
+    // @DataJpaTest로 덮지 못한다: 테스트는 H2(create-drop)에서 도는데 User.spotCategories를 저장하면
+    // Hibernate가 만든 체크 제약("CATEGORY" IN (...))에 걸려 insert 자체가 실패한다(값은 맞는데도).
+    // 관심테마 행을 못 넣으니 이 쿼리에 줄 입력을 만들 수 없다. 검증은 MySQL 통합 테스트가 붙을 때까지
+    // 수동 확인에 의존한다 — 바꾸기 전에 이 사실을 먼저 알고 시작할 것.
     @Query(value = """
             SELECT s.* FROM spot s
-            JOIN spot_categories sc ON sc.spot_id = s.id
-            JOIN user_spot_categories uc ON uc.category = sc.category AND uc.user_id = :userId
-            WHERE s.is_active = true AND s.status = 'APPROVED'
-            GROUP BY s.id
-            ORDER BY COUNT(uc.category) DESC, (s.review_count + s.bookmark_count) DESC, s.id DESC
+            JOIN (SELECT sc.spot_id, COUNT(DISTINCT sc.category) AS match_count
+                  FROM spot_categories sc
+                  JOIN user_spot_categories uc ON uc.category = sc.category
+                  WHERE uc.user_id = :userId
+                  GROUP BY sc.spot_id) m ON m.spot_id = s.id
+            WHERE s.is_active = true AND s.status = :status
+            ORDER BY m.match_count DESC, (s.review_count + s.bookmark_count) DESC, s.id DESC
             LIMIT :limit
             """, nativeQuery = true)
-    List<Spot> findRecommendedSpots(@Param("userId") Long userId, @Param("limit") int limit);
+    List<Spot> findRecommendedSpots(@Param("userId") Long userId,
+                                    @Param("status") String status,
+                                    @Param("limit") int limit);
 
     Page<Spot> findAllByStatusAndIsActiveTrue(
             SpotStatus status,

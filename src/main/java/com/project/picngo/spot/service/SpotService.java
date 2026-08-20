@@ -110,7 +110,8 @@ public class SpotService {
     }
 
     public List<RecommendedSpotResponse> getRecommendedSpots(Long userId, int limit) {
-        List<Spot> spots = spotRepository.findRecommendedSpots(userId, Math.min(limit, 20));
+        List<Spot> spots = spotRepository.findRecommendedSpots(
+                userId, SpotStatus.APPROVED.name(), clampLimit(limit, 20));
         Set<Long> bookmarked = bookmarkedSpotIds(userId, spots);
         return spots.stream()
                 .map(spot -> RecommendedSpotResponse.from(spot, isBookmarked(bookmarked, spot)))
@@ -118,13 +119,19 @@ public class SpotService {
     }
 
     public List<NearbySpotResponse> getNearbySpots(Double lat, Double lng, Double radiusKm, int limit) {
-        List<Spot> spots = spotRepository.findNearbySpots(lat, lng, radiusKm, Math.min(limit, 50));
+        List<Spot> spots = spotRepository.findNearbySpots(lat, lng, radiusKm, clampLimit(limit, 50));
         return spots.stream()
                 .map(spot -> {
                     double distance = calcDistance(lat, lng, spot.getLatitude(), spot.getLongitude());
                     return NearbySpotResponse.of(spot, distance);
                 })
                 .toList();
+    }
+
+    // LIMIT에 그대로 들어가는 값이라 하한이 필요하다 — limit=0이나 음수가 오면
+    // Math.min만으로는 그대로 통과해 "LIMIT -1" 문법 오류(500)가 된다.
+    private int clampLimit(int limit, int max) {
+        return Math.max(1, Math.min(limit, max));
     }
 
     private double calcDistance(double lat1, double lng1, double lat2, double lng2) {

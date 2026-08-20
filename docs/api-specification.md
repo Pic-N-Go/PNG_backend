@@ -96,7 +96,7 @@
 | 마이페이지 | POST | /users/{id}/follow | 팔로우 | 이예인 | 미시작 |
 | 마이페이지 | DELETE | /users/{id}/follow | 언팔로우 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/bookmarked-spots | 북마크한 스팟 전체 목록 | 박예은 | 완료 |
-| 마이페이지 | GET | /bookmark-collections/{id}/spots | 컬렉션에 담긴 스팟 목록 | 박예은 | 완료 |
+| 마이페이지 | GET | /bookmark-collections/{collectionId}/spots | 컬렉션에 담긴 스팟 목록 | 박예은 | 완료 |
 | 타 유저 프로필 | GET | /users/{id}/profile | 타 유저 프로필 조회 | 이예인 | 미시작 |
 | 설정 | GET | /settings | 앱 설정 조회 | 소영재 | 미시작 |
 | 설정 | PUT | /settings | 앱 설정 저장 | 소영재 | 미시작 |
