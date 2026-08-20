@@ -39,6 +39,7 @@ class SocialNicknameTest {
 
     @Mock UserRepository userRepository;
     @Mock FollowRepository followRepository;
+    @Mock com.project.picngo.notification.service.NotificationService notificationService;
 
     @InjectMocks UserService service;
 

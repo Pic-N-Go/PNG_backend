@@ -12,6 +12,7 @@ import com.project.picngo.community.dto.CommentUpdateRequest;
 import com.project.picngo.community.repository.PostRepository;
 import com.project.picngo.community.repository.PostCommentLikeRepository;
 import com.project.picngo.community.repository.PostCommentRepository;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -43,6 +44,7 @@ class PostCommentServiceTest {
     @Mock PostCommentLikeRepository commentLikeRepository;
     @Mock UserRepository userRepository;
     @Mock ImageStorageService imageStorageService;
+    @Mock NotificationService notificationService;
 
     @InjectMocks PostCommentService service;
 

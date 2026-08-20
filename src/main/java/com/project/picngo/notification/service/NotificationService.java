@@ -143,7 +143,7 @@ public class NotificationService {
             return !Boolean.FALSE.equals(setting.isGoldenHourPushEnabled());
         } else if ("WEATHER_MATCH".equalsIgnoreCase(type) || "SPOT_ALERT".equalsIgnoreCase(type)) {
             return !Boolean.FALSE.equals(setting.isSpotAlertPushEnabled());
-        } else if ("COMMUNITY".equalsIgnoreCase(type)) {
+        } else if (type != null && type.toUpperCase().startsWith("COMMUNITY")) {
             return !Boolean.FALSE.equals(setting.isCommunityPushEnabled());
         }
         return true;

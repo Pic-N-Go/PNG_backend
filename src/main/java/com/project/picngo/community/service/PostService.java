@@ -13,7 +13,9 @@ import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.community.domain.*;
 import com.project.picngo.community.dto.*;
 import com.project.picngo.community.repository.*;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
+import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
@@ -45,9 +47,11 @@ public class PostService {
     private final PostCommentRepository commentRepository;
     private final PostCommentLikeRepository commentLikeRepository;
     private final UserRepository userRepository;
+    private final FollowRepository followRepository;
     private final SpotRepository spotRepository;
     private final ExifExtractor exifExtractor;
     private final ImageStorageService imageStorageService;
+    private final NotificationService notificationService;
 
     /**
      * @param authorId 지정하면 그 사용자가 쓴 글만 준다(프로필 화면의 게시글 탭).
@@ -120,6 +124,10 @@ public class PostService {
                 imageRepository.save(image);
             }
             imageRepository.flush();
+
+            // 🔔 팔로워(구독자) 대상 새 글 알림 비동기 큐 Fan-out
+            sendNewPostNotificationsToFollowers(author, post);
+
             return toResponse(post, userId);
             //오류 발생 시 s3 업로드 삭제, 트랜잭션 롤백으로 데이터 정합성 보장
         } catch (RuntimeException exception) {
@@ -134,6 +142,24 @@ public class PostService {
         if (!likeRepository.existsByPostIdAndUserId(postId, userId)) {
             likeRepository.save(new PostLike(post, userId));
             postRepository.changeLikeCount(postId, 1);
+
+            // 🔔 게시글 좋아요 알림 (본인 좋아요 제외)
+            if (post.getAuthor() != null && !post.getAuthor().getId().equals(userId)) {
+                User liker = userRepository.findById(userId).orElse(null);
+                String likerNickname = liker != null ? liker.getNickname() : "회원";
+                Long spotId = post.getSpot() != null ? post.getSpot().getId() : null;
+                String dedupeKey = "LIKE:" + userId + ":" + postId + ":" + java.time.LocalDate.now();
+
+                notificationService.sendPushNotification(
+                        post.getAuthor().getId(),
+                        "COMMUNITY_LIKE",
+                        "게시글 좋아요",
+                        likerNickname + "님이 회원님의 게시글을 좋아합니다.",
+                        "/community/post/" + postId,
+                        spotId,
+                        dedupeKey
+                );
+            }
         }
         return new ReactionResponse(true, findPost(postId).getLikeCount());
     }
@@ -512,6 +538,31 @@ public class PostService {
                         cleanupException
                 );
             }
+        }
+    }
+
+    private void sendNewPostNotificationsToFollowers(User author, Post post) {
+        try {
+            List<Long> followerIds = followRepository.findFollowerUserIdsByFollowingId(author.getId());
+            if (!followerIds.isEmpty()) {
+                String postSnippet = post.getContent().length() > 30
+                        ? post.getContent().substring(0, 30) + "..."
+                        : post.getContent();
+                Long spotId = post.getSpot() != null ? post.getSpot().getId() : null;
+
+                for (Long followerId : followerIds) {
+                    notificationService.sendPushNotification(
+                            followerId,
+                            "COMMUNITY_NEW_POST",
+                            "새 게시글 알림",
+                            author.getNickname() + "님이 새 글을 등록했습니다: " + postSnippet,
+                            "/community/post/" + post.getId(),
+                            spotId
+                    );
+                }
+            }
+        } catch (Exception e) {
+            log.warn("게시글 등록 알림 발송 중 예외 발생 (authorId: {}, postId: {})", author.getId(), post.getId(), e);
         }
     }
 }

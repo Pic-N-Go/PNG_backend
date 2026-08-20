@@ -41,6 +41,7 @@ class PasswordChangeTest {
     @Mock FollowRepository followRepository;
     @Mock PasswordEncoder passwordEncoder;
     @Mock com.project.picngo.auth.service.RefreshTokenService refreshTokenService;
+    @Mock com.project.picngo.notification.service.NotificationService notificationService;
 
     @InjectMocks UserService service;
 
