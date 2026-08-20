@@ -45,6 +45,7 @@ class ProfileImageTest {
     @Mock FollowRepository followRepository;
     @Mock PasswordEncoder passwordEncoder;
     @Mock ImageStorageService imageStorageService;
+    @Mock com.project.picngo.notification.service.NotificationService notificationService;
 
     @InjectMocks UserService service;
 

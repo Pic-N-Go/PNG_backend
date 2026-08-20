@@ -16,6 +16,7 @@ import com.project.picngo.community.dto.ReactionResponse;
 import com.project.picngo.community.repository.PostCommentLikeRepository;
 import com.project.picngo.community.repository.PostRepository;
 import com.project.picngo.community.repository.PostCommentRepository;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +52,7 @@ public class PostCommentService {
     private final PostCommentLikeRepository commentLikeRepository;
     private final UserRepository userRepository;
     private final ImageStorageService imageStorageService;
+    private final NotificationService notificationService;
 
     /**
      * 최상위 댓글만 준다. 답글은 getReplies로 따로 받아간다("답글 N개 보기").
@@ -87,6 +89,50 @@ public class PostCommentService {
         postRepository.incrementCommentCount(postId);
         if (parent != null) {
             commentRepository.changeReplyCount(parent.getId(), 1);
+        }
+
+        // 🔔 알림 비동기 발송
+        String commentSnippet = comment.getContent().length() > 30
+                ? comment.getContent().substring(0, 30) + "..."
+                : comment.getContent();
+        Long spotId = post.getSpot() != null ? post.getSpot().getId() : null;
+
+        if (parent != null) {
+            // 대댓글(답글) 작성 시: 원댓글 작성자에게 알림 (본인 답글 제외)
+            if (parent.getAuthor() != null && !parent.getAuthor().getId().equals(userId)) {
+                notificationService.sendPushNotification(
+                        parent.getAuthor().getId(),
+                        "COMMUNITY_REPLY",
+                        "새 답글 알림",
+                        author.getNickname() + "님이 회원님의 댓글에 답글을 남겼습니다: " + commentSnippet,
+                        "/community/post/" + postId,
+                        spotId
+                );
+            }
+            // 원댓글 작성자와 게시글 작성자가 다르고, 게시글 작성자가 본인이 아닐 경우 게시글 작성자에게도 새 댓글 알림
+            if (post.getAuthor() != null && !post.getAuthor().getId().equals(userId)
+                    && (parent.getAuthor() == null || !post.getAuthor().getId().equals(parent.getAuthor().getId()))) {
+                notificationService.sendPushNotification(
+                        post.getAuthor().getId(),
+                        "COMMUNITY_COMMENT",
+                        "새 댓글 알림",
+                        author.getNickname() + "님이 회원님의 게시글에 댓글을 남겼습니다: " + commentSnippet,
+                        "/community/post/" + postId,
+                        spotId
+                );
+            }
+        } else {
+            // 일반 댓글 작성 시: 게시글 작성자에게 알림 (본인 댓글 제외)
+            if (post.getAuthor() != null && !post.getAuthor().getId().equals(userId)) {
+                notificationService.sendPushNotification(
+                        post.getAuthor().getId(),
+                        "COMMUNITY_COMMENT",
+                        "새 댓글 알림",
+                        author.getNickname() + "님이 회원님의 게시글에 댓글을 남겼습니다: " + commentSnippet,
+                        "/community/post/" + postId,
+                        spotId
+                );
+            }
         }
 
         return toResponse(comment, false);

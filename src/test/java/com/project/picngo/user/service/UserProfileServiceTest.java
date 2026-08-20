@@ -41,6 +41,7 @@ class UserProfileServiceTest {
     @Mock UserRepository userRepository;
     @Mock FollowRepository followRepository;
     @Mock ImageStorageService imageStorageService;
+    @Mock com.project.picngo.notification.service.NotificationService notificationService;
 
     @InjectMocks UserService service;
 

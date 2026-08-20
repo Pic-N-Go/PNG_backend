@@ -19,6 +19,7 @@ import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.*;
 import com.project.picngo.community.repository.PostRepository;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.repository.FollowRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +58,7 @@ public class UserService {
 	private final PasswordEncoder passwordEncoder;
 	private final ImageStorageService imageStorageService;
 	private final RefreshTokenService refreshTokenService;
+	private final NotificationService notificationService;
 
 	/**
 	 * 프로필 사진은 S3 objectKey로 저장돼 있어 그대로는 열리지 않는다 — 응답에 담기 전에
@@ -415,6 +417,20 @@ public class UserService {
 		}
 
 		followRepository.save(Follow.create(follower, following));
+
+		// 🔔 새 팔로워 발생 알림 (본인 제외)
+		if (!follower.getId().equals(following.getId())) {
+			String dedupeKey = "FOLLOW:" + follower.getId() + ":" + following.getId() + ":" + java.time.LocalDate.now();
+			notificationService.sendPushNotification(
+					following.getId(),
+					"COMMUNITY_FOLLOW",
+					"새 팔로워 알림",
+					follower.getNickname() + "님이 회원님을 팔로우하기 시작했습니다.",
+					"/users/" + follower.getId(),
+					null,
+					dedupeKey
+			);
+		}
 	}
 
 	// 언팔로우

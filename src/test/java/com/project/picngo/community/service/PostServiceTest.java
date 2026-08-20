@@ -21,6 +21,8 @@ import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.notification.service.NotificationService;
+import com.project.picngo.user.repository.FollowRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -53,9 +55,11 @@ class PostServiceTest {
     @Mock PostCommentRepository commentRepository;
     @Mock PostCommentLikeRepository commentLikeRepository;
     @Mock UserRepository userRepository;
+    @Mock FollowRepository followRepository;
     @Mock SpotRepository spotRepository;
     @Mock ExifExtractor exifExtractor;
     @Mock ImageStorageService imageStorageService;
+    @Mock NotificationService notificationService;
 
     @InjectMocks PostService service;
 
