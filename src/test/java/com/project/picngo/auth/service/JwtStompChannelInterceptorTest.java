@@ -81,6 +81,25 @@ class JwtStompChannelInterceptorTest {
     }
 
     @Test
+    @DisplayName("SEND 시 유효하지 않은 Access Token을 거부한다")
+    void rejectsSendWithInvalidAccessToken() {
+        Map<String, Object> sessionAttributes = connectedSession(1L);
+        when(jwtTokenProvider.validateAccessTokenResult("invalid-token"))
+                .thenReturn(AccessTokenValidationResult.INVALID);
+
+        CustomException exception = assertThrows(
+                CustomException.class,
+                () -> interceptor.preSend(
+                        stompMessage(StompCommand.SEND, "invalid-token", sessionAttributes),
+                        channel
+                )
+        );
+
+        assertEquals(AuthErrorCode.ACCESS_TOKEN_INVALID, exception.getErrorCode());
+        verify(userDetailsService, never()).loadUserById(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
     @DisplayName("SEND에 Access Token이 없으면 요청을 거부한다")
     void rejectsSendWithoutAccessToken() {
         Map<String, Object> sessionAttributes = connectedSession(1L);
