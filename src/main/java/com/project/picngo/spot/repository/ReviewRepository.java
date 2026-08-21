@@ -36,12 +36,22 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     // 마이페이지 리뷰 목록과 지도 핀 개수가 어긋난다 (getBookmarkedSpots도 같은 이유로 안 건다).
     @Query("SELECT new com.project.picngo.spot.dto.ReviewedSpotResponse("
             + "s.id, s.name, s.address, s.latitude, s.longitude, "
-            + "COALESCE(NULLIF(s.thumbnailUrl, ''), NULLIF(s.imageUrl, '')), "
+            + "COALESCE(NULLIF(TRIM(s.thumbnailUrl), ''), NULLIF(TRIM(s.imageUrl), '')), "
             + "r.createdAt, r.rating) "
             + "FROM Review r JOIN r.spot s "
             + "WHERE r.userId = :userId "
-            + "ORDER BY r.createdAt DESC")
+            // 작성일이 같은 리뷰가 생긴다(연속 저장). 타이브레이커가 없으면 요청마다 핀 순서가 흔들린다.
+            + "ORDER BY r.createdAt DESC, r.id DESC")
     List<ReviewedSpotResponse> findReviewedSpotsByUserId(@Param("userId") Long userId);
+
+    // TRIM을 씌우는 이유: /me/reviews는 MyReviewInfo.firstNonBlank가 isBlank()로 걸러서
+    // 공백만 있는 thumbnailUrl도 폴백시킨다. NULLIF(x, '')만으로는 "  "가 그대로 내려가
+    // 두 엔드포인트가 같은 스팟을 다르게 표현한다(프론트 폴백은 null 기준이라 깨진 이미지가 뜬다).
+    //
+    // ponytail: SQL TRIM은 공백만 걷어낸다 — 탭·개행만 담긴 값은 여기서 걸러지지 않아
+    // isBlank()와 완전히 일치하지 않는다. 실제 문제는 TourAPI가 주는 빈 문자열이고 그건
+    // 잡힌다. 탭·개행까지 맞춰야 하면 SQL로는 안 되고, 두 컬럼을 그대로 내려 서비스에서
+    // firstNonBlank를 재사용해야 한다(projection이 10인자가 되고 조립 단계가 하나 붙는다).
 
     // 위 projection은 컬렉션을 실을 수 없어 카테고리만 따로 일괄 조회한다.
     // 엔티티를 읽어 spot.getCategoryNames()를 부르는 방법도 있지만, Spot.embedding이

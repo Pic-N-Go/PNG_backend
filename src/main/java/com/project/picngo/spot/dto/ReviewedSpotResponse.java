@@ -29,14 +29,17 @@ public record ReviewedSpotResponse(
 ) {
     /**
      * JPQL constructor projection 전용. 컬렉션은 projection에 실을 수 없어
-     * categories를 비워 두고 만들고, 서비스가 별도 조회로 채운다(withCategories).
+     * 서비스가 별도 조회로 채운다(withCategories).
+     *
+     * 기본값을 빈 리스트가 아니라 ["ETC"]로 둔다 — withCategories를 부르는 것을 잊어도
+     * "비어 있으면 ETC"라는 문서화된 불변식이 깨지지 않는다. 빈 리스트면 조용히 규약을 벗어난다.
      */
     public ReviewedSpotResponse(
             Long spotId, String name, String address,
             Double latitude, Double longitude, String imageUrl,
             LocalDateTime reviewedAt, Integer rating
     ) {
-        this(spotId, name, address, latitude, longitude, imageUrl, reviewedAt, rating, List.of());
+        this(spotId, name, address, latitude, longitude, imageUrl, reviewedAt, rating, List.of("ETC"));
     }
 
     public ReviewedSpotResponse withCategories(List<String> categories) {
