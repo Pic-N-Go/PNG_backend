@@ -89,4 +89,44 @@ class BookmarkedSpotIdsQueryTest {
 
         assertThat(result).containsExactly(10L);
     }
+
+    // findSpotIdsByUserId / findSpotIdsByCollectionId — MY 탭 "북마크한 스팟"의 유일한 조회 경로.
+    // 서비스는 이 리포지토리를 목으로 막으므로 조인·정렬이 틀려도 단위 테스트는 통과한다.
+
+    @Test
+    @DisplayName("findSpotIdsByUserId는 다른 유저가 담은 스팟을 섞지 않는다")
+    void spotIdsByUserId_isolatedPerUser() {
+        addSpot(collection(MY_ID, "즐겨찾기"), 10L);
+        addSpot(collection(OTHER_ID, "즐겨찾기"), 20L);
+
+        assertThat(membershipRepository.findSpotIdsByUserId(MY_ID)).containsExactly(10L);
+        assertThat(membershipRepository.findSpotIdsByUserId(OTHER_ID)).containsExactly(20L);
+    }
+
+    @Test
+    @DisplayName("findSpotIdsByUserId는 최근 담은 순으로, 여러 컬렉션에 담긴 스팟은 한 번만 반환한다")
+    void spotIdsByUserId_dedupedAndOrderedByRecency() {
+        BookmarkCollection first = collection(MY_ID, "즐겨찾기");
+        BookmarkCollection second = collection(MY_ID, "가을 출사");
+        addSpot(first, 10L);
+        addSpot(first, 20L);
+        // 20번을 두 번째 컬렉션에도 담는다 → 중복 없이, 가장 최근 담은 시점으로 줄을 선다.
+        addSpot(second, 30L);
+        addSpot(second, 20L);
+
+        assertThat(membershipRepository.findSpotIdsByUserId(MY_ID)).containsExactly(20L, 30L, 10L);
+    }
+
+    @Test
+    @DisplayName("findSpotIdsByCollectionId는 해당 컬렉션 것만 최근 담은 순으로 반환한다")
+    void spotIdsByCollectionId_scopedAndOrdered() {
+        BookmarkCollection mine = collection(MY_ID, "즐겨찾기");
+        BookmarkCollection other = collection(MY_ID, "가을 출사");
+        addSpot(mine, 10L);
+        addSpot(mine, 20L);
+        addSpot(other, 30L);
+
+        assertThat(membershipRepository.findSpotIdsByCollectionId(mine.getId())).containsExactly(20L, 10L);
+        assertThat(membershipRepository.findSpotIdsByCollectionId(other.getId())).containsExactly(30L);
+    }
 }
