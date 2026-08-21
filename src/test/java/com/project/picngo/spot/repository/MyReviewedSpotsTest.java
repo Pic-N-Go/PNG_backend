@@ -1,5 +1,6 @@
 package com.project.picngo.spot.repository;
 
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.SpotSource;
@@ -15,6 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -78,6 +80,24 @@ class MyReviewedSpotsTest {
                 );
     }
 
+    // 카테고리가 실제로 담긴 경우는 여기서 검증할 수 없다. H2가 만든 DDL에서는 spot_categories에
+    // 어떤 값도 넣지 못한다 — 리터럴 native INSERT('PARK')조차 체크 제약에 걸린다. spot_categories와
+    // user_spot_categories가 같은 category 컬럼·같은 enum 체크를 갖는 탓으로 보인다.
+    // 운영 스키마(V1__baseline_schema.sql:501)는 varchar(50) + 이름 14개 체크로 정상이다.
+    // 기존 테스트들이 Set.of()만 넣거나 flush를 하지 않아 이 한계가 드러나지 않았다.
+    // 그룹핑·정렬·ETC 폴백은 ReviewService.getReviewedSpots가 맡고, 실제 MySQL에서 확인해야 한다.
+
+    @Test
+    @DisplayName("카테고리 조회 쿼리가 실행되고, 카테고리 없는 스팟은 행이 없다 (서비스의 ETC 폴백이 받는 경우)")
+    void omitsSpotsWithoutCategories() {
+        Spot bare = saveSpot("무분류", 35.1, 129.1, Set.of());
+        saveReview(bare, MY_ID);
+
+        assertThat(reviewRepository.findReviewedSpotCategories(MY_ID)).isEmpty();
+        // 핀 자체는 정상적으로 내려간다 — 카테고리만 비어 있다.
+        assertThat(reviewRepository.findReviewedSpotsByUserId(MY_ID)).hasSize(1);
+    }
+
     @Test
     @DisplayName("리뷰가 없으면 빈 목록을 받는다")
     void returnsEmptyWhenNoReviews() {
@@ -97,6 +117,18 @@ class MyReviewedSpotsTest {
 
     private Spot saveSpot(String name, Double lat, Double lng) {
         return saveSpot(name, lat, lng, "https://example.com/thumb.jpg", null);
+    }
+
+    private Spot saveSpot(String name, Double lat, Double lng, Set<SpotCategory> categories) {
+        return spotRepository.save(Spot.builder()
+                .name(name)
+                .address("부산 수영구")
+                .latitude(lat)
+                .longitude(lng)
+                .source(SpotSource.TOUR_API)
+                .status(SpotStatus.APPROVED)
+                .categories(categories)
+                .build());
     }
 
     private Spot saveSpot(String name, Double lat, Double lng, String thumbnailUrl, String imageUrl) {

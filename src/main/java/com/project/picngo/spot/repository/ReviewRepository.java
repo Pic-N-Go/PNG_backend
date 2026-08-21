@@ -43,6 +43,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             + "ORDER BY r.createdAt DESC")
     List<ReviewedSpotResponse> findReviewedSpotsByUserId(@Param("userId") Long userId);
 
+    // 위 projection은 컬렉션을 실을 수 없어 카테고리만 따로 일괄 조회한다.
+    // 엔티티를 읽어 spot.getCategoryNames()를 부르는 방법도 있지만, Spot.embedding이
+    // MEDIUMBLOB이고 lazy가 아니라 스팟마다 임베딩 벡터까지 끌고 온다.
+    @Query("SELECT r.spot.id, c FROM Review r JOIN r.spot.categories c WHERE r.userId = :userId")
+    List<Object[]> findReviewedSpotCategories(@Param("userId") Long userId);
+
     // "자주 쓰인 태그" — 2회 이상 등장한 것만, 많이 쓰인 순. 상위 N개 절삭은 호출부에서 한다.
     // 리뷰가 적은 스팟에서 1회짜리 태그가 대표 태그로 뜨는 것을 막기 위해 HAVING을 둔다.
     @Query("SELECT t, COUNT(t) FROM Review r JOIN r.tags t WHERE r.spot.id = :spotId "
