@@ -118,6 +118,19 @@ class FlywayMigrationOnMySqlTest {
             assertThat(fulltextColumns("ft_spot_search"))
                     .as("새로 만든 DB의 인덱스도 코드가 요구하는 컬럼과 같아야 한다")
                     .isEqualTo("name,address");
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.TABLES "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME LIKE 'contest%'"))
+                    .as("콘테스트 테이블 6종이 만들어져야 한다")
+                    .isEqualTo(6);
+
+            // rank는 MySQL 8 예약어라 그 이름으로는 create table 자체가 실패한다.
+            // 엔티티가 ranking으로 매핑하고 있으므로 컬럼도 그 이름이어야 validate를 통과한다.
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' "
+                    + "AND TABLE_NAME = 'contest_ranking_snapshot' AND COLUMN_NAME = 'ranking'"))
+                    .as("순위 컬럼은 예약어를 피해 ranking이어야 한다")
+                    .isEqualTo(1);
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }
@@ -191,7 +204,7 @@ class FlywayMigrationOnMySqlTest {
 
             assertThat(result.migrationsExecuted)
                     .as("V1은 baseline으로 건너뛰고 V2부터 끝까지 실행되어야 한다")
-                    .isEqualTo(4);
+                    .isEqualTo(5);
 
             assertThat(count("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS "
                     + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
@@ -305,7 +318,7 @@ class FlywayMigrationOnMySqlTest {
 
             assertThat(result.migrationsExecuted)
                     .as("이력을 지웠으니 V2부터 끝까지 다시 실행되어야 한다")
-                    .isEqualTo(4);
+                    .isEqualTo(5);
             assertThat(count("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS "
                     + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
                     + "AND INDEX_NAME IN ('ft_spot_search','ft_spot_search_norm','idx_spot_map_bounds')"))

@@ -37,6 +37,33 @@ ALTER TABLE spot ADD COLUMN rating_sum INT NOT NULL DEFAULT 0;
 (V2~V5가 예외인데, 환경마다 상태가 달랐던 시기를 수습하는 파일들이라 그렇다.
 각 파일 안에 이유를 적어뒀다. V6부터는 조건 검사 없이 평범하게 쓰면 된다.)
 
+### ⚠️ 새 엔티티를 만들었다면 마이그레이션도 같이 써야 한다
+
+**Flyway 도입 전과 가장 크게 달라진 점이다.** 예전에는 `@Entity`만 만들면
+`ddl-auto: update`가 테이블을 알아서 만들어줬다. 지금은 만들어주지 않는다.
+
+```
+전:  엔티티 추가        →  앱 켜면 테이블 자동 생성
+후:  엔티티 추가        →  마이그레이션을 안 쓰면 그 테이블이 없는 모든 환경에서 기동 실패
+                          Schema validation: missing table [xxx]
+```
+
+**내 로컬에서 잘 되는 것은 근거가 되지 않는다.** 예전에 `update`로 만들어둔
+테이블이 남아 있어서 나만 안 겪는 것일 수 있다. 실제로 콘테스트 기능이
+이렇게 머지됐고, 다른 팀원과 운영에서 기동이 막혔다.
+
+엔티티를 추가·수정했다면 커밋 전에 **빈 스키마로 한 번 확인**하는 것이 확실하다
+(아래 "마이그레이션을 실제 MySQL로 검증하기" 참고).
+
+#### 컬럼 이름에 예약어를 쓰지 말 것
+
+`rank`, `order`, `group`, `key`, `system` 같은 이름은 MySQL이 문법으로 해석해서
+`create table`이 실패한다. 더 나쁜 건 **`ddl-auto: update`가 이 실패를 `WARN`으로만
+남기고 넘어간다**는 점이다. 앱은 정상 기동하고, 그 테이블만 조용히 없다.
+
+실제로 `contest_ranking_snapshot`이 그래서 어느 환경에도 만들어지지 않았다.
+필드명은 그대로 두고 `@Column(name = "...")`으로 다른 컬럼명을 주면 된다.
+
 ### 코드에서 컬럼이나 인덱스를 뺐다면 마이그레이션도 같이 써야 한다
 
 `ddl-auto`는 **추가만 하고 지우지 않는다.** 코드에서 빼도 DB에는 남고,
@@ -73,6 +100,7 @@ Migration checksum mismatch for migration version 2
 | `V3__create_missing_baseline_tables.sql` | V1 이후 추가돼 기존 DB에 없던 테이블 생성 |
 | `V4__add_spot_categories_category_index.sql` | 관심테마 추천 조인용 인덱스 |
 | `V5__fix_schema_drift.sql` | 코드와 어긋난 옛 컬럼·인덱스 정리 |
+| `V6__create_contest_tables.sql` | 콘테스트 테이블 6종 |
 
 **V1은 빈 DB에서만 실행된다.** 이미 테이블이 있는 DB에서는
 `baseline-on-migrate` 설정이 "V1까지는 이미 적용됨"으로 기록하고 V2부터 시작한다.
