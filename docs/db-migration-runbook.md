@@ -34,8 +34,8 @@ ALTER TABLE spot ADD COLUMN rating_sum INT NOT NULL DEFAULT 0;
 
 **조건 검사(`IF NOT EXISTS` 같은 것)를 넣을 필요가 없다.** Flyway가 각 파일을
 정확히 한 번만, 그리고 앞 버전이 모두 적용된 상태에서 실행하는 것을 보장한다.
-(V2~V4가 예외인데, 환경마다 상태가 달랐던 시기를 수습하는 파일들이라 그렇다.
-각 파일 안에 이유를 적어뒀다. V5부터는 조건 검사 없이 평범하게 쓰면 된다.)
+(V2~V5가 예외인데, 환경마다 상태가 달랐던 시기를 수습하는 파일들이라 그렇다.
+각 파일 안에 이유를 적어뒀다. V6부터는 조건 검사 없이 평범하게 쓰면 된다.)
 
 ### 코드에서 컬럼이나 인덱스를 뺐다면 마이그레이션도 같이 써야 한다
 
@@ -71,7 +71,8 @@ Migration checksum mismatch for migration version 2
 | `V1__baseline_schema.sql` | 기준 스키마 (테이블 37개) |
 | `V2__converge_schema.sql` | 검색 인덱스·생성 컬럼 추가, 낙관적 락 `course.version` 정리, 고아 테이블 제거 |
 | `V3__create_missing_baseline_tables.sql` | V1 이후 추가돼 기존 DB에 없던 테이블 생성 |
-| `V4__fix_schema_drift.sql` | 코드와 어긋난 옛 컬럼·인덱스 정리 |
+| `V4__add_spot_categories_category_index.sql` | 관심테마 추천 조인용 인덱스 |
+| `V5__fix_schema_drift.sql` | 코드와 어긋난 옛 컬럼·인덱스 정리 |
 
 **V1은 빈 DB에서만 실행된다.** 이미 테이블이 있는 DB에서는
 `baseline-on-migrate` 설정이 "V1까지는 이미 적용됨"으로 기록하고 V2부터 시작한다.
