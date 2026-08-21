@@ -12,7 +12,7 @@
 | 회원가입 | GET | /categories | 관심 카테고리 목록 조회 | 소영재 | 미시작 |
 | 회원가입 | PUT | /users/me/preferences | 관심 카테고리 저장 | 소영재 | 미시작 |
 | 홈/지도 | GET | /spots/nearby | 내 위치 기반 주변 스팟 조회 | 박예은 | 미시작 |
-| 홈/지도 | GET | /spots/recommended | 오늘의 추천 스팟 | 박예은 | 미시작 |
+| 홈/지도 | GET | /spots/recommended | 관심 테마 기반 추천 스팟 | 박예은 | 완료 |
 | 홈/지도 | GET | /weather/current | 현재 위치 날씨 조회 | 박예은 | 미시작 |
 | 홈/지도 | GET | /weather/golden-hour | 골든아워 시간 계산 | 모정민 | 미시작 |
 | 홈/지도 | GET | /spots | 카테고리 필터 스팟 목록 | 이예인 | 미시작 |
@@ -95,6 +95,8 @@
 | 마이페이지 | GET | /users/{id}/following | 팔로잉 목록 | 이예인 | 미시작 |
 | 마이페이지 | POST | /users/{id}/follow | 팔로우 | 이예인 | 미시작 |
 | 마이페이지 | DELETE | /users/{id}/follow | 언팔로우 | 이예인 | 미시작 |
+| 마이페이지 | GET | /users/me/bookmarked-spots | 북마크한 스팟 전체 목록 | 박예은 | 완료 |
+| 마이페이지 | GET | /bookmark-collections/{collectionId}/spots | 컬렉션에 담긴 스팟 목록 | 박예은 | 완료 |
 | 타 유저 프로필 | GET | /users/{id}/profile | 타 유저 프로필 조회 | 이예인 | 미시작 |
 | 설정 | GET | /settings | 앱 설정 조회 | 소영재 | 미시작 |
 | 설정 | PUT | /settings | 앱 설정 저장 | 소영재 | 미시작 |
