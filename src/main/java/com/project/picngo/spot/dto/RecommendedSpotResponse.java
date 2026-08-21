@@ -14,9 +14,12 @@ public record RecommendedSpotResponse(
         Double latitude,
         Double longitude,
         Integer reviewCount,
-        Integer bookmarkCount
+        Integer bookmarkCount,
+        Double reviewAverage,
+        // 홈 추천 카드가 인기 카드와 같은 모양이어야 해서 SpotResponse와 동일 규칙으로 채운다.
+        Boolean isBookmarked
 ) {
-    public static RecommendedSpotResponse from(Spot spot) {
+    public static RecommendedSpotResponse from(Spot spot, boolean isBookmarked) {
         return new RecommendedSpotResponse(
                 spot.getId(),
                 spot.getName(),
@@ -27,7 +30,9 @@ public record RecommendedSpotResponse(
                 spot.getLatitude(),
                 spot.getLongitude(),
                 spot.getReviewCount(),
-                spot.getBookmarkCount()
+                spot.getBookmarkCount(),
+                spot.getReviewAverage(),
+                isBookmarked
         );
     }
 }

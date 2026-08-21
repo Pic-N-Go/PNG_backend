@@ -10,6 +10,7 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.BookmarkErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -17,7 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,6 +59,44 @@ public class BookmarkCollectionService {
                         c,
                         membershipRepository.countByCollectionId(c.getId()),
                         containingIds.contains(c.getId())))
+                .toList();
+    }
+
+    // 컬렉션 상세: 담긴 스팟 목록. 최근 담은 것부터.
+    public List<SpotResponse> getCollectionSpots(Long userId, Long collectionId) {
+        BookmarkCollection collection = collectionRepository.findById(collectionId)
+                .orElseThrow(() -> new CustomException(BookmarkErrorCode.COLLECTION_NOT_FOUND));
+        // 남의 컬렉션이면 존재 여부조차 흘리지 않는다 — 403이 아니라 404.
+        if (!collection.getUserId().equals(userId)) {
+            throw new CustomException(BookmarkErrorCode.COLLECTION_NOT_FOUND);
+        }
+
+        return toSpotResponses(membershipRepository.findSpotIdsByCollectionId(collectionId));
+    }
+
+    // MY 탭의 "북마크한 스팟": 컬렉션 구분 없이 담아둔 스팟 전부. 최근 담은 것부터.
+    public List<SpotResponse> getBookmarkedSpots(Long userId) {
+        return toSpotResponses(membershipRepository.findSpotIdsByUserId(userId));
+    }
+
+    // ponytail: 심사 상태·활성 여부로 걸러내지 않는다 — 담아둔 스팟을 말없이 빼면 컬렉션 카드의
+    // spotCount와 목록 개수가 어긋난다. 비활성 스팟을 감춰야 하면 카운트 쿼리도 같이 맞출 것.
+    // isBookmarked는 항상 true — 담겨 있다는 게 조회 조건 자체다.
+    //
+    // 아래 nonNull 필터도 같은 어긋남을 만든다: bookmark_collection_spot.spot_id에는 spot FK가
+    // 없어(collection_id만 있음) 스팟이 하드 삭제되면 멤버십 행이 남는다. 그 행은 여기서 조용히
+    // 빠지므로 countByCollectionId > 목록 길이가 된다. 카운트를 맞추려면 멤버십 정리가 선행이다.
+    private List<SpotResponse> toSpotResponses(List<Long> spotIds) {
+        if (spotIds.isEmpty()) {
+            return List.of();
+        }
+        // findAllById는 순서를 보장하지 않아 담은 순서로 다시 세운다.
+        Map<Long, Spot> byId = spotRepository.findAllById(spotIds).stream()
+                .collect(Collectors.toMap(Spot::getId, Function.identity()));
+        return spotIds.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .map(spot -> SpotResponse.from(spot, true))
                 .toList();
     }
 
