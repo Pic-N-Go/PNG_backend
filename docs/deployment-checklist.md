@@ -131,7 +131,8 @@ POST /admin/embeddings/backfill     일괄 채우기
 
 | 짝 | 어긋나면 |
 |---|---|
-| `MATCH(name, address, overview)` ↔ `ft_spot_search(name, address, overview)` | 컬럼 순서까지 같아야 한다. 다르면 검색 전부 실패 (ERROR 1191) |
+| `MATCH(name, address)` ↔ `ft_spot_search(name, address)` | 컬럼 순서까지 같아야 한다. 다르면 검색 전부 실패 (ERROR 1191). 실제로 마이그레이션이 옛 3컬럼 정의를 들고 있어 운영 검색이 전부 500이었다 (V5에서 수정) |
+| 엔티티에서 뺀 컬럼 ↔ 실제 테이블 | `validate`는 **없는 컬럼만** 잡고 남아도는 컬럼은 통과시킨다. 그 컬럼이 `NOT NULL`이면 기동은 되는데 INSERT만 실패한다. `review_photo.photo_url`이 그래서 사진 업로드를 막았다 (V5에서 수정) |
 | `search_norm` 생성 규칙 ↔ `FullTextKeyword`의 정규식 | 한쪽만 바꾸면 조용히 0건. 실제로 괄호 처리가 어긋나 자기 이름으로도 검색이 안 됐던 적이 있다 |
 | `@@ngram_token_size = 2` | 2가 아니면 2글자 검색어가 색인에 잡히지 않는다 |
 | 엔티티 컬럼 ↔ 실제 테이블 | 운영은 `validate`라 기동 자체가 막힌다 |
