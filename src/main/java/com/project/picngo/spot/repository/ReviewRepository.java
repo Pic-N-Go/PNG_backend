@@ -1,6 +1,7 @@
 package com.project.picngo.spot.repository;
 
 import com.project.picngo.spot.domain.Review;
+import com.project.picngo.spot.dto.ReviewedSpotResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,6 +29,19 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     @Query(value = "SELECT r FROM Review r JOIN FETCH r.spot WHERE r.userId = :userId",
             countQuery = "SELECT COUNT(r) FROM Review r WHERE r.userId = :userId")
     Page<Review> findByUserIdWithSpot(@Param("userId") Long userId, Pageable pageable);
+
+    // PIC MAP의 리뷰 핀. 지도는 전체 핀이 필요해 페이징이 없고, 본문·태그·사진을 쓰지 않아
+    // 엔티티 대신 DTO projection으로 필요한 컬럼만 읽는다 (presigned URL 서명 비용도 안 든다).
+    // ponytail: isActive·status로는 걸러내지 않는다. 내가 리뷰를 남긴 기록을 말없이 감추면
+    // 마이페이지 리뷰 목록과 지도 핀 개수가 어긋난다 (getBookmarkedSpots도 같은 이유로 안 건다).
+    @Query("SELECT new com.project.picngo.spot.dto.ReviewedSpotResponse("
+            + "s.id, s.name, s.address, s.latitude, s.longitude, "
+            + "COALESCE(NULLIF(s.thumbnailUrl, ''), NULLIF(s.imageUrl, '')), "
+            + "r.createdAt, r.rating) "
+            + "FROM Review r JOIN r.spot s "
+            + "WHERE r.userId = :userId "
+            + "ORDER BY r.createdAt DESC")
+    List<ReviewedSpotResponse> findReviewedSpotsByUserId(@Param("userId") Long userId);
 
     // "자주 쓰인 태그" — 2회 이상 등장한 것만, 많이 쓰인 순. 상위 N개 절삭은 호출부에서 한다.
     // 리뷰가 적은 스팟에서 1회짜리 태그가 대표 태그로 뜨는 것을 막기 위해 HAVING을 둔다.

@@ -88,7 +88,7 @@
 | 마이페이지 | PUT | /users/me | 프로필 수정 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/stats | 활동 통계 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/reviews | 내가 쓴 리뷰 목록 | 박예은 | 완료 |
-| 마이페이지 | GET | /users/me/visited-spots | 방문한 스팟 목록 (지도용) | 이예인 | 미시작 |
+| 마이페이지 | GET | /users/me/reviewed-spots | PIC MAP 리뷰 핀 목록 (지도용) | 박예은 | 완료 |
 | 마이페이지 | GET | /users/me/albums | 지난 촬영 앨범 목록 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/me/photogenic-report | 월간 포토제닉 리포트 | 이예인 | 미시작 |
 | 마이페이지 | GET | /users/{id}/followers | 팔로워 목록 | 이예인 | 미시작 |

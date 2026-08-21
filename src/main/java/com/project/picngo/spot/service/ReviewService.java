@@ -134,6 +134,11 @@ public class ReviewService {
         );
     }
 
+    // PIC MAP의 리뷰 핀 전체. 리포지토리가 DTO를 바로 만들어 여기서 조립할 게 없다.
+    public List<ReviewedSpotResponse> getReviewedSpots(Long userId) {
+        return reviewRepository.findReviewedSpotsByUserId(userId);
+    }
+
     // 수정 화면 진입 시 폼을 채울 원본값. 스팟 상세의 myReviewId로 받은 id를 그대로 쓴다.
     public ReviewResponse getMyReview(Long userId, Long reviewId) {
         Review review = findMyReview(userId, reviewId);

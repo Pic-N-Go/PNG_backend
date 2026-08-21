@@ -2,6 +2,7 @@ package com.project.picngo.user.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.MyReviewListResponse;
+import com.project.picngo.spot.dto.ReviewedSpotResponse;
 import com.project.picngo.user.dto.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -26,6 +27,13 @@ public interface UserControllerApiSpec {
 		@Parameter(description = "정렬 기준") @RequestParam(defaultValue = "LATEST") String sort,
 		@Parameter(description = "페이지 번호 (0부터)") @RequestParam(defaultValue = "0") int page,
 		@Parameter(description = "페이지 크기 (최대 100)") @RequestParam(defaultValue = "20") int size
+	);
+
+	@Operation(summary = "PIC MAP 리뷰 핀 목록 조회",
+		description = "내가 리뷰를 남긴 스팟을 지도 핀용으로 조회합니다. 리뷰 작성일 내림차순, 페이징 없음. "
+			+ "리뷰 본문·태그·사진은 내려가지 않습니다 — 그것들이 필요하면 GET /users/me/reviews를 쓰세요.")
+	ResponseEntity<List<ReviewedSpotResponse>> myReviewedSpots(
+		@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
 	);
 
 	@Operation(summary = "내 정보 조회", description = "현재 인증된 사용자의 기본 정보를 조회합니다.")
