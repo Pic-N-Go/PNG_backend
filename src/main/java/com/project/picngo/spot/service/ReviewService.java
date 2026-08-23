@@ -9,6 +9,7 @@ import com.project.picngo.common.image.dto.PhotoExifResponse;
 import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.spot.domain.Review;
+import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.ReviewPhoto;
 import com.project.picngo.spot.domain.Spot;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -132,6 +134,27 @@ public class ReviewService {
                 reviewPage.getTotalPages(),
                 reviewPage.getNumber()
         );
+    }
+
+    // PIC MAP의 리뷰 핀 전체. 좌표·이름은 projection이 만들고 카테고리만 따로 붙인다.
+    public List<ReviewedSpotResponse> getReviewedSpots(Long userId) {
+        Map<Long, List<String>> categoryMap = categoryNamesBySpotId(userId);
+        return reviewRepository.findReviewedSpotsByUserId(userId).stream()
+                .map(pin -> pin.withCategories(
+                        categoryMap.getOrDefault(pin.spotId(), List.of("ETC"))))
+                .toList();
+    }
+
+    // Spot.getCategoryNames()와 같은 규칙을 지킨다 — 이름 정렬, 비어 있으면 ETC.
+    // 즐겨찾기 핀(SpotResponse)과 형태가 어긋나면 프론트가 두 핀을 다르게 그리게 된다.
+    private Map<Long, List<String>> categoryNamesBySpotId(Long userId) {
+        Map<Long, List<String>> map = new HashMap<>();
+        for (Object[] row : reviewRepository.findReviewedSpotCategories(userId)) {
+            map.computeIfAbsent((Long) row[0], k -> new ArrayList<>())
+                    .add(((SpotCategory) row[1]).name());
+        }
+        map.values().forEach(Collections::sort);
+        return map;
     }
 
     // 수정 화면 진입 시 폼을 채울 원본값. 스팟 상세의 myReviewId로 받은 id를 그대로 쓴다.
