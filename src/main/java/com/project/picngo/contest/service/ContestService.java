@@ -296,7 +296,9 @@ public class ContestService {
                 showRanking ? calculateRank(contest, entry) : null,
                 voted,
                 mine,
-                phase == ContestPhase.VOTING,
+                // 내 작품에는 투표할 수 없다 — voteEntry가 거절하므로 여기서도 false로 내려
+                // 클라이언트가 이 값만 보고 버튼 상태를 정할 수 있게 한다
+                phase == ContestPhase.VOTING && !mine,
                 mine && (phase == ContestPhase.SUBMITTING || phase == ContestPhase.VOTING),
                 contest.getVoteLimit(),
                 remainingVoteCount
@@ -373,6 +375,11 @@ public class ContestService {
         ContestEntry entry = getEntryByContest(contest, entryId);
 
         validatePhase(contest, ContestPhase.VOTING, ContestErrorCode.NOT_VOTING_PERIOD);
+
+        // 1인 3표라 자기 작품에 한 표씩만 줘도 순위가 그만큼 왜곡된다
+        if (isMine(entry, user)) {
+            throw new CustomException(ContestErrorCode.CANNOT_VOTE_OWN_ENTRY);
+        }
 
         if (contestVoteRepository.existsByEntryAndUser(entry, user)) {
             throw new CustomException(ContestErrorCode.ALREADY_VOTED);
