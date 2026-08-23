@@ -39,11 +39,22 @@ class ContestScheduleTest {
     }
 
     @Test
-    @DisplayName("phase가 출품 → 투표 → 집계중 → 종료 순으로 넘어간다")
+    @DisplayName("시작 전에는 UPCOMING이다 — 출품 API가 몇 주 일찍 열리지 않게 하는 유일한 방어")
+    void beforeSubmitStartIsUpcoming() {
+        LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
+        Contest contest = contest(start);
+
+        assertThat(contest.getPhase(start.minusDays(40))).isEqualTo(ContestPhase.UPCOMING);
+        assertThat(contest.getPhase(start.minusMinutes(1))).isEqualTo(ContestPhase.UPCOMING);
+    }
+
+    @Test
+    @DisplayName("phase가 예정 → 출품 → 투표 → 집계중 → 종료 순으로 넘어간다")
     void movesThroughPhases() {
         LocalDateTime start = LocalDateTime.of(2026, 9, 1, 0, 0);
         Contest contest = contest(start);
 
+        assertThat(contest.getPhase(start.minusSeconds(1))).isEqualTo(ContestPhase.UPCOMING);
         assertThat(contest.getPhase(start)).isEqualTo(ContestPhase.SUBMITTING);
         assertThat(contest.getPhase(start.plusDays(13))).isEqualTo(ContestPhase.SUBMITTING);
         assertThat(contest.getPhase(contest.getSubmitEndAt())).isEqualTo(ContestPhase.VOTING);

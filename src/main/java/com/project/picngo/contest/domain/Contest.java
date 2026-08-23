@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 
 @Entity
 @Getter
@@ -66,6 +67,13 @@ public class Contest {
     private static final int VOTE_WEEKS = 2;
     private static final LocalTime RESULT_ANNOUNCE_TIME = LocalTime.of(9, 0);
 
+    /**
+     * "오전 9시 발표"가 가리키는 시간대. 컨테이너(alpine)에 TZ가 없으면 systemDefault()가 UTC라
+     * 발표가 서울 기준 18시에 열린다. 배포 설정에 기대지 않도록 도메인에 못박는다.
+     * 레포의 다른 모듈(Course·NotificationScheduler·WeatherForecastService 등)과 같은 방식이다.
+     */
+    public static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
     public static Contest create(
             String title,
             String description,
@@ -84,7 +92,11 @@ public class Contest {
         // 투표는 받는데 순위 스냅샷만 늦게 시작하는 구간이 생기므로 둘을 항상 붙여 둔다.
         contest.voteStartAt = contest.submitEndAt;
         contest.voteEndAt = contest.voteStartAt.plusWeeks(VOTE_WEEKS);
-        contest.resultOpenAt = contest.voteEndAt.toLocalDate().plusDays(1).atTime(RESULT_ANNOUNCE_TIME);
+        contest.resultOpenAt = contest.voteEndAt
+                .atZone(ZONE)
+                .toLocalDate()
+                .plusDays(1)
+                .atTime(RESULT_ANNOUNCE_TIME);
         contest.maxEntriesPerUser = maxEntriesPerUser;
         contest.voteLimit = voteLimit;
         contest.active = true;
@@ -92,6 +104,12 @@ public class Contest {
     }
 
     public ContestPhase getPhase(LocalDateTime now) {
+        // submitStartAt을 보지 않으면 다음 달 회차도 SUBMITTING으로 잡힌다.
+        // GET /contests/upcoming이 그 id를 내주므로 출품 API가 몇 주 일찍 열린다.
+        if (now.isBefore(submitStartAt)) {
+            return ContestPhase.UPCOMING;
+        }
+
         if (now.isBefore(submitEndAt)) {
             return ContestPhase.SUBMITTING;
         }

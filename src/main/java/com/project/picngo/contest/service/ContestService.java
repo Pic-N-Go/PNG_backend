@@ -47,6 +47,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -84,7 +85,7 @@ public class ContestService {
     // 현재 진행 중인 콘테스트 조회
     public ContestResponse getCurrentContest(Long userId) {
         User user = getUser(userId);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
 
         Contest contest = contestRepository
                 .findFirstBySubmitStartAtLessThanEqualAndResultOpenAtGreaterThanOrderBySubmitStartAtDesc(now, now)
@@ -100,7 +101,7 @@ public class ContestService {
     @Transactional
     public ContestResponse createContest(Long userId, ContestCreateRequest request) {
         User user = getUser(userId);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
 
         // 직전 회차의 발표 시각에 이어 붙인다. 겹치게 두면 집계 중 구간에서
         // getCurrentContest가 새 회차를 골라 발표 대기 중인 직전 회차가 어디에서도 안 잡힌다.
@@ -134,7 +135,7 @@ public class ContestService {
     // getCurrentContest는 submitStartAt <= now 인 것만 찾으므로 아직 시작 전인 회차를 잡지 못한다.
     public ContestResponse getUpcomingContest(Long userId) {
         User user = getUser(userId);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
 
         return contestRepository.findFirstBySubmitStartAtAfterOrderBySubmitStartAtAsc(now)
                 .map(contest -> toContestResponse(contest, user, now))
@@ -146,14 +147,14 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
 
-        return toContestResponse(contest, user, LocalDateTime.now());
+        return toContestResponse(contest, user, LocalDateTime.now(Contest.ZONE));
     }
 
     // 지난 콘테스트 목록 조회
     public ContestPastPageResponse getPastContests(Long userId, Pageable pageable) {
         User user = getUser(userId);
         Page<Contest> contests = contestRepository.findAllByResultOpenAtBeforeOrderByResultOpenAtDesc(
-                LocalDateTime.now(),
+                LocalDateTime.now(Contest.ZONE),
                 pageable
         );
 
@@ -230,12 +231,12 @@ public class ContestService {
     ) {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
         boolean showRanking = canShowRanking(phase);
 
         Page<ContestEntry> entries = contestEntryRepository.findAllByContest(
                 contest,
-                PageRequest.of(page, size, resolveEntrySort(sort))
+                PageRequest.of(page, size, resolveEntrySort(sort, phase))
         );
 
         List<Long> entryIds = entries.getContent().stream()
@@ -281,7 +282,7 @@ public class ContestService {
         Contest contest = getContestById(contestId);
         ContestEntry entry = getEntryByContest(contest, entryId);
 
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
         boolean showRanking = canShowRanking(phase);
         boolean voted = contestVoteRepository.existsByEntryAndUser(entry, user);
         boolean mine = isMine(entry, user);
@@ -320,10 +321,14 @@ public class ContestService {
         }
 
         Spot spot = getSpotOrNull(request.spotId());
-        // EXIF는 업로드 전에 읽는다 — upload()가 스트림을 소비한 뒤에는 추출이 실패한다.
-        // EXIF가 없는 사진(스크린샷·편집본)이면 takenAt은 null이고, 그건 정상 경로다.
-        LocalDateTime shotAt = exifExtractor.extract(photo).takenAt();
         ImageUploadResult uploadResult = imageStorageService.upload(photo, "contests/" + contest.getId());
+
+        // 클라이언트가 원본에서 읽어 보낸 값이 우선이다. 피커가 재인코딩하면서 메타데이터를
+        // 떨어뜨리는 경우가 많아, 업로드된 바이트에서 뽑는 건 폴백으로만 쓴다.
+        // 둘 다 없으면 null이고(스크린샷·편집본), 그건 정상 경로다.
+        LocalDateTime shotAt = request.shotAt() != null
+                ? request.shotAt()
+                : exifExtractor.extract(photo).takenAt();
 
         ContestEntry entry = ContestEntry.create(
                 contest,
@@ -350,7 +355,7 @@ public class ContestService {
             throw new CustomException(ContestErrorCode.NOT_MY_ENTRY);
         }
 
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
         if (phase == ContestPhase.RESULT || phase == ContestPhase.ENDED) {
             throw new CustomException(ContestErrorCode.NOT_SUBMITTING_PERIOD);
         }
@@ -411,7 +416,7 @@ public class ContestService {
     public ContestMyEntryResponse getMyEntry(Long contestId, Long userId) {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
         boolean showRanking = canShowRanking(phase);
 
         List<ContestEntryResponse> entries = contestEntryRepository.findAllByContestAndUser(contest, user).stream()
@@ -467,7 +472,7 @@ public class ContestService {
         List<ContestMyHistoryResponse.HistoryItem> items = entries.stream()
                 .map(entry -> {
                     Contest contest = entry.getContest();
-                    ContestPhase phase = contest.getPhase(LocalDateTime.now());
+                    ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
                     boolean showRanking = canShowRanking(phase);
                     Integer rank = showRanking
                             ? calculateRank(contest, entry)
@@ -491,7 +496,7 @@ public class ContestService {
                 .min(Integer::compareTo)
                 .orElse(null);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
         long totalVoteCount = entries.stream()
                 .filter(entry -> canShowRanking(entry.getContest().getPhase(now)))
                 .mapToLong(ContestEntry::getVoteCount)
@@ -503,7 +508,7 @@ public class ContestService {
     // 순위 집계 조회
     public ContestRankingHistoryResponse getRankingHistory(Long contestId) {
         Contest contest = getContestById(contestId);
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
 
         if (!canShowRankingHistory(phase)) {
             throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
@@ -542,7 +547,7 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
 
-        if (!canShowRanking(contest.getPhase(LocalDateTime.now()))) {
+        if (!canShowRanking(contest.getPhase(LocalDateTime.now(Contest.ZONE)))) {
             throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
         }
 
@@ -576,9 +581,17 @@ public class ContestService {
 
         // 멱등하게 둔다 — 프론트에서 탭 한 번으로 켜고 끄는 토글이라
         // 연타나 상태 어긋남이 그대로 409로 튀면 사용자가 볼 이유가 없는 에러가 뜬다.
-        // 취소(unsubscribe)도 이미 멱등하다.
+        //
+        // exists 검사만으로는 부족하다. 연타하면 두 요청이 같이 통과해 둘 다 save하고,
+        // uk_contest_subscription_user_contest에 걸려 1062 → 400("이미 사용 중인 값입니다")이 된다.
+        // 막으려던 바로 그 상황이라 제약 위반까지 성공으로 흡수한다
+        // (BookmarkCollectionService.addSpot과 같은 방식).
         if (!subscriptionRepository.existsByContestAndUser(contest, user)) {
-            subscriptionRepository.save(ContestSubscription.create(contest, user));
+            try {
+                subscriptionRepository.saveAndFlush(ContestSubscription.create(contest, user));
+            } catch (DataIntegrityViolationException e) {
+                // 다른 요청이 먼저 넣었다 — 결과는 구독 중으로 같다
+            }
         }
 
         return new ContestSubscriptionResponse(contest.getId(), true);
@@ -720,8 +733,22 @@ public class ContestService {
         return responses;
     }
 
-    private Sort resolveEntrySort(String sort) {
-        if ("votes".equalsIgnoreCase(sort)) {
+    /**
+     * 목록 정렬.
+     *
+     * 득표순은 숫자를 가려도 순서 자체가 순위다. 투표 기간에는 그게 의도된 노출이지만
+     * (목업이 득표순 칩을 두고 상위 3개는 표수까지 공개한다), 집계 중에는 다르다 —
+     * 투표가 끝난 뒤의 순서는 곧 최종 결과라, 열어두면 /result를 발표 시각까지 막아둔 게
+     * 아무 의미가 없어진다. 그래서 그 구간만 최신순으로 내린다.
+     *
+     * 409로 거절하지 않고 조용히 내리는 이유는, 에러로 답하면 "정렬이 되나 안 되나"로
+     * 결과 공개 여부를 다시 알려주는 꼴이기 때문이다.
+     */
+    // 인스턴스 상태를 쓰지 않으므로 static — 목 없이 phase별 정렬만 테스트한다
+    static Sort resolveEntrySort(String sort, ContestPhase phase) {
+        boolean voteOrderPublic = phase == ContestPhase.VOTING || phase == ContestPhase.ENDED;
+
+        if ("votes".equalsIgnoreCase(sort) && voteOrderPublic) {
             return Sort.by(Sort.Direction.DESC, "voteCount")
                     .and(Sort.by(Sort.Direction.ASC, "createdAt"));
         }
@@ -736,8 +763,9 @@ public class ContestService {
      * RESULT는 그 전까지의 "집계 중" 구간이라 여기에 넣으면 안 된다 —
      * 넣으면 투표가 끝나는 순간 결과가 열려 발표 시각이 아무 의미가 없어진다.
      *
-     * 투표 기간에 서열이 드러나는 창구는 순위 변동 스냅샷(canShowRankingHistory) 하나뿐이고,
-     * 그건 상위 3개만 매일 한 번 집계해서 내보낸다. 개별 작품은 내 것까지 전부 가린다
+     * 투표 기간에 공개되는 서열은 두 가지다 — 순위 변동 스냅샷(상위 3개, 표수 포함)과
+     * 득표순 정렬의 순서. 둘 다 목업이 의도한 노출이다. 이 함수가 가리는 건 개별 작품에
+     * 붙는 숫자(순위·득표수)이고, 내 작품도 예외가 아니다
      * (프론트 "내 출품" 탭도 이 구간에는 순위 자리에 "집계 중"을 띄운다).
      */
     // 인스턴스 상태를 쓰지 않으므로 static — 목 없이 phase 매트릭스만 테스트한다
@@ -835,7 +863,7 @@ public class ContestService {
     }
 
     private void validatePhase(Contest contest, ContestPhase requiredPhase, ContestErrorCode errorCode) {
-        if (contest.getPhase(LocalDateTime.now()) != requiredPhase) {
+        if (contest.getPhase(LocalDateTime.now(Contest.ZONE)) != requiredPhase) {
             throw new CustomException(errorCode);
         }
     }

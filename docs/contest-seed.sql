@@ -25,16 +25,18 @@
 --   SUBMITTING : 출품 기간
 --   VOTING     : 투표 기간 (순위 변동 패널)
 --   COUNTING   : 투표 마감 ~ 발표 전 (백엔드 phase는 RESULT, 결과 비공개)
+--                발표가 항상 미래가 되도록 투표 종료를 12시간 전으로 당겨 둔다
 --   NONE       : 진행 중 회차 없음 (예고 + 알림 신청)
 SET @phase = 'SUBMITTING';
 
 
 -- ── 1. 진행 중 콘테스트 (@phase = 'NONE'이면 건너뜀) ────────────
--- COUNTING은 투표 종료를 1시간 전으로 당겨 둔다. 그래야 발표(익일 09:00)가 항상 미래다.
+-- COUNTING은 투표 종료를 12시간 전으로 당겨 둔다. 발표(익일 09:00)가 항상 미래여야 하는데,
+-- 1시간으로 잡으면 아침에 시드할 때 이미 발표 시각을 지나 ENDED로 떨어진다.
 SET @submit_start = CASE @phase
         WHEN 'SUBMITTING' THEN NOW() - INTERVAL 5 DAY
         WHEN 'VOTING'     THEN NOW() - INTERVAL 20 DAY
-        WHEN 'COUNTING'   THEN NOW() - INTERVAL 28 DAY - INTERVAL 1 HOUR
+        WHEN 'COUNTING'   THEN NOW() - INTERVAL 28 DAY - INTERVAL 12 HOUR
         ELSE NULL
     END;
 
@@ -57,7 +59,7 @@ WHERE @submit_start IS NOT NULL;
 
 
 -- ── 2. 다음 예정 콘테스트 ────────────────────────────────────────
--- GET /contests/upcoming이 잡아가는 행. 진행 중 회차가 없을 때의 예고 화면과
+-- GET /contests/upcoming이 잡아가는 행. phase는 UPCOMING이라 출품 API가 막혀 있다. 진행 중 회차가 없을 때의 예고 화면과
 -- 알림 신청(구독) 버튼이 이 데이터로 그려진다. 이 행을 빼면 "예고 없음" 상태가 된다.
 SET @submit_start = NOW() + INTERVAL 40 DAY;
 

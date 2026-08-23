@@ -18,12 +18,15 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Iterator;
 
 @Service
 @Slf4j
 public class ExifExtractor {
+
+    private static final DateTimeFormatter EXIF_DATE_TIME = DateTimeFormatter.ofPattern("yyyy:MM:dd HH:mm:ss");
 
     private static final int TAG_IMAGE_WIDTH = 0x0100;
     private static final int TAG_IMAGE_HEIGHT = 0x0101;
@@ -67,14 +70,15 @@ public class ExifExtractor {
                 longitude = geoLocation.getLongitude();
             }
 
-            LocalDateTime takenAt = null;
-
-            if (exifDirectory != null && exifDirectory.getDateOriginal() != null) {
-                takenAt = exifDirectory.getDateOriginal()
-                        .toInstant()
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDateTime();
-            }
+            /*
+             * EXIF DateTimeOriginal은 정의상 "촬영한 카메라의 벽시계"다. 문자열을 그대로 읽는다.
+             *
+             * getDateOriginal()을 쓰면 안 된다 — 오프셋 태그(0x9011)가 없으면 GMT로 파싱하고
+             * 있으면 그 오프셋으로 파싱하는데, 우리는 결과를 systemDefault()로 다시 눕힌다.
+             * 파싱 존과 렌더 존이 따로 놀아서 "05:32 광안리 일출"이 아이폰(+09:00 기록)에서는
+             * 전날 20:32로, 안드로이드(오프셋 없음)에서는 14:32로 저장된다.
+             */
+            LocalDateTime takenAt = parseExifDateTime(string(exifDirectory, ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL));
 
             Integer imageWidth = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_WIDTH, TAG_IMAGE_WIDTH);
             Integer imageHeight = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_HEIGHT, TAG_IMAGE_HEIGHT);
@@ -133,6 +137,19 @@ public class ExifExtractor {
         } catch (Exception e) {
             log.warn("EXIF metadata extraction failed", e);
             return empty(file);
+        }
+    }
+
+    /** `2026:08:23 05:32:00`. 형식이 어긋나거나 없으면 null — 촬영 시각은 없어도 되는 값이다 */
+    private LocalDateTime parseExifDateTime(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(raw.trim(), EXIF_DATE_TIME);
+        } catch (DateTimeParseException e) {
+            log.debug("EXIF DateTimeOriginal 파싱 실패: {}", raw);
+            return null;
         }
     }
 

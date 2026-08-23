@@ -32,6 +32,9 @@ EXPOSE 8080
 # JAVA_OPTS는 이미지 재빌드 없이 docker-compose 쪽에서 덮어쓸 수 있게 비워둔다.
 # 컨테이너 메모리 제한을 인식하도록 MaxRAMPercentage를 기본값으로 준다
 # (오라클 A1.Flex 1~2 OCPU 소형 인스턴스라 힙을 과하게 잡으면 다른 컨테이너가 OOM 킬된다).
+# alpine 기본값은 UTC다. 콘테스트 발표 시각(오전 9시)처럼 벽시계로 약속한 값이
+# 9시간 어긋나고, 스케줄러·EXIF 파싱도 같은 영향을 받는다.
+ENV TZ=Asia/Seoul
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=70.0"
 
 # Actuator health 엔드포인트로 생존 확인. 로컬 검증 중 swagger-ui를 써봤다가

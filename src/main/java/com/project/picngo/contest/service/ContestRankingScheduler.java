@@ -31,8 +31,10 @@ public class ContestRankingScheduler {
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
     @Transactional
     public void createDailyRankingSnapshot() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDate snapshotDate = LocalDate.now();
+        // @Scheduled(zone)은 언제 도는지만 정한다 — 여기서 읽는 시각은 JVM 기본 존이라
+        // 컨테이너가 UTC면 날짜가 하루 어긋난 스냅샷이 쌓인다
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+        LocalDate snapshotDate = LocalDate.now(Contest.ZONE);
 
         contestRepository.findAllByVoteStartAtLessThanEqualAndVoteEndAtGreaterThan(now, now).stream()
                 .forEach(contest -> createSnapshotIfAbsent(contest, snapshotDate));
