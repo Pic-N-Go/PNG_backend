@@ -1,5 +1,6 @@
 package com.project.picngo.contest.dto;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record ContestMyHistoryResponse(
@@ -12,6 +13,7 @@ public record ContestMyHistoryResponse(
     public record HistoryItem(
             Long contestId,
             String title,
+            LocalDateTime submitStartAt,
             String thumbnailUrl,
             Integer myRank,
             Integer voteCount,

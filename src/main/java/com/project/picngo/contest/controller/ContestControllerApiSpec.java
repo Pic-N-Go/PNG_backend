@@ -43,6 +43,15 @@ public interface ContestControllerApiSpec {
     );
 
     @Operation(
+            summary = "다음 예정 콘테스트 조회",
+            description = "아직 출품이 시작되지 않은 가장 이른 콘테스트를 조회합니다. 예정된 회차가 없으면 204를 반환합니다.",
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    ResponseEntity<ContestResponse> getUpcomingContest(
+            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+    );
+
+    @Operation(
             summary = "콘테스트 상세 조회",
             description = "특정 콘테스트의 기본 정보와 내 참여 상태를 조회합니다.",
             security = @SecurityRequirement(name = "bearerAuth")

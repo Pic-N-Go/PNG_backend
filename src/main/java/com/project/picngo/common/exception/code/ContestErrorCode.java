@@ -18,7 +18,8 @@ public enum ContestErrorCode implements BaseErrorCode {
     VOTE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "투표 가능 횟수를 모두 사용했습니다."),
     ALREADY_VOTED(HttpStatus.CONFLICT, "이미 투표한 출품작입니다."),
     ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 출품작입니다."),
-    ALREADY_SUBSCRIBED(HttpStatus.CONFLICT, "이미 알림을 신청한 콘테스트입니다."),
+
+    CONTEST_PERIOD_OVERLAP(HttpStatus.CONFLICT, "직전 콘테스트의 결과 발표 전에는 다음 회차를 시작할 수 없습니다."),
 
     NOT_MY_ENTRY(HttpStatus.FORBIDDEN, "내 출품작만 처리할 수 있습니다.");
 

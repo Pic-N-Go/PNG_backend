@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Getter
@@ -54,6 +55,41 @@ public class Contest {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    // ── 주기 규칙 ──────────────────────────────────────────────
+    // 출품 2주 → 투표 2주 → 투표 종료 다음 날 오전 9시 결과 발표.
+    // 발표까지의 사이(집계 중)에는 결과를 공개하지 않는다(ContestService.canShowRanking).
+    //
+    // 회차를 손으로 INSERT하면 이 규칙이 아무 데도 강제되지 않아 3일짜리 출품 기간도 통과한다.
+    // 그래서 생성 경로를 create() 하나로 모으고 날짜 5개를 전부 여기서 파생시킨다.
+    private static final int SUBMIT_WEEKS = 2;
+    private static final int VOTE_WEEKS = 2;
+    private static final LocalTime RESULT_ANNOUNCE_TIME = LocalTime.of(9, 0);
+
+    public static Contest create(
+            String title,
+            String description,
+            String themeImageUrl,
+            LocalDateTime submitStartAt,
+            int maxEntriesPerUser,
+            int voteLimit
+    ) {
+        Contest contest = new Contest();
+        contest.title = title;
+        contest.description = description;
+        contest.themeImageUrl = themeImageUrl;
+        contest.submitStartAt = submitStartAt;
+        contest.submitEndAt = submitStartAt.plusWeeks(SUBMIT_WEEKS);
+        // getPhase가 투표 시작을 submitEndAt으로 본다. voteStartAt을 그보다 뒤로 두면
+        // 투표는 받는데 순위 스냅샷만 늦게 시작하는 구간이 생기므로 둘을 항상 붙여 둔다.
+        contest.voteStartAt = contest.submitEndAt;
+        contest.voteEndAt = contest.voteStartAt.plusWeeks(VOTE_WEEKS);
+        contest.resultOpenAt = contest.voteEndAt.toLocalDate().plusDays(1).atTime(RESULT_ANNOUNCE_TIME);
+        contest.maxEntriesPerUser = maxEntriesPerUser;
+        contest.voteLimit = voteLimit;
+        contest.active = true;
+        return contest;
+    }
 
     public ContestPhase getPhase(LocalDateTime now) {
         if (now.isBefore(submitEndAt)) {

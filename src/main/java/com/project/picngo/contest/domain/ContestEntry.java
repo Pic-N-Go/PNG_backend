@@ -43,6 +43,9 @@ public class ContestEntry {
     @Column(nullable = false)
     private int voteCount; // 받은 투표 수
 
+    // 업로드한 사진의 EXIF DateTimeOriginal. EXIF가 없는 사진이면 null이다
+    private LocalDateTime shotAt;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -52,7 +55,8 @@ public class ContestEntry {
             String photoUrl,
             String caption,
             Spot spot,
-            String spotName
+            String spotName,
+            LocalDateTime shotAt
     ) {
         ContestEntry entry = new ContestEntry();
         entry.contest = contest;
@@ -61,6 +65,7 @@ public class ContestEntry {
         entry.caption = caption;
         entry.spot = spot;
         entry.spotName = spotName;
+        entry.shotAt = shotAt;
         entry.voteCount = 0;
         entry.createdAt = LocalDateTime.now();
         return entry;
