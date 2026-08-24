@@ -26,6 +26,14 @@ public interface ExternalApiControllerApiSpec {
             @Parameter(description = "끝 페이지 (분할 sync 시 사용, 미입력 시 전체)") @RequestParam(required = false) Integer endPage
     );
 
+    @Operation(summary = "한국관광공사 타입별 샘플 스팟 동기화 (ADMIN 권한 필요)",
+            description = "관광타입별(관광지 12, 문화시설 14, 축제 15, 카페 39) 지정한 개수만큼 샘플 데이터를 TourAPI에서 가져와 DB에 저장합니다. (POST /admin/tour-api/sync/sample, ROLE_ADMIN 권한 필요)",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    ResponseEntity<String> syncSample(
+            @Parameter(description = "관광타입당 수집할 스팟 개수 (기본값: 7)", example = "7") @RequestParam(defaultValue = "7") int countPerType,
+            @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails
+    );
+
     @Operation(summary = "한국관광공사 전체 지역 스팟 동기화 (ADMIN 권한 필요)",
             description = "전국 17개 지역 관광지 데이터를 totalCount 기반 페이지 순환으로 전부 가져옵니다. 최초 1회 실행용 (POST /admin/tour-api/sync/all, ROLE_ADMIN 권한 필요).\n\n⚠️ 주의: 스팟 수만큼 detailCommon API를 추가 호출하므로 완료까지 상당한 시간이 소요됩니다.\n중간 업데이트가 필요하거나 특정 지역만 갱신할 경우 POST /admin/tour-api/sync (areaCode 지정)를 사용하세요.",
             security = @SecurityRequirement(name = "bearerAuth"))

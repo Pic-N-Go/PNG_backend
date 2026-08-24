@@ -82,6 +82,31 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         return ResponseEntity.ok(saved + "건 저장 완료");
     }
 
+    // 3-1. TourAPI 타입별 샘플 동기화 (admin 전용)
+    @PostMapping("/admin/tour-api/sync/sample")
+    public ResponseEntity<String> syncSample(
+            @RequestParam(defaultValue = "7") int countPerType,
+            @AuthenticationPrincipal CustomUserDetails adminUserDetails
+    ) {
+        Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
+        int saved = tourApiSyncService.syncSample(countPerType);
+
+        try {
+            adminAuditLogService.record(
+                    adminId,
+                    AdminActionType.TOUR_API_SYNC,
+                    "TOUR_API",
+                    "SAMPLE",
+                    String.format("한국관광공사 TourAPI 타입별 샘플(%d건) 동기화 실행 (%d건 저장)", countPerType, saved),
+                    null
+            );
+        } catch (Exception e) {
+            log.warn("TourAPI 샘플 동기화 감사 로그 기록 실패: {}", e.getMessage());
+        }
+
+        return ResponseEntity.ok("샘플 동기화 완료: " + saved + "건 저장");
+    }
+
     // 4. TourAPI 전체 지역 동기화 (admin 전용)
     @PostMapping("/admin/tour-api/sync/all")
     public ResponseEntity<String> syncAll(

@@ -22,16 +22,20 @@ public class TourApiSyncService {
     private static final int PAGE_SIZE = 100;
 
     public int sync(int areaCode) {
-        return sync(areaCode, 1, Integer.MAX_VALUE);
+        return syncType(12, areaCode, 1, Integer.MAX_VALUE);
     }
 
     public int sync(int areaCode, int startPage, int endPage) {
+        return syncType(12, areaCode, startPage, endPage);
+    }
+
+    public int syncType(int contentTypeId, Integer lDongRegnCd, int startPage, int endPage) {
         int pageNo = startPage;
         int saved = 0;
         int totalCount = Integer.MAX_VALUE;
 
         while (pageNo <= endPage && (pageNo - 1) * PAGE_SIZE < totalCount) {
-            TourApiResponse response = tourApiClient.getAreaBasedListRaw(areaCode, pageNo, PAGE_SIZE);
+            TourApiResponse response = tourApiClient.getAreaBasedListRaw(contentTypeId, lDongRegnCd, pageNo, PAGE_SIZE);
             if (response == null || response.response() == null
                     || response.response().body() == null
                     || response.response().body().items() == null) break;
@@ -44,7 +48,7 @@ public class TourApiSyncService {
                 // API 호출 + sleep은 트랜잭션 밖에서 처리
                 Item detail = tourApiClient.getDetailCommon(item.contentid());
                 sleep(500);
-                IntroItem intro = tourApiClient.getDetailIntro(item.contentid());
+                IntroItem intro = tourApiClient.getDetailIntro(item.contentid(), contentTypeId);
                 sleep(500);
                 List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
                 sleep(500);
@@ -53,23 +57,68 @@ public class TourApiSyncService {
                 saved++;
             }
 
-            log.info("areaCode={} page={}/{} 저장중 ({}건)", areaCode, pageNo,
+            log.info("contentTypeId={} lDongRegnCd={} page={}/{} 저장중 ({}건)",
+                    contentTypeId, lDongRegnCd, pageNo,
                     (int) Math.ceil((double) totalCount / PAGE_SIZE), saved);
             pageNo++;
         }
 
-        log.info("TourAPI 동기화 완료: areaCode={}, 총 {}건 처리", areaCode, saved);
+        log.info("TourAPI 동기화 완료: contentTypeId={}, lDongRegnCd={}, 총 {}건 처리", contentTypeId, lDongRegnCd, saved);
         return saved;
     }
 
-    public int syncAll() {
-        int[] areaCodes = {1, 2, 3, 4, 5, 6, 7, 8, 31, 32, 33, 34, 35, 36, 37, 38, 39};
+    public int syncAllTypes(int maxPagesPerType) {
+        int[] targetTypes = {12, 14, 15, 39}; // 관광지, 문화시설, 축제/행사, 카페
         int total = 0;
-        for (int areaCode : areaCodes) {
-            total += sync(areaCode);
+        for (int type : targetTypes) {
+            total += syncType(type, null, 1, maxPagesPerType);
         }
-        log.info("TourAPI 전체 지역 동기화 완료: 총 {}건 처리", total);
+        log.info("TourAPI 전체 타입 전국 동기화 완료: 총 {}건 처리", total);
         return total;
+    }
+
+    public int syncSample(int countPerType) {
+        int[] targetTypes = {12, 14, 15, 39}; // 관광지, 문화시설, 축제/행사, 카페
+        int totalSaved = 0;
+
+        for (int type : targetTypes) {
+            TourApiResponse response = (type == 39)
+                    ? tourApiClient.getAreaBasedListRaw(type, null, "FD050100", 1, countPerType * 2)
+                    : tourApiClient.getAreaBasedListRaw(type, null, 1, countPerType);
+
+            if (response == null || response.response() == null
+                    || response.response().body() == null
+                    || response.response().body().items() == null) {
+                log.warn("샘플 수집 실패: type={}", type);
+                continue;
+            }
+
+            List<Item> items = response.response().body().items().item();
+            if (items == null || items.isEmpty()) continue;
+
+            int savedForType = 0;
+            for (Item item : items) {
+                if (savedForType >= countPerType) break;
+
+                Item detail = tourApiClient.getDetailCommon(item.contentid());
+                sleep(200);
+                IntroItem intro = tourApiClient.getDetailIntro(item.contentid(), type);
+                sleep(200);
+                List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
+                sleep(200);
+
+                spotUpsertService.upsertSpot(item, detail, intro, images);
+                savedForType++;
+                totalSaved++;
+                log.info("샘플 저장 완료 [type={}]: {} (contentId={})", type, item.title(), item.contentid());
+            }
+        }
+        log.info("TourAPI 샘플 동기화 완료: 총 {}건 저장", totalSaved);
+        return totalSaved;
+    }
+
+    public int syncAll() {
+        return syncAllTypes(Integer.MAX_VALUE);
     }
 
     private void sleep(long ms) {

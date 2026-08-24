@@ -31,6 +31,11 @@ public record TourApiResponse(Response response) {
             String cat1,
             String cat2,
             String cat3,
+            String lclsSystm1,
+            String lclsSystm2,
+            String lclsSystm3,
+            String lDongRegnCd,
+            String lDongSignguCd,
             String firstimage,
             String firstimage2,
             String overview,
@@ -40,6 +45,33 @@ public record TourApiResponse(Response response) {
             String parking,
             String chkbabycarriage,
             String chkpet,
-            String chkhandichief
-    ) {}
+            String chkhandichief,
+            String tel,
+            String homepage,
+            String eventstartdate,
+            String eventenddate,
+            String progresstype
+    ) {
+        /**
+         * 구버전(cat3) 또는 신버전(lclsSystm3) 중 존재하는 소분류 카테고리 코드를 반환한다.
+         */
+        public String getEffectiveCategoryCode() {
+            if (lclsSystm3 != null && !lclsSystm3.isBlank()) {
+                return lclsSystm3.trim();
+            }
+            if (cat3 != null && !cat3.isBlank()) {
+                return cat3.trim();
+            }
+            return null;
+        }
+
+        public Integer getContentTypeIdOrNull() {
+            if (contenttypeid == null || contenttypeid.isBlank()) return null;
+            try {
+                return Integer.parseInt(contenttypeid.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+    }
 }

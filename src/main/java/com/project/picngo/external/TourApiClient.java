@@ -48,27 +48,71 @@ public class TourApiClient {
         this.serviceKey = serviceKey;
     }
 
-    public TourApiResponse getAreaBasedListRaw(int areaCode, int pageNo, int numOfRows) {
+    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer lDongRegnCd, String lclsSystm3, int pageNo, int numOfRows) {
         try {
             return webClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/areaBasedList2")
-                            .queryParam("serviceKey", serviceKey)
-                            .queryParam("MobileOS", "ETC")
-                            .queryParam("MobileApp", "picngo")
-                            .queryParam("_type", "json")
-                            .queryParam("areaCode", areaCode)
-                            .queryParam("contentTypeId", 12)
-                            .queryParam("pageNo", pageNo)
-                            .queryParam("numOfRows", numOfRows)
-                            .build())
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/areaBasedList2")
+                                .queryParam("serviceKey", serviceKey)
+                                .queryParam("MobileOS", "ETC")
+                                .queryParam("MobileApp", "picngo")
+                                .queryParam("_type", "json")
+                                .queryParam("pageNo", pageNo)
+                                .queryParam("numOfRows", numOfRows);
+
+                        if (contentTypeId != null) {
+                            builder.queryParam("contentTypeId", contentTypeId);
+                        }
+                        if (lDongRegnCd != null) {
+                            builder.queryParam("lDongRegnCd", lDongRegnCd);
+                        }
+                        if (lclsSystm3 != null && !lclsSystm3.isBlank()) {
+                            builder.queryParam("lclsSystm3", lclsSystm3);
+                        }
+                        return builder.build();
+                    })
                     .retrieve()
                     .bodyToMono(TourApiResponse.class)
                     .timeout(CALL_TIMEOUT)
                     .block();
         } catch (Exception e) {
-            // 스택트레이스는 남기지 않는다. 전국 동기화는 스팟 수만큼 이 경로를 탈 수 있어
-            // 스택을 남기면 장애 시 로그가 수백 MB로 불어난다.
             log.warn("TourAPI areaBasedList 호출 실패: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer lDongRegnCd, int pageNo, int numOfRows) {
+        return getAreaBasedListRaw(contentTypeId, lDongRegnCd, null, pageNo, numOfRows);
+    }
+
+    public TourApiResponse getAreaBasedListRaw(int areaCode, int pageNo, int numOfRows) {
+        return getAreaBasedListRaw(12, areaCode, null, pageNo, numOfRows);
+    }
+
+    public TourApiResponse getFestivalList(String eventStartDate, Integer lDongRegnCd, int pageNo, int numOfRows) {
+        try {
+            return webClient.get()
+                    .uri(uriBuilder -> {
+                        var builder = uriBuilder.path("/searchFestival2")
+                                .queryParam("serviceKey", serviceKey)
+                                .queryParam("MobileOS", "ETC")
+                                .queryParam("MobileApp", "picngo")
+                                .queryParam("_type", "json")
+                                .queryParam("eventStartDate", eventStartDate)
+                                .queryParam("pageNo", pageNo)
+                                .queryParam("numOfRows", numOfRows);
+
+                        if (lDongRegnCd != null) {
+                            builder.queryParam("lDongRegnCd", lDongRegnCd);
+                        }
+                        return builder.build();
+                    })
+                    .retrieve()
+                    .bodyToMono(TourApiResponse.class)
+                    .timeout(CALL_TIMEOUT)
+                    .block();
+        } catch (Exception e) {
+            log.warn("TourAPI searchFestival2 호출 실패: {}", e.getMessage());
         }
         return null;
     }
@@ -100,7 +144,7 @@ public class TourApiClient {
         return null;
     }
 
-    public IntroItem getDetailIntro(String contentId) {
+    public IntroItem getDetailIntro(String contentId, int contentTypeId) {
         try {
             TourApiIntroResponse response = webClient.get()
                     .uri(uriBuilder -> uriBuilder.path("/detailIntro2")
@@ -109,7 +153,7 @@ public class TourApiClient {
                             .queryParam("MobileApp", "picngo")
                             .queryParam("_type", "json")
                             .queryParam("contentId", contentId)
-                            .queryParam("contentTypeId", 12)
+                            .queryParam("contentTypeId", contentTypeId)
                             .build())
                     .retrieve()
                     .bodyToMono(TourApiIntroResponse.class)
@@ -123,9 +167,13 @@ public class TourApiClient {
                 if (items != null && !items.isEmpty()) return items.get(0);
             }
         } catch (Exception e) {
-            log.warn("TourAPI detailIntro 호출 실패 contentId={}: {}", contentId, e.getMessage());
+            log.warn("TourAPI detailIntro 호출 실패 contentId={}, contentTypeId={}: {}", contentId, contentTypeId, e.getMessage());
         }
         return null;
+    }
+
+    public IntroItem getDetailIntro(String contentId) {
+        return getDetailIntro(contentId, 12);
     }
 
     public List<ImageItem> getDetailImages(String contentId) {
