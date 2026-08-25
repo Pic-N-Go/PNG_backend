@@ -524,4 +524,12 @@ order by coalesce(s.eventStartDate, '9999-12-31') asc, s.id desc
             @Param("endDate") LocalDate endDate,
             Pageable pageable
     );
+
+    @Query("""
+            SELECT s FROM Spot s
+            WHERE (s.contentTypeId = 15 or :festivalCategory member of s.categories)
+            AND s.eventEndDate IS NOT NULL
+            AND s.eventEndDate < :today
+            """)
+    List<Spot> findExpiredFestivals(@Param("festivalCategory") SpotCategory festivalCategory, @Param("today") LocalDate today);
 }

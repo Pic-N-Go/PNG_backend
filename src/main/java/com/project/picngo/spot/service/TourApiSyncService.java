@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +28,7 @@ public class TourApiSyncService {
 
     private static final int PAGE_SIZE = 100;
     private static final long API_CALL_DELAY_MS = 150;
+    private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public int sync(int areaCode) {
         return syncType(12, areaCode, 1, Integer.MAX_VALUE);
@@ -39,9 +42,14 @@ public class TourApiSyncService {
         int pageNo = startPage;
         int saved = 0;
         int totalCount = Integer.MAX_VALUE;
+        String todayStr = LocalDate.now().format(YYYYMMDD);
 
         while (pageNo <= endPage && (pageNo - 1) * PAGE_SIZE < totalCount) {
-            TourApiResponse response = tourApiClient.getAreaBasedListRaw(contentTypeId, areaCode, pageNo, PAGE_SIZE);
+            // 축제(15)인 경우 searchFestival2 전용 API로 오늘 기준 진행중/예정 축제만 선별 수집 (과거 축제 원천 배제)
+            TourApiResponse response = (contentTypeId == 15)
+                    ? tourApiClient.getFestivalList(todayStr, areaCode, null, pageNo, PAGE_SIZE)
+                    : tourApiClient.getAreaBasedListRaw(contentTypeId, areaCode, pageNo, PAGE_SIZE);
+
             if (response == null || response.response() == null
                     || response.response().body() == null
                     || response.response().body().items() == null) break;
@@ -110,11 +118,17 @@ public class TourApiSyncService {
     public int syncSample(int countPerType) {
         int[] targetTypes = {12, 14, 15, 39}; // 관광지, 문화시설, 축제/행사, 카페
         int totalSaved = 0;
+        String todayStr = LocalDate.now().format(YYYYMMDD);
 
         for (int type : targetTypes) {
-            TourApiResponse response = (type == 39)
-                    ? tourApiClient.getAreaBasedListRaw(type, null, "FD050100", 1, countPerType * 2)
-                    : tourApiClient.getAreaBasedListRaw(type, null, 1, countPerType);
+            TourApiResponse response;
+            if (type == 15) {
+                response = tourApiClient.getFestivalList(todayStr, null, null, 1, countPerType);
+            } else if (type == 39) {
+                response = tourApiClient.getAreaBasedListRaw(type, null, "FD050100", 1, countPerType * 2);
+            } else {
+                response = tourApiClient.getAreaBasedListRaw(type, null, 1, countPerType);
+            }
 
             if (response == null || response.response() == null
                     || response.response().body() == null
