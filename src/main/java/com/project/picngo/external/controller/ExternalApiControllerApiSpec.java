@@ -35,11 +35,16 @@ public interface ExternalApiControllerApiSpec {
     );
 
     @Operation(summary = "한국관광공사 전체 지역 스팟 동기화 (ADMIN 권한 필요)",
-            description = "전국 17개 지역 관광지 데이터를 totalCount 기반 페이지 순환으로 전부 가져옵니다. 최초 1회 실행용 (POST /admin/tour-api/sync/all, ROLE_ADMIN 권한 필요).\n\n⚠️ 주의: 스팟 수만큼 detailCommon API를 추가 호출하므로 완료까지 상당한 시간이 소요됩니다.\n중간 업데이트가 필요하거나 특정 지역만 갱신할 경우 POST /admin/tour-api/sync (areaCode 지정)를 사용하세요.",
+            description = "전국 17개 지역 관광지 데이터를 totalCount 기반 페이지 순환으로 전부 가져옵니다. 최초 1회 실행용 (POST /admin/tour-api/sync/all, ROLE_ADMIN 권한 필요).\n\n⚠️ 주의: 비동기 큐로 전송되어 백그라운드에서 실행됩니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     ResponseEntity<String> syncAll(
             @Parameter(hidden = true) com.project.picngo.auth.service.CustomUserDetails adminUserDetails
     );
+
+    @Operation(summary = "한국관광공사 동기화 진행 상태 및 진행률 조회 (ADMIN 권한 필요)",
+            description = "현재 백그라운드 큐에서 실행 중인 TourAPI 동기화 작업의 진행 여부, 대상 지역, 처리 건수, 진행률(%), 상태 메시지를 조회합니다. (GET /admin/tour-api/sync/status)",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    ResponseEntity<com.project.picngo.spot.dto.TourApiSyncStatusResponse> getSyncStatus();
 
     @Operation(summary = "길찾기 (이동시간/거리)", description = "카카오모빌리티 API를 이용하여 출발지에서 목적지까지의 자동차 예상 소요 시간과 거리를 조회합니다.")
     ResponseEntity<DirectionsResponse> getDirections(

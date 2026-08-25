@@ -18,8 +18,10 @@ public class TourApiSyncService {
 
     private final TourApiClient tourApiClient;
     private final SpotUpsertService spotUpsertService;
+    private final TourApiSyncStatusManager syncStatusManager;
 
     private static final int PAGE_SIZE = 100;
+    private static final long API_CALL_DELAY_MS = 150;
 
     public int sync(int areaCode) {
         return syncType(12, areaCode, 1, Integer.MAX_VALUE);
@@ -47,14 +49,23 @@ public class TourApiSyncService {
             for (Item item : items) {
                 // API 호출 + sleep은 트랜잭션 밖에서 처리
                 Item detail = tourApiClient.getDetailCommon(item.contentid());
-                sleep(500);
+                sleep(API_CALL_DELAY_MS);
                 IntroItem intro = tourApiClient.getDetailIntro(item.contentid(), contentTypeId);
-                sleep(500);
+                sleep(API_CALL_DELAY_MS);
                 List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
-                sleep(500);
+                sleep(API_CALL_DELAY_MS);
 
                 spotUpsertService.upsertSpot(item, detail, intro, images);
                 saved++;
+
+                if (syncStatusManager != null) {
+                    syncStatusManager.updateProgress(
+                            saved,
+                            totalCount,
+                            String.format("동기화 진행 중 (type: %d, 지역: %s) - %d/%d건",
+                                    contentTypeId, areaCode != null ? areaCode : "전체", saved, totalCount)
+                    );
+                }
             }
 
             log.info("contentTypeId={} areaCode={} page={}/{} 저장중 ({}건)",
