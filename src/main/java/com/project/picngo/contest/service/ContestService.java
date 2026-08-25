@@ -538,6 +538,11 @@ public class ContestService {
                                         snapshot.getEntry().getId(),
                                         imageStorageService.getPresignedUrl(snapshot.getEntry().getPhotoUrl()),
                                         snapshot.getEntry().getUser().getNickname(),
+                                        // 직접 올린 사진은 S3 objectKey라 presign이 필요하다. 소셜 사진은
+                                        // 외부 URL인데 getPresignedUrl이 http로 시작하면 그대로 통과시킨다.
+                                        imageStorageService.getPresignedUrl(
+                                                snapshot.getEntry().getUser().getDisplayProfileImage()
+                                        ),
                                         snapshot.getEntry().getSpotName(),
                                         snapshot.getVoteCount()
                                 ))
@@ -717,7 +722,11 @@ public class ContestService {
                 rank,
                 entry.getId(),
                 imageStorageService.getPresignedUrl(entry.getPhotoUrl()),
+                entry.getUser().getId(),
                 entry.getUser().getNickname(),
+                // 직접 올린 사진은 S3 objectKey라 presign이 필요하다. 소셜 사진은 외부 URL인데
+                // getPresignedUrl이 http로 시작하면 그대로 통과시킨다.
+                imageStorageService.getPresignedUrl(entry.getUser().getDisplayProfileImage()),
                 entry.getCaption(),
                 entry.getSpot() != null ? entry.getSpot().getId() : null,
                 entry.getSpotName(),
