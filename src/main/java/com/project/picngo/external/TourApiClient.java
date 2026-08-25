@@ -48,7 +48,7 @@ public class TourApiClient {
         this.serviceKey = serviceKey;
     }
 
-    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer lDongRegnCd, String lclsSystm3, int pageNo, int numOfRows) {
+    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer areaCode, Integer lDongRegnCd, String lclsSystm3, int pageNo, int numOfRows) {
         try {
             return webClient.get()
                     .uri(uriBuilder -> {
@@ -62,6 +62,9 @@ public class TourApiClient {
 
                         if (contentTypeId != null) {
                             builder.queryParam("contentTypeId", contentTypeId);
+                        }
+                        if (areaCode != null) {
+                            builder.queryParam("areaCode", areaCode);
                         }
                         if (lDongRegnCd != null) {
                             builder.queryParam("lDongRegnCd", lDongRegnCd);
@@ -81,15 +84,19 @@ public class TourApiClient {
         return null;
     }
 
-    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer lDongRegnCd, int pageNo, int numOfRows) {
-        return getAreaBasedListRaw(contentTypeId, lDongRegnCd, null, pageNo, numOfRows);
+    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer areaCode, String lclsSystm3, int pageNo, int numOfRows) {
+        return getAreaBasedListRaw(contentTypeId, areaCode, null, lclsSystm3, pageNo, numOfRows);
+    }
+
+    public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer areaCode, int pageNo, int numOfRows) {
+        return getAreaBasedListRaw(contentTypeId, areaCode, null, null, pageNo, numOfRows);
     }
 
     public TourApiResponse getAreaBasedListRaw(int areaCode, int pageNo, int numOfRows) {
-        return getAreaBasedListRaw(12, areaCode, null, pageNo, numOfRows);
+        return getAreaBasedListRaw(12, areaCode, null, null, pageNo, numOfRows);
     }
 
-    public TourApiResponse getFestivalList(String eventStartDate, Integer lDongRegnCd, int pageNo, int numOfRows) {
+    public TourApiResponse getFestivalList(String eventStartDate, Integer areaCode, Integer lDongRegnCd, int pageNo, int numOfRows) {
         try {
             return webClient.get()
                     .uri(uriBuilder -> {
@@ -102,6 +109,9 @@ public class TourApiClient {
                                 .queryParam("pageNo", pageNo)
                                 .queryParam("numOfRows", numOfRows);
 
+                        if (areaCode != null) {
+                            builder.queryParam("areaCode", areaCode);
+                        }
                         if (lDongRegnCd != null) {
                             builder.queryParam("lDongRegnCd", lDongRegnCd);
                         }
@@ -115,6 +125,10 @@ public class TourApiClient {
             log.warn("TourAPI searchFestival2 호출 실패: {}", e.getMessage());
         }
         return null;
+    }
+
+    public TourApiResponse getFestivalList(String eventStartDate, Integer areaCode, int pageNo, int numOfRows) {
+        return getFestivalList(eventStartDate, areaCode, null, pageNo, numOfRows);
     }
 
     public Item getDetailCommon(String contentId) {

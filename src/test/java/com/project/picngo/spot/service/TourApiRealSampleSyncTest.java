@@ -1,6 +1,7 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.domain.SpotCategory;
+import com.project.picngo.external.TourApiClient;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.dto.FestivalResponse;
 import com.project.picngo.spot.repository.SpotPhotoRepository;
@@ -34,6 +35,9 @@ class TourApiRealSampleSyncTest {
 
     @Autowired
     private SpotPhotoRepository spotPhotoRepository;
+
+    @Autowired
+    private TourApiClient tourApiClient;
 
     @Autowired
     private FestivalService festivalService;
@@ -100,5 +104,24 @@ class TourApiRealSampleSyncTest {
 
         long photoCount = spotPhotoRepository.count();
         System.out.println(">>> [7] spot_photo 테이블에 저장된 총 사진 수: " + photoCount);
+    }
+
+    @Test
+    @DisplayName("충남(areaCode=34) 지역 동기화 호출 시 TourAPI에서 데이터 정상 수신 검증")
+    void verifyAreaCodeChungnamSync() {
+        var response = tourApiClient.getAreaBasedListRaw(12, 34, 1, 5);
+        if (response != null && response.response() != null && response.response().body() != null) {
+            int total = response.response().body().totalCount();
+            var items = response.response().body().items().item();
+            System.out.println("==================================================");
+            System.out.println(">>> 충남(areaCode=34) 관광지 총 건수: " + total);
+            if (items != null) {
+                for (var it : items) {
+                    System.out.println("  - 충남 스팟: " + it.title() + " | 주소: " + it.addr1());
+                }
+            }
+            System.out.println("==================================================");
+            assertThat(total).isGreaterThan(0);
+        }
     }
 }

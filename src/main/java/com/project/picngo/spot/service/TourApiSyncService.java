@@ -29,13 +29,13 @@ public class TourApiSyncService {
         return syncType(12, areaCode, startPage, endPage);
     }
 
-    public int syncType(int contentTypeId, Integer lDongRegnCd, int startPage, int endPage) {
+    public int syncType(int contentTypeId, Integer areaCode, int startPage, int endPage) {
         int pageNo = startPage;
         int saved = 0;
         int totalCount = Integer.MAX_VALUE;
 
         while (pageNo <= endPage && (pageNo - 1) * PAGE_SIZE < totalCount) {
-            TourApiResponse response = tourApiClient.getAreaBasedListRaw(contentTypeId, lDongRegnCd, pageNo, PAGE_SIZE);
+            TourApiResponse response = tourApiClient.getAreaBasedListRaw(contentTypeId, areaCode, pageNo, PAGE_SIZE);
             if (response == null || response.response() == null
                     || response.response().body() == null
                     || response.response().body().items() == null) break;
@@ -57,13 +57,13 @@ public class TourApiSyncService {
                 saved++;
             }
 
-            log.info("contentTypeId={} lDongRegnCd={} page={}/{} 저장중 ({}건)",
-                    contentTypeId, lDongRegnCd, pageNo,
+            log.info("contentTypeId={} areaCode={} page={}/{} 저장중 ({}건)",
+                    contentTypeId, areaCode, pageNo,
                     (int) Math.ceil((double) totalCount / PAGE_SIZE), saved);
             pageNo++;
         }
 
-        log.info("TourAPI 동기화 완료: contentTypeId={}, lDongRegnCd={}, 총 {}건 처리", contentTypeId, lDongRegnCd, saved);
+        log.info("TourAPI 동기화 완료: contentTypeId={}, areaCode={}, 총 {}건 처리", contentTypeId, areaCode, saved);
         return saved;
     }
 
