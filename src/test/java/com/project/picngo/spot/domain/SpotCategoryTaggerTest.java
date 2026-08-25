@@ -80,6 +80,36 @@ class SpotCategoryTaggerTest {
     }
 
     @Test
+    @DisplayName("소개글에 단순 축제 언급이 있어도 관광특구는 FESTIVAL로 오태깅되지 않는다")
+    void testFestivalNotTaggedForGenericMentionsInOverview() {
+        Set<SpotCategory> tags = SpotCategoryTagger.tag("VE040200", "용두산 자갈치 관광특구",
+                "용두산·자갈치 관광특구는 부산의 원도심으로 매년 부산자갈치축제와 크리스마스트리문화축제가 열리는 곳이다.");
+
+        assertThat(tags).contains(SpotCategory.CITY);
+        assertThat(tags).doesNotContain(SpotCategory.FESTIVAL);
+    }
+
+    @Test
+    @DisplayName("박물관 소개글에 1층 카페 편의시설이 언급되어도 CAFE로 오태깅되지 않는다")
+    void testCafeNotTaggedForFacilityMentionsInMuseum() {
+        Set<SpotCategory> tags = SpotCategoryTagger.tag("VE070100", "국립박물관",
+                "1층 로비에는 관람객을 위한 카페와 편의시설, 기념품 매장이 있습니다.");
+
+        assertThat(tags).contains(SpotCategory.HERITAGE);
+        assertThat(tags).doesNotContain(SpotCategory.CAFE);
+    }
+
+    @Test
+    @DisplayName("일출/일몰 동의어(해돋이, 낙조) 및 꽃 명소 키워드 정상 태깅 검증")
+    void testSunriseSunsetAndFlowerKeywords() {
+        Set<SpotCategory> tagsSunrise = SpotCategoryTagger.tag("VE030400", "해맞이공원", "동해의 웅장한 해돋이와 낙조를 감상할 수 있습니다.");
+        assertThat(tagsSunrise).contains(SpotCategory.SUNRISE_SUNSET);
+
+        Set<SpotCategory> tagsFlower = SpotCategoryTagger.tag("VE030400", "수국테마공원", "여름철 화려한 수국과 가을 핑크뮬리가 장관입니다.");
+        assertThat(tagsFlower).contains(SpotCategory.FLOWER);
+    }
+
+    @Test
     @DisplayName("소분류 코드 및 키워드가 없는 경우 ETC로 기본 귀속")
     void testFallbackToEtc() {
         Set<SpotCategory> tags = SpotCategoryTagger.tag(null, "평범한 장소", "아무런 특징이 없는 설명입니다.");

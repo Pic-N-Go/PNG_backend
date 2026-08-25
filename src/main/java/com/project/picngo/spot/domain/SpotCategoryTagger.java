@@ -137,12 +137,10 @@ public final class SpotCategoryTagger {
     private record KeywordRule(SpotCategory theme, List<String> keywords) {}
 
     private static final List<KeywordRule> KEYWORD_RULES = List.of(
-            new KeywordRule(SpotCategory.NIGHT_VIEW, List.of("야경", "전망대")),
-            new KeywordRule(SpotCategory.CAFE, List.of("카페", "커피")),
-            new KeywordRule(SpotCategory.SUNRISE_SUNSET, List.of("일출", "일몰", "노을")),
-            new KeywordRule(SpotCategory.FLOWER, List.of("벚꽃", "단풍", "유채")),
-            new KeywordRule(SpotCategory.FESTIVAL, List.of("축제", "페스티벌")),
-            new KeywordRule(SpotCategory.MILKY_WAY, List.of("은하수")),
+            new KeywordRule(SpotCategory.NIGHT_VIEW, List.of("야경", "전망대", "루프탑", "야경명소")),
+            new KeywordRule(SpotCategory.SUNRISE_SUNSET, List.of("일출", "일몰", "노을", "해돋이", "낙조", "해넘이")),
+            new KeywordRule(SpotCategory.FLOWER, List.of("벚꽃", "유채", "수국", "장미", "해바라기", "라벤더", "코스모스", "철쭉", "튤립", "단풍명소", "핑크뮬리", "갈대밭", "억새밭")),
+            new KeywordRule(SpotCategory.MILKY_WAY, List.of("은하수", "별자리", "천문대")),
             // ponytail: 시내/도심/도시는 "시내를 내려다보는 산·절"을 오태깅해서 제외
             new KeywordRule(SpotCategory.CITY, List.of("골목", "번화가", "야시장", "로데오"))
     );
@@ -150,6 +148,7 @@ public final class SpotCategoryTagger {
     public static Set<SpotCategory> tag(String categoryCode, String name, String overview) {
         Set<SpotCategory> result = EnumSet.noneOf(SpotCategory.class);
 
+        // 1. 공공데이터 소분류 코드 매핑
         if (categoryCode != null && !categoryCode.isBlank()) {
             SpotCategory place = CATEGORY_MAP.get(categoryCode.trim());
             if (place != null) {
@@ -157,13 +156,40 @@ public final class SpotCategoryTagger {
             }
         }
 
-        String text = nullToEmpty(name) + " " + nullToEmpty(overview);
+        String safeName = nullToEmpty(name);
+        String safeOverview = nullToEmpty(overview);
+        String fullText = safeName + " " + safeOverview;
+
+        // 2. 키워드 기반 보완
         for (KeywordRule rule : KEYWORD_RULES) {
             for (String keyword : rule.keywords()) {
-                if (text.contains(keyword)) {
+                if (fullText.contains(keyword)) {
                     result.add(rule.theme());
                     break;
                 }
+            }
+        }
+
+        // [정교화 1] CAFE: 이름에 직접 카페 관련 단어가 있거나, 개요에 감성/오션뷰/거리 등 특정 컨텍스트일 때만 태깅 (단순 1층 편의시설 카페 오태깅 방지)
+        if (!result.contains(SpotCategory.CAFE)) {
+            boolean nameMatch = safeName.contains("카페") || safeName.contains("찻집") || safeName.contains("베이커리")
+                    || safeName.contains("디저트") || safeName.contains("로스터리") || safeName.contains("커피");
+            boolean overviewMatch = safeOverview.contains("카페거리") || safeOverview.contains("오션뷰 카페")
+                    || safeOverview.contains("감성 카페") || safeOverview.contains("한옥 카페")
+                    || safeOverview.contains("디저트 카페") || safeOverview.contains("루프탑 카페")
+                    || safeOverview.contains("로스터리");
+            if (nameMatch || overviewMatch) {
+                result.add(SpotCategory.CAFE);
+            }
+        }
+
+        // [정교화 2] FESTIVAL: 스팟 이름(name) 자체에 축제/행사 명칭이 포함된 경우에만 키워드 매핑 (일반 관광특구/공원 소개글의 '축제가 열린다' 오태깅 방지)
+        if (!result.contains(SpotCategory.FESTIVAL)) {
+            boolean isFestivalName = safeName.contains("축제") || safeName.contains("페스티벌")
+                    || safeName.contains("군항제") || safeName.contains("비엔날레") || safeName.contains("엑스포")
+                    || safeName.contains("문화제") || safeName.contains("대제전");
+            if (isFestivalName) {
+                result.add(SpotCategory.FESTIVAL);
             }
         }
 
@@ -186,14 +212,14 @@ public final class SpotCategoryTagger {
             case "바다", "해변", "해수욕장", "해안", "바닷가", "오션", "백사장" -> SpotCategory.BEACH;
             case "카페", "커피", "디저트", "베이커리", "찻집" -> SpotCategory.CAFE;
             case "야경", "밤풍경", "야간경관", "야간" -> SpotCategory.NIGHT_VIEW;
-            case "일출", "일몰", "노을", "해돋이", "해넘이" -> SpotCategory.SUNRISE_SUNSET;
+            case "일출", "일몰", "노을", "해돋이", "해넘이", "낙조" -> SpotCategory.SUNRISE_SUNSET;
             case "공원", "산책", "피크닉", "유원지" -> SpotCategory.PARK;
             case "산", "등산", "계곡", "봉우리", "트래킹" -> SpotCategory.MOUNTAIN;
             case "숲", "수목원", "휴양림", "자연휴양림", "삼림욕" -> SpotCategory.FOREST;
             case "한옥", "한옥마을", "고택" -> SpotCategory.HANOK;
             case "역사", "유적지", "문화재", "박물관", "미술관", "전시관" -> SpotCategory.HERITAGE;
             case "축제", "행사", "페스티벌", "마켓" -> SpotCategory.FESTIVAL;
-            case "꽃", "벚꽃", "단풍", "억새", "튤립" -> SpotCategory.FLOWER;
+            case "꽃", "벚꽃", "단풍", "억새", "갈대", "튤립", "수국", "장미", "해바라기", "라벤더", "코스모스", "철쭉", "핑크뮬리" -> SpotCategory.FLOWER;
             case "은하수", "별", "별자리", "천문대" -> SpotCategory.MILKY_WAY;
             case "도심", "벽화마을", "거리", "핫플", "핫플레이스" -> SpotCategory.CITY;
             default -> null;
