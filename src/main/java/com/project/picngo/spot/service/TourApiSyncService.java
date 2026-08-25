@@ -5,11 +5,14 @@ import com.project.picngo.external.dto.TourApiImageResponse.ImageItem;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse;
 import com.project.picngo.external.dto.TourApiResponse.Item;
+import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -18,6 +21,7 @@ public class TourApiSyncService {
 
     private final TourApiClient tourApiClient;
     private final SpotUpsertService spotUpsertService;
+    private final SpotRepository spotRepository;
     private final TourApiSyncStatusManager syncStatusManager;
 
     private static final int PAGE_SIZE = 100;
@@ -46,7 +50,22 @@ public class TourApiSyncService {
             List<Item> items = response.response().body().items().item();
             if (items == null || items.isEmpty()) break;
 
+            // N+1 문제 없는 배치 IN 조회로 이미 존재하는 스팟 ID들을 Set으로 일괄 조회
+            List<String> contentIds = items.stream()
+                    .map(Item::contentid)
+                    .filter(id -> id != null && !id.isBlank())
+                    .toList();
+            Set<String> existingIds = contentIds.isEmpty()
+                    ? Collections.emptySet()
+                    : spotRepository.findExistingTourContentIds(contentIds);
+
             for (Item item : items) {
+                // 이미 DB에 존재하는 스팟은 상세 API 3회 호출(1.5초)을 즉시 스킵
+                if (item.contentid() != null && existingIds.contains(item.contentid())) {
+                    log.debug("이미 존재하는 스팟 건너뜁니다: contentId={}, title={}", item.contentid(), item.title());
+                    continue;
+                }
+
                 // API 호출 + sleep은 트랜잭션 밖에서 처리
                 Item detail = tourApiClient.getDetailCommon(item.contentid());
                 sleep(API_CALL_DELAY_MS);
@@ -74,7 +93,7 @@ public class TourApiSyncService {
             pageNo++;
         }
 
-        log.info("TourAPI 동기화 완료: contentTypeId={}, areaCode={}, 총 {}건 처리", contentTypeId, areaCode, saved);
+        log.info("TourAPI 동기화 완료: contentTypeId={}, areaCode={}, 총 {}건 신규/갱신 처리", contentTypeId, areaCode, saved);
         return saved;
     }
 
@@ -107,16 +126,28 @@ public class TourApiSyncService {
             List<Item> items = response.response().body().items().item();
             if (items == null || items.isEmpty()) continue;
 
+            List<String> contentIds = items.stream()
+                    .map(Item::contentid)
+                    .filter(id -> id != null && !id.isBlank())
+                    .toList();
+            Set<String> existingIds = contentIds.isEmpty()
+                    ? Collections.emptySet()
+                    : spotRepository.findExistingTourContentIds(contentIds);
+
             int savedForType = 0;
             for (Item item : items) {
                 if (savedForType >= countPerType) break;
+                if (item.contentid() != null && existingIds.contains(item.contentid())) {
+                    log.debug("샘플 동기화 중 이미 존재하는 스팟 건너뜁니다: contentId={}, title={}", item.contentid(), item.title());
+                    continue;
+                }
 
                 Item detail = tourApiClient.getDetailCommon(item.contentid());
-                sleep(200);
+                sleep(API_CALL_DELAY_MS);
                 IntroItem intro = tourApiClient.getDetailIntro(item.contentid(), type);
-                sleep(200);
+                sleep(API_CALL_DELAY_MS);
                 List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
-                sleep(200);
+                sleep(API_CALL_DELAY_MS);
 
                 spotUpsertService.upsertSpot(item, detail, intro, images);
                 savedForType++;

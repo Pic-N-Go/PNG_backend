@@ -14,10 +14,14 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface SpotRepository extends JpaRepository<Spot, Long> {
 
     Optional<Spot> findByTourContentId(String tourContentId);
+
+    @Query("SELECT s.tourContentId FROM Spot s WHERE s.tourContentId IN :tourContentIds")
+    Set<String> findExistingTourContentIds(@Param("tourContentIds") Collection<String> tourContentIds);
 
     @Query(value = """
             SELECT *, (6371 * acos(cos(radians(:lat)) * cos(radians(latitude))
