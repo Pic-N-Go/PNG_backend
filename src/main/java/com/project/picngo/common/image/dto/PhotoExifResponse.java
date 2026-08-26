@@ -17,6 +17,7 @@ public record PhotoExifResponse(
         String software,
         Double latitude,
         Double longitude,
+        String address,
         Long fileSize,
         String fileFormat,
         String fileName
