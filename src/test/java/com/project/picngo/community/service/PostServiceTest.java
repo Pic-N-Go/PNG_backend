@@ -435,6 +435,7 @@ class PostServiceTest {
         when(image.getSoftware()).thenReturn("Adobe Lightroom Classic 12.3");
         when(image.getLatitude()).thenReturn(35.153386);
         when(image.getLongitude()).thenReturn(129.118785);
+        when(image.getAddress()).thenReturn("부산광역시 수영구 광안해변로 219");
         when(image.getOriginalFileName()).thenReturn("DSC03421.JPG");
         when(image.getFileSize()).thenReturn(8_400_000L);
 
@@ -445,6 +446,7 @@ class PostServiceTest {
         assertEquals("Adobe Lightroom Classic 12.3", response.software());
         assertEquals(35.153386, response.latitude());
         assertEquals(129.118785, response.longitude());
+        assertEquals("부산광역시 수영구 광안해변로 219", response.address());
         assertEquals("DSC03421.JPG", response.fileName());
         assertEquals(8_400_000L, response.fileSize());
     }
