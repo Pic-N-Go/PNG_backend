@@ -106,9 +106,9 @@ class SpotServiceSemanticFallbackTest {
                 .willReturn(new PageImpl<>(List.of()));
         given(embeddingClient.embed(any())).willReturn(Optional.of(new float[]{1f, 0f}));
         given(spotRepository.findEmbeddingCandidates(SpotStatus.APPROVED)).willReturn(List.of(
-                candidate(1L, new float[]{0f, 1f}),   // 직교 → 유사도 0
-                candidate(2L, new float[]{1f, 0f}),   // 동일 → 유사도 1
-                candidate(3L, new float[]{0.7f, 0.7f}) // 중간
+                candidate(1L, new float[]{0.3f, 0.95f}),  // 유사도 ~0.3
+                candidate(2L, new float[]{1f, 0f}),       // 유사도 1.0
+                candidate(3L, new float[]{0.7f, 0.7f})    // 유사도 ~0.7
         ));
         given(spotRepository.findByIdIn(List.of(2L, 3L, 1L))).willReturn(List.of(
                 spot(1L, "3위"), spot(2L, "1위"), spot(3L, "2위")

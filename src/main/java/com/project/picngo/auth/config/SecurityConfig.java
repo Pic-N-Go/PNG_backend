@@ -35,6 +35,7 @@ public class SecurityConfig {
             "/version/check",
             "/categories",
             "/spots/**",
+            "/festivals/**",
 
             "/picngo-team-api-2026.html",
             "/picngo-team-api-2026/**",

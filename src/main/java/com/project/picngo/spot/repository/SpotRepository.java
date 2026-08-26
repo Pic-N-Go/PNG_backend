@@ -10,13 +10,18 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface SpotRepository extends JpaRepository<Spot, Long> {
 
     Optional<Spot> findByTourContentId(String tourContentId);
+
+    @Query("SELECT s.tourContentId FROM Spot s WHERE s.tourContentId IN :tourContentIds")
+    Set<String> findExistingTourContentIds(@Param("tourContentIds") Collection<String> tourContentIds);
 
     @Query(value = """
             SELECT *, (6371 * acos(cos(radians(:lat)) * cos(radians(latitude))
@@ -501,4 +506,30 @@ and s.embedding is not null
     @Modifying
     @Query("update Spot s set s.embedding = :embedding where s.id = :id")
     void updateEmbedding(@Param("id") Long id, @Param("embedding") byte[] embedding);
+
+    // ── 축제/행사 전용 조회 ──────────────────────────────────────────
+    @Query("""
+select s from Spot s
+where (s.contentTypeId = 15 or :festivalCategory member of s.categories)
+and s.status = :status
+and s.isActive = true
+and (:startDate is null or s.eventEndDate is null or s.eventEndDate >= :startDate)
+and (:endDate is null or s.eventStartDate is null or s.eventStartDate <= :endDate)
+order by coalesce(s.eventStartDate, '9999-12-31') asc, s.id desc
+""")
+    Page<Spot> findFestivals(
+            @Param("festivalCategory") SpotCategory festivalCategory,
+            @Param("status") SpotStatus status,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT s FROM Spot s
+            WHERE (s.contentTypeId = 15 or :festivalCategory member of s.categories)
+            AND s.eventEndDate IS NOT NULL
+            AND s.eventEndDate < :today
+            """)
+    List<Spot> findExpiredFestivals(@Param("festivalCategory") SpotCategory festivalCategory, @Param("today") LocalDate today);
 }

@@ -18,9 +18,10 @@ package com.project.picngo.spot.domain;
  */
 public final class EditDistance {
 
-    // 이보다 짧은 검색어에는 쓰지 않는다. 한 글자는 거리 1만 허용해도 거의 모든
-    // 스팟에 걸려서, 오타를 잡는 게 아니라 아무거나 돌려주는 꼴이 된다.
-    public static final int MIN_KEYWORD_LENGTH = 2;
+    // 이보다 짧은 검색어에는 쓰지 않는다. 1~2글자는 거리 1만 허용해도
+    // 한 글자만 우연히 들어간 거의 모든 스팟('다락원', '김광석다시그리기길')에 걸려서,
+    // 오타를 잡는 게 아니라 엉뚱한 스팟이 채워져 의미 검색(Semantic)으로 넘어가지 못한다.
+    public static final int MIN_KEYWORD_LENGTH = 3;
 
     // 허용 오차의 상한. 검색어가 길어질수록 오타도 늘 수 있지만, 무한정 풀어주면
     // 전혀 다른 이름까지 후보로 들어온다.
@@ -32,12 +33,15 @@ public final class EditDistance {
     /**
      * 검색어 길이에 따라 몇 글자까지 틀린 것을 봐줄지.
      *
-     * <p>길이에 비례시키는 이유: '헙재'(2글자)에서 2글자가 다르면 완전히 다른 단어지만,
+     * <p>길이에 비례시키는 이유: '오셜록'(3글자)에서 1글자 오타는 흔하지만,
      * '제주올레길일코스'(8글자)에서 2글자쯤은 흔한 오타다. 고정값을 쓰면 짧은 검색어는
      * 엉뚱한 결과가 쏟아지고 긴 검색어는 오타를 못 잡는다.
      */
     public static int allowedDistance(int keywordLength) {
-        return Math.max(1, Math.min(MAX_ALLOWED_DISTANCE, keywordLength / 3));
+        if (keywordLength < MIN_KEYWORD_LENGTH) {
+            return 0;
+        }
+        return Math.min(MAX_ALLOWED_DISTANCE, keywordLength / 3);
     }
 
     /**

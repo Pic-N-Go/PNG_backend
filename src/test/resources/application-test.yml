@@ -69,3 +69,11 @@ cloud:
 firebase:
   config:
     path: classpath:firebase-key.json
+
+picngo:
+  search:
+    engine: LIKE
+    normalize-fallback: false
+    similar-fallback: false
+    fuzzy-fallback: false
+    semantic-fallback: false
