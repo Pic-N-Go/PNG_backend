@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 public record PhotoExifInfo(
         Double latitude,
         Double longitude,
+        String address,
         LocalDateTime takenAt,
 
         String cameraMake,

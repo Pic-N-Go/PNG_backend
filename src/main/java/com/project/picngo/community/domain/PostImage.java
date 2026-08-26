@@ -38,6 +38,10 @@ public class PostImage extends BaseTimeEntity {
     // 사진 EXIF에 기록된 GPS 경도
     private Double longitude;
 
+    // 사진 EXIF의 GPS 좌표를 역지오코딩한 주소
+    @Column(length = 255)
+    private String address;
+
     // 사진 원본 촬영 시각
     @Column(name = "taken_at")
     private LocalDateTime takenAt;
@@ -131,6 +135,7 @@ public class PostImage extends BaseTimeEntity {
         image.objectKey = objectKey;
         image.latitude = exif.latitude();
         image.longitude = exif.longitude();
+        image.address = exif.address();
         image.takenAt = exif.takenAt();
         image.cameraMake = exif.cameraMake();
         image.cameraModel = exif.cameraModel();

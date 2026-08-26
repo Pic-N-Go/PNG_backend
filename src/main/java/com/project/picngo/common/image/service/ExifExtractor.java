@@ -9,6 +9,8 @@ import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.exif.GpsDirectory;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
+import com.project.picngo.external.KakaoAddressClient;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,7 +25,10 @@ import java.util.Iterator;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ExifExtractor {
+
+    private final KakaoAddressClient kakaoAddressClient;
 
     private static final int TAG_IMAGE_WIDTH = 0x0100;
     private static final int TAG_IMAGE_HEIGHT = 0x0101;
@@ -67,6 +72,8 @@ public class ExifExtractor {
                 longitude = geoLocation.getLongitude();
             }
 
+            String address = kakaoAddressClient.coord2Address(latitude, longitude);
+
             LocalDateTime takenAt = null;
 
             if (exifDirectory != null && exifDirectory.getDateOriginal() != null) {
@@ -94,6 +101,7 @@ public class ExifExtractor {
             return new PhotoExifInfo(
                     latitude,
                     longitude,
+                    address,
                     takenAt,
 
                     string(ifd0Directory, ExifIFD0Directory.TAG_MAKE),
@@ -140,6 +148,7 @@ public class ExifExtractor {
         ImageSize imageSize = readImageSize(file);
 
         return new PhotoExifInfo(
+                null,
                 null,
                 null,
                 null,
