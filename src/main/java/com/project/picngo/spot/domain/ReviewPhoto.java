@@ -32,6 +32,9 @@ public class ReviewPhoto {
 
     private Double longitude;
 
+    @Column(length = 255)
+    private String address;
+
     @Column(name = "taken_at")
     private LocalDateTime takenAt;
 
@@ -103,6 +106,7 @@ public class ReviewPhoto {
         photo.objectKey = objectKey;
         photo.latitude = exif.latitude();
         photo.longitude = exif.longitude();
+        photo.address = exif.address();
         photo.takenAt = exif.takenAt();
         photo.cameraMake = exif.cameraMake();
         photo.cameraModel = exif.cameraModel();

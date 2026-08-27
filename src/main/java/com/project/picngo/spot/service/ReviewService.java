@@ -278,6 +278,7 @@ public class ReviewService {
                 photo.getSoftware(),
                 photo.getLatitude(),
                 photo.getLongitude(),
+                photo.getAddress(),
                 photo.getFileSize(),
                 photo.getFileFormat(),
                 photo.getOriginalFileName()

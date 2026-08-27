@@ -17,6 +17,7 @@ class PostImageTest {
         PhotoExifInfo exif = new PhotoExifInfo(
                 35.153386,
                 129.118785,
+                "부산광역시 수영구 광안해변로 219",
                 takenAt,
                 "Sony",
                 "ILCE-7M4",
@@ -62,6 +63,7 @@ class PostImageTest {
         assertEquals("Multi-segment", image.getMeteringMode());
         assertEquals("Manual exposure", image.getExposureMode());
         assertEquals("sRGB", image.getColorSpace());
+        assertEquals("부산광역시 수영구 광안해변로 219", image.getAddress());
         assertEquals("DSC03421.JPG", image.getOriginalFileName());
         assertEquals(8_400_000L, image.getFileSize());
     }
