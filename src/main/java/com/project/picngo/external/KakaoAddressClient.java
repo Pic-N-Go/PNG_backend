@@ -44,10 +44,10 @@ public class KakaoAddressClient {
 
             return resolveAddress(response);
         } catch (CallNotPermittedException e) {
-            log.warn("카카오 주소 변환 서킷브레이커가 열려 있습니다. lat={} lng={}", latitude, longitude);
+            log.warn("카카오 주소 변환 서킷브레이커가 열려 있습니다.");
             return null;
         } catch (Exception e) {
-            log.warn("카카오 주소 변환에 실패했습니다. lat={} lng={}: {}", latitude, longitude, e.getMessage());
+            log.warn("카카오 주소 변환에 실패했습니다. cause={}", e.getClass().getSimpleName());
             return null;
         }
     }
