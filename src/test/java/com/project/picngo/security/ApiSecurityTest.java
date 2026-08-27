@@ -260,6 +260,14 @@ public class ApiSecurityTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    @DisplayName("매핑된 컨트롤러가 없는 경로는 500이 아니라 404로 응답한다")
+    void 없는_경로는_404로_응답한다() throws Exception {
+        mockMvc.perform(get("/categories")
+                        .with(authentication(createMockAuthToken())))
+                .andExpect(status().isNotFound());
+    }
+
     private String createToken(String tokenType, Instant expiration) {
         Instant now = Instant.now();
 
