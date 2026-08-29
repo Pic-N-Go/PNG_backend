@@ -21,6 +21,11 @@
 -- 규칙이 바뀌면 Contest.create()와 이 파일을 같이 고쳐야 한다.
 
 
+-- NOW()는 MySQL 세션 타임존을 따르는데 Contest.getPhase는 이 DATETIME들을 Asia/Seoul로 읽는다.
+-- UTC 세션에서 그냥 돌리면 모든 경계가 9시간 밀린다.
+SET time_zone = '+09:00';
+
+
 -- ── 어떤 phase의 "진행 중 콘테스트"를 만들지 고른다 ──────────────
 --   SUBMITTING : 출품 기간
 --   VOTING     : 투표 기간 (순위 변동 패널)

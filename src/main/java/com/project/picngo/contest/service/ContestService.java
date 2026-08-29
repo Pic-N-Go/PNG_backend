@@ -12,7 +12,6 @@ import com.project.picngo.contest.domain.ContestEntry;
 import com.project.picngo.contest.domain.ContestPhase;
 import com.project.picngo.contest.domain.ContestRankingSnapshot;
 import com.project.picngo.contest.domain.ContestReport;
-import com.project.picngo.contest.domain.ContestSubscription;
 import com.project.picngo.contest.domain.ContestVote;
 import com.project.picngo.contest.dto.ContestCreateEntryRequest;
 import com.project.picngo.contest.dto.ContestCreateRequest;
@@ -47,7 +46,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,6 +113,12 @@ public class ContestService {
 
         if (lastResultOpenAt != null && submitStartAt.isBefore(lastResultOpenAt)) {
             throw new CustomException(ContestErrorCode.CONTEST_PERIOD_OVERLAP);
+        }
+
+        // 지정값은 위의 기본 계산을 건너뛴다 — 지난 시각을 넣으면 개설하자마자 출품이 끝나 있거나
+        // 이미 종료된 회차가 생긴다. 그런 상태가 필요한 건 시드뿐이고 docs/contest-seed.sql이 맡는다.
+        if (submitStartAt.isBefore(now)) {
+            throw new CustomException(ContestErrorCode.CONTEST_START_IN_PAST);
         }
 
         Contest contest = contestRepository.save(Contest.create(
@@ -594,17 +598,11 @@ public class ContestService {
         // 멱등하게 둔다 — 프론트에서 탭 한 번으로 켜고 끄는 토글이라
         // 연타나 상태 어긋남이 그대로 409로 튀면 사용자가 볼 이유가 없는 에러가 뜬다.
         //
-        // exists 검사만으로는 부족하다. 연타하면 두 요청이 같이 통과해 둘 다 save하고,
-        // uk_contest_subscription_user_contest에 걸려 1062 → 400("이미 사용 중인 값입니다")이 된다.
-        // 막으려던 바로 그 상황이라 제약 위반까지 성공으로 흡수한다
-        // (BookmarkCollectionService.addSpot과 같은 방식).
-        if (!subscriptionRepository.existsByContestAndUser(contest, user)) {
-            try {
-                subscriptionRepository.saveAndFlush(ContestSubscription.create(contest, user));
-            } catch (DataIntegrityViolationException e) {
-                // 다른 요청이 먼저 넣었다 — 결과는 구독 중으로 같다
-            }
-        }
+        // exists 검사 후 save는 안 된다. 연타하면 두 요청이 같이 통과해 둘 다 save하고,
+        // uk_contest_subscription_user_contest에 걸린다. 그 제약 위반을 잡아서 무시해도
+        // 트랜잭션은 이미 rollback-only로 찍혀 커밋에서 UnexpectedRollbackException이 난다.
+        // 예외를 아예 만들지 않는 INSERT IGNORE로 DB에 판정을 맡긴다.
+        subscriptionRepository.insertIgnore(contest.getId(), user.getId(), LocalDateTime.now(Contest.ZONE));
 
         return new ContestSubscriptionResponse(contest.getId(), true);
     }

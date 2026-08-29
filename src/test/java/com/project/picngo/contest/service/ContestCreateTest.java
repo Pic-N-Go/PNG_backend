@@ -129,6 +129,18 @@ class ContestCreateTest {
     }
 
     @Test
+    @DisplayName("지난 시각으로 시작일을 지정하면 거절한다 — 개설하자마자 끝나 있는 회차가 된다")
+    void rejectsPastSubmitStartAt() {
+        givenUser();
+        givenLastContest(null);
+
+        assertThatThrownBy(() -> contestService.createContest(
+                USER_ID, request(LocalDateTime.now(Contest.ZONE).minusDays(1))))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ContestErrorCode.CONTEST_START_IN_PAST);
+    }
+
+    @Test
     @DisplayName("직전 회차 발표 시각 정각은 허용된다 — 기본 체이닝이 만드는 값이라 막으면 안 된다")
     void allowsExactlyAtPreviousResultOpen() {
         givenUser();
