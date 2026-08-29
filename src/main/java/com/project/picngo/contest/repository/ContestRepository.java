@@ -20,6 +20,9 @@ public interface ContestRepository extends JpaRepository<Contest, Long> {
     // 다음 예정 콘테스트 조회
     Optional<Contest> findFirstBySubmitStartAtAfterOrderBySubmitStartAtAsc(LocalDateTime now);
 
+    // 가장 나중에 끝나는 회차 (새 회차를 그 뒤에 이어 붙이려고 본다)
+    Optional<Contest> findFirstByOrderByResultOpenAtDesc();
+
     // 지난 콘테스트 목록 조회
     Page<Contest> findAllByResultOpenAtBeforeOrderByResultOpenAtDesc(LocalDateTime now, Pageable pageable);
 

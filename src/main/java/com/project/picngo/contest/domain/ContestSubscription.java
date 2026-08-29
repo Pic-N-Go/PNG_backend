@@ -36,12 +36,4 @@ public class ContestSubscription {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
-
-    public static ContestSubscription create(Contest contest, User user) {
-        ContestSubscription subscription = new ContestSubscription();
-        subscription.contest = contest;
-        subscription.user = user;
-        subscription.createdAt = LocalDateTime.now();
-        return subscription;
-    }
 }

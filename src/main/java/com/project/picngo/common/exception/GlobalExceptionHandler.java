@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
@@ -166,6 +167,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(CourseErrorCode.COURSE_MODIFIED_CONCURRENTLY.getStatus())
                 .body(ErrorResponse.of(CourseErrorCode.COURSE_MODIFIED_CONCURRENTLY));
+    }
+
+    /**
+     * 매핑된 컨트롤러가 없는 경로. 전역 Exception 핸들러에 걸리면 500이 나가는데,
+     * 서버가 고장난 게 아니라 클라이언트가 없는 주소를 부른 것이므로 404가 맞다.
+     * (프론트에서 오타 URL을 서버 장애로 오인하던 문제)
+     *
+     * 스택트레이스는 남기지 않는다 - 스캐너·크롤러가 없는 경로를 계속 두드리면 로그만 비대해진다.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
+        log.warn("NoResourceFoundException: {}", e.getResourcePath());
+        return ResponseEntity
+                .status(CommonErrorCode.ENDPOINT_NOT_FOUND.getStatus())
+                .body(ErrorResponse.of(CommonErrorCode.ENDPOINT_NOT_FOUND));
     }
 
     @ExceptionHandler(Exception.class)
