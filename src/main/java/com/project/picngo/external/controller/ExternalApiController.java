@@ -8,7 +8,9 @@ import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
-import com.project.picngo.spot.service.TourApiSyncService;
+import com.project.picngo.spot.dto.TourApiSyncStatusResponse;
+import com.project.picngo.spot.producer.TourApiSyncProducer;
+import com.project.picngo.spot.service.TourApiSyncStatusManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -27,8 +29,8 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
 
     private final WeatherClient weatherClient;
     private final DirectionsClient directionsClient;
-    private final TourApiSyncService tourApiSyncService;
-    private final AdminAuditLogService adminAuditLogService;
+    private final TourApiSyncProducer tourApiSyncProducer;
+    private final TourApiSyncStatusManager tourApiSyncStatusManager;
 
     // 1. 길찾기 API (바로 출발 시 호출)
     @GetMapping("/directions")
@@ -53,7 +55,7 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
         return ResponseEntity.ok(weatherClient.getShortTermForecast(lat, lng, date));
     }
 
-    // 3. TourAPI 특정 지역 동기화 (admin 전용, startPage/endPage로 분할 가능)
+    // 3. TourAPI 특정 지역 동기화 (admin 전용, 비동기 큐 발행)
     @PostMapping("/admin/tour-api/sync")
     public ResponseEntity<String> syncSpots(
             @AuthenticationPrincipal CustomUserDetails adminUserDetails,
@@ -62,48 +64,38 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
             @RequestParam(required = false) Integer endPage
     ) {
         Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
-        int saved = (startPage != null && endPage != null)
-                ? tourApiSyncService.sync(areaCode, startPage, endPage)
-                : tourApiSyncService.sync(areaCode);
-
-        try {
-            adminAuditLogService.record(
-                    adminId,
-                    AdminActionType.TOUR_API_SYNC,
-                    "TOUR_API",
-                    "AREA_" + areaCode,
-                    String.format("한국관광공사 TourAPI 지역(areaCode: %d) 동기화 실행 (%d건 저장)", areaCode, saved),
-                    null
-            );
-        } catch (Exception e) {
-            log.warn("TourAPI 동기화 감사 로그 기록 실패: {}", e.getMessage());
-        }
-
-        return ResponseEntity.ok(saved + "건 저장 완료");
+        tourApiSyncProducer.sendAreaSync(areaCode, startPage, endPage, adminId);
+        return ResponseEntity.accepted()
+                .body(String.format("지역(areaCode: %d) 동기화 작업이 큐에 등록되었습니다. 백그라운드에서 진행됩니다.", areaCode));
     }
 
-    // 4. TourAPI 전체 지역 동기화 (admin 전용)
+    // 3-1. TourAPI 타입별 샘플 동기화 (admin 전용, 비동기 큐 발행)
+    @PostMapping("/admin/tour-api/sync/sample")
+    public ResponseEntity<String> syncSample(
+            @RequestParam(defaultValue = "7") int countPerType,
+            @AuthenticationPrincipal CustomUserDetails adminUserDetails
+    ) {
+        Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
+        tourApiSyncProducer.sendSampleSync(countPerType, adminId);
+        return ResponseEntity.accepted()
+                .body(String.format("타입별 샘플(%d건) 동기화 작업이 큐에 등록되었습니다. 백그라운드에서 진행됩니다.", countPerType));
+    }
+
+    // 4. TourAPI 전체 지역 동기화 (admin 전용, 비동기 큐 발행)
     @PostMapping("/admin/tour-api/sync/all")
     public ResponseEntity<String> syncAll(
             @AuthenticationPrincipal CustomUserDetails adminUserDetails
     ) {
         Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
-        int saved = tourApiSyncService.syncAll();
+        tourApiSyncProducer.sendAllSync(adminId);
+        return ResponseEntity.accepted()
+                .body("전국 17개 지역 전체 동기화 작업이 큐에 등록되었습니다. 백그라운드에서 진행됩니다.");
+    }
 
-        try {
-            adminAuditLogService.record(
-                    adminId,
-                    AdminActionType.TOUR_API_SYNC,
-                    "TOUR_API",
-                    "ALL_AREAS",
-                    String.format("한국관광공사 TourAPI 전국 17개 지역 전체 동기화 실행 (%d건 저장)", saved),
-                    null
-            );
-        } catch (Exception e) {
-            log.warn("TourAPI 전체 동기화 감사 로그 기록 실패: {}", e.getMessage());
-        }
-
-        return ResponseEntity.ok("전체 지역 동기화 완료: " + saved + "건 저장");
+    // 4-1. TourAPI 동기화 진행 상태 조회 (admin 전용)
+    @GetMapping("/admin/tour-api/sync/status")
+    public ResponseEntity<TourApiSyncStatusResponse> getSyncStatus() {
+        return ResponseEntity.ok(tourApiSyncStatusManager.getStatus());
     }
 
     // 5. 골든아워 조회 (스팟별/홈 화면)

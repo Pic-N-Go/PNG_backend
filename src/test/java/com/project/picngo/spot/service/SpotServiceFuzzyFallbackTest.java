@@ -83,8 +83,8 @@ class SpotServiceFuzzyFallbackTest {
     }
 
     @Test
-    @DisplayName("두 글자 검색어의 오타를 잡는다 - '헙재'로 협재해수욕장")
-    void findsTwoCharacterTypo() {
+    @DisplayName("3글자 검색어의 오타를 잡는다 - '협재해'로 협재해수욕장")
+    void findsThreeCharacterTypo() {
         primaryReturnsNothing();
         given(spotRepository.findFuzzyCandidates(SpotStatus.APPROVED)).willReturn(List.of(
                 candidate(5L, "협재해수욕장", "제주특별자치도 제주시 한림읍")
@@ -92,7 +92,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.findByIdIn(List.of(5L)))
                 .willReturn(List.of(spot(5L, "협재해수욕장")));
 
-        var response = service(false, true).searchSpots("헙재", null, 0, 20, null);
+        var response = service(false, true).searchSpots("협제해", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isEqualTo(1);
         assertThat(response.getContent().get(0).name()).isEqualTo("협재해수욕장");
@@ -120,17 +120,17 @@ class SpotServiceFuzzyFallbackTest {
     void ranksByDistanceAscending() {
         primaryReturnsNothing();
         given(spotRepository.findFuzzyCandidates(SpotStatus.APPROVED)).willReturn(List.of(
-                candidate(1L, "협제해변", "제주"),      // '협재'와 1글자 차이
-                candidate(2L, "협재해수욕장", "제주")   // '협재'와 정확히 일치
+                candidate(1L, "오설로록", "제주"),      // '오설록'과 1글자 차이
+                candidate(2L, "오설록티뮤지엄", "제주") // '오설록'과 정확히 일치
         ));
         given(spotRepository.findByIdIn(List.of(2L, 1L))).willReturn(List.of(
-                spot(1L, "협제해변"), spot(2L, "협재해수욕장")
+                spot(1L, "오설로록"), spot(2L, "오설록티뮤지엄")
         ));
 
-        var response = service(false, true).searchSpots("협재", null, 0, 20, null);
+        var response = service(false, true).searchSpots("오설록", null, 0, 20, null);
 
         assertThat(response.getContent()).extracting("name")
-                .containsExactly("협재해수욕장", "협제해변");
+                .containsExactly("오설록티뮤지엄", "오설로록");
     }
 
     @Test
@@ -141,7 +141,7 @@ class SpotServiceFuzzyFallbackTest {
                 candidate(9L, "한라산", "제주특별자치도 서귀포시")
         ));
 
-        var response = service(false, true).searchSpots("헙재", null, 0, 20, null);
+        var response = service(false, true).searchSpots("오셜록", null, 0, 20, null);
 
         assertThat(response.getTotalElements()).isZero();
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -149,11 +149,11 @@ class SpotServiceFuzzyFallbackTest {
     }
 
     @Test
-    @DisplayName("한 글자 검색어에는 돌지 않는다 - 아무 스팟이나 걸린다")
-    void skipsSingleCharacterKeyword() {
+    @DisplayName("2글자 이하 검색어에는 돌지 않는다 - 한 글자만 걸려 엉뚱한 스팟이 오탐되는 것을 방지하고 의미 검색으로 전달")
+    void skipsShortKeyword() {
         primaryReturnsNothing();
 
-        service(false, true).searchSpots("협", null, 0, 20, null);
+        service(false, true).searchSpots("가나", null, 0, 20, null);
 
         verify(spotRepository, never()).findFuzzyCandidates(any());
         assertThat(stageCount("none")).isEqualTo(1d);
@@ -205,7 +205,7 @@ class SpotServiceFuzzyFallbackTest {
         given(spotRepository.findByIdIn(List.of(5L)))
                 .willReturn(List.of(spot(5L, "협재해수욕장")));
 
-        var response = service(false, true).searchSpots("헙재", List.of("BEACH"), 0, 20, null);
+        var response = service(false, true).searchSpots("협제해", List.of("BEACH"), 0, 20, null);
 
         assertThat(response.getTotalElements()).isEqualTo(1);
         verify(spotRepository, never()).findFuzzyCandidates(any());

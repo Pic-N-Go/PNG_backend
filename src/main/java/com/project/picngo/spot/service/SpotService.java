@@ -11,6 +11,7 @@ import com.project.picngo.spot.domain.EditDistance;
 import com.project.picngo.spot.domain.EmbeddingVector;
 import com.project.picngo.spot.domain.FullTextKeyword;
 import com.project.picngo.spot.domain.Spot;
+import com.project.picngo.spot.domain.SpotCategoryTagger;
 import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.common.domain.SpotCategory;
@@ -245,6 +246,24 @@ public class SpotService {
     // 그리고 어느 단계에서 결과가 나왔는지 세어두면 "이 층이 실제로 쓰이긴 하나"에 답할 수 있다.
     // 폴백은 앞 단계가 빈 결과일 때만 도는 추가 쿼리라, 정상 검색의 비용은 그대로다.
     private Page<Spot> searchInStages(String keyword, List<SpotCategory> categories, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
+
+        // [테마/카테고리 직결 매칭] 사용자가 '바다', '해변', '카페', '야경', '일몰' 등 테마 키워드를 검색한 경우
+        if ((categories == null || categories.isEmpty()) && keyword != null) {
+            SpotCategory themeCategory = SpotCategoryTagger.matchCategoryByKeyword(keyword);
+            if (themeCategory != null) {
+                Page<Spot> categoryMatches = spotRepository.findAllByCategoriesAndStatusAndIsActiveTrue(
+                        List.of(themeCategory),
+                        SpotStatus.APPROVED,
+                        pageable
+                );
+                if (categoryMatches != null && !categoryMatches.isEmpty()) {
+                    recordSearchStage(STAGE_PRIMARY);
+                    return categoryMatches;
+                }
+            }
+        }
+
         Page<Spot> primary = (searchProperties.getEngine() == SearchEngine.FULLTEXT)
                 ? searchByFullText(keyword, categories, page, size)
                 : searchByLike(keyword, categories, page, size);
@@ -297,6 +316,9 @@ public class SpotService {
     // 인덱스 없이 후보 전부를 코사인 유사도로 훑는 브루트포스다. 스팟 수가 수천 건
     // 규모라 이 정도로 충분하고(search-eval/evaluate-vector.js로 확인), pgvector 같은
     // 별도 ANN 인덱스/DB를 새로 들일 이유가 없다.
+    // 의미 검색 최소 유사도 임계값. 단어-문장 임베딩 특성을 고려하여 0.20 이상만 유효 결과로 반환.
+    private static final float MIN_SEMANTIC_SIMILARITY = 0.20f;
+
     private Page<Spot> searchBySemantic(String keyword, List<SpotCategory> categories, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
 
@@ -314,16 +336,19 @@ public class SpotService {
         }
 
         float[] query = queryVector.get();
-        Map<Long, Float> scoreById = candidates.stream()
-                .collect(Collectors.toMap(
-                        SpotRepository.EmbeddingCandidate::getId,
-                        c -> EmbeddingVector.cosineSimilarity(query, EmbeddingVector.decode(c.getEmbedding()))
-                ));
-
-        List<Long> rankedIds = scoreById.entrySet().stream()
+        List<Long> rankedIds = candidates.stream()
+                .map(c -> Map.entry(
+                        c.getId(),
+                        EmbeddingVector.cosineSimilarity(query, EmbeddingVector.decode(c.getEmbedding()))
+                ))
+                .filter(entry -> entry.getValue() >= MIN_SEMANTIC_SIMILARITY)
                 .sorted(Map.Entry.<Long, Float>comparingByValue().reversed())
                 .map(Map.Entry::getKey)
                 .toList();
+
+        if (rankedIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
 
         return pageOfRankedIds(rankedIds, pageable);
     }
@@ -356,9 +381,9 @@ public class SpotService {
 
         List<ScoredSpot> scored = new ArrayList<>();
         for (SpotRepository.FuzzyCandidate candidate : candidates) {
-            String target = FullTextKeyword.toSimilarityTerms(
-                    (candidate.getName() == null ? "" : candidate.getName())
-                            + (candidate.getAddress() == null ? "" : candidate.getAddress()));
+            // 오타 교정의 대상은 스팟 이름이다. 주소까지 합치면 긴 주소의 글자 조각이 우연히 걸려
+            // 엉뚱한 스팟이 상위로 올라오거나 다음 단계(의미 검색)로 넘어가지 못한다.
+            String target = FullTextKeyword.toSimilarityTerms(candidate.getName());
             if (target == null) {
                 continue;
             }
@@ -421,7 +446,10 @@ public class SpotService {
         String terms = FullTextKeyword.toSimilarityTerms(keyword);
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE));
 
-        if (terms == null) {
+        // 2글자 이하의 짧은 단어는 ngram 조각(1개)이 너무 적어 한 글자만 우연히 겹쳐도(예: '바다' 검색 시 '다락원'의 '다')
+        // 오탐으로 잡히고 다음 단계(Fuzzy / Semantic)로 넘어가지 못한다.
+        // 따라서 유사도(similar) 검색은 3글자 이상일 때만 수행한다.
+        if (terms == null || terms.length() < 3) {
             return Page.empty(pageable);
         }
 

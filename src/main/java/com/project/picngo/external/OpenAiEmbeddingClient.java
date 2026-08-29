@@ -28,7 +28,7 @@ import java.util.Optional;
 @Component
 public class OpenAiEmbeddingClient implements EmbeddingClient {
 
-    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(10);
 
     private final WebClient webClient;
     private final String apiKey;

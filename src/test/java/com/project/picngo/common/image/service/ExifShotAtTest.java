@@ -1,7 +1,9 @@
 package com.project.picngo.common.image.service;
 
+import com.project.picngo.external.KakaoAddressClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,7 +30,8 @@ class ExifShotAtTest {
 
     private static final LocalDateTime EXPECTED = LocalDateTime.of(2026, 8, 23, 5, 32, 0);
 
-    private final ExifExtractor extractor = new ExifExtractor();
+    // ponytail: 주소 변환은 이 테스트의 관심사가 아니다 — mock이 null을 준다
+    private final ExifExtractor extractor = new ExifExtractor(Mockito.mock(KakaoAddressClient.class));
 
     private static MultipartFile load(String name) throws IOException {
         try (InputStream in = ExifShotAtTest.class.getResourceAsStream("/exif/" + name)) {

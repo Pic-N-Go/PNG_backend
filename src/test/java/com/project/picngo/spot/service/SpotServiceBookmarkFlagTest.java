@@ -108,12 +108,12 @@ class SpotServiceBookmarkFlagTest {
     @Test
     @DisplayName("searchSpots(Page 경로): 북마크한 스팟만 isBookmarked=true로 표시된다")
     void searchSpots_marksOnlyBookmarkedSpots() {
-        given(spotRepository.searchSpots(eq("공원"), eq(SpotStatus.APPROVED), any()))
-                .willReturn(new PageImpl<>(List.of(spot(1L, "갈산공원"), spot(2L, "거리공원"))));
+        given(spotRepository.searchSpots(eq("갈산"), eq(SpotStatus.APPROVED), any()))
+                .willReturn(new PageImpl<>(List.of(spot(1L, "갈산공원"), spot(2L, "갈산거리"))));
         given(bookmarkCollectionSpotRepository.findBookmarkedSpotIds(eq(7L), anyCollection()))
                 .willReturn(List.of(1L));
 
-        Page<SpotResponse> result = spotService.searchSpots("공원", null, 0, 10, 7L);
+        Page<SpotResponse> result = spotService.searchSpots("갈산", null, 0, 10, 7L);
 
         assertThat(result.getContent()).extracting(SpotResponse::id, SpotResponse::isBookmarked)
                 .containsExactly(tuple(1L, true), tuple(2L, false));
