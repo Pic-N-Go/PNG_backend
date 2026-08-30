@@ -69,8 +69,8 @@ public class ExifExtractor {
             Double latitude = null;
             Double longitude = null;
 
-            if (gpsDirectory != null && gpsDirectory.getGeoLocation() != null) {
-                GeoLocation geoLocation = gpsDirectory.getGeoLocation();
+            GeoLocation geoLocation = gpsDirectory == null ? null : gpsDirectory.getGeoLocation();
+            if (isUsableGeoLocation(geoLocation)) {
                 latitude = geoLocation.getLatitude();
                 longitude = geoLocation.getLongitude();
             }
@@ -146,6 +146,10 @@ public class ExifExtractor {
             log.warn("EXIF metadata extraction failed", e);
             return empty(file);
         }
+    }
+
+    static boolean isUsableGeoLocation(GeoLocation geoLocation) {
+        return geoLocation != null && !geoLocation.isZero();
     }
 
     /** `2026:08:23 05:32:00`. 형식이 어긋나거나 없으면 null — 촬영 시각은 없어도 되는 값이다 */

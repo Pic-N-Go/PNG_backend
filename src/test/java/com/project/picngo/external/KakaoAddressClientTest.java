@@ -95,6 +95,7 @@ class KakaoAddressClientTest {
         assertThat(client.coord2Address(null, 129.118785)).isNull();
         assertThat(client.coord2Address(91.0, 129.118785)).isNull();
         assertThat(client.coord2Address(35.153386, Double.NaN)).isNull();
+        assertThat(client.coord2Address(0.0, 0.0)).isNull();
         assertThat(server.getRequestCount()).isZero();
     }
 
