@@ -6,10 +6,7 @@ import com.project.picngo.chat.service.ChatMessageService;
 import com.project.picngo.chat.service.ChatParticipantService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -22,8 +19,12 @@ public class ChatRestController implements ChatRestControllerApiSpec{
 
     @Override
     @GetMapping("/{spotId}/messages")
-    public ResponseEntity<List<ChatMessageResponse>> getMessages(@PathVariable Long spotId) {
-        return ResponseEntity.ok(chatMessageService.getMessages(spotId));
+    public ResponseEntity<List<ChatMessageResponse>> getMessages(
+            @PathVariable Long spotId,
+            @RequestParam(required = false) Long beforeId,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(chatMessageService.getMessages(spotId, beforeId, size));
     }
 
     @Override

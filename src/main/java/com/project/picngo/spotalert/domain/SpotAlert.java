@@ -31,12 +31,14 @@ public class SpotAlert extends BaseTimeEntity {
     @Column(length = 200)
     private String memo;
 
+    @org.hibernate.annotations.BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "spot_alert_weather_conditions", joinColumns = @JoinColumn(name = "spot_alert_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "weather_condition", length = 50)
     private Set<WeatherCondition> weatherConditions = new HashSet<>();
 
+    @org.hibernate.annotations.BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "spot_alert_time_conditions", joinColumns = @JoinColumn(name = "spot_alert_id"))
     @Enumerated(EnumType.STRING)

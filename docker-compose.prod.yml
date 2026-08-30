@@ -31,6 +31,8 @@ services:
     restart: always
     logging: *default-logging
     environment:
+      # 이미지에도 ENV TZ가 있지만, 이미지를 갈아끼워도 안 흔들리게 여기서도 명시한다
+      TZ: Asia/Seoul
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/picngo?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       DB_USERNAME: ${DB_USERNAME}
@@ -91,6 +93,8 @@ services:
     restart: always
     logging: *default-logging
     environment:
+      # NOW()가 앱의 벽시계와 같아야 한다 — docs/contest-seed.sql이 NOW() 기준 상대 날짜를 쓴다
+      TZ: Asia/Seoul
       MYSQL_DATABASE: picngo
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_USER: ${DB_USERNAME}

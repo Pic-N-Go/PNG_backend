@@ -316,6 +316,7 @@ public class PostService {
                 image.getSoftware(),
                 image.getLatitude(),
                 image.getLongitude(),
+                image.getAddress(),
                 image.getFileSize(),
                 image.getFileFormat(),
                 image.getOriginalFileName()

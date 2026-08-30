@@ -8,7 +8,8 @@ public enum AdminActionType {
     INQUIRY_ANSWER("1:1 문의 답변 등록/수정"),
     EMBEDDING_RECALCULATE("스팟 임베딩 개별 재계산"),
     EMBEDDING_BACKFILL("스팟 임베딩 일괄 백필"),
-    TOUR_API_SYNC("한국관광공사 TourAPI 동기화");
+    TOUR_API_SYNC("한국관광공사 TourAPI 동기화"),
+    CONTEST_CREATE("콘테스트 회차 개설");
 
     private final String description;
 

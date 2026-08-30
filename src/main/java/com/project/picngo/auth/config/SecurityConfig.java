@@ -32,9 +32,8 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/auth/**",
-            "/version/check",
-            "/categories",
             "/spots/**",
+            "/festivals/**",
 
             "/picngo-team-api-2026.html",
             "/picngo-team-api-2026/**",

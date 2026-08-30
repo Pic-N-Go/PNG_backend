@@ -2,6 +2,7 @@ package com.project.picngo.user.controller;
 
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.MyReviewListResponse;
+import com.project.picngo.spot.dto.ReviewedSpotResponse;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.user.dto.*;
 import com.project.picngo.user.service.UserService;
@@ -33,6 +34,14 @@ public class UserController implements UserControllerApiSpec {
 			@RequestParam(defaultValue = "20") int size
 	) {
 		return ResponseEntity.ok(reviewService.getMyReviews(userDetails.getId(), sort, page, size));
+	}
+
+	// 지도는 핀을 한 번에 다 받아야 해 페이징을 두지 않는다. /me/reviews와 달리 리뷰 본문·사진을 안 준다.
+	@GetMapping("/me/reviewed-spots")
+	public ResponseEntity<List<ReviewedSpotResponse>> myReviewedSpots(
+			@AuthenticationPrincipal CustomUserDetails userDetails
+	) {
+		return ResponseEntity.ok(reviewService.getReviewedSpots(userDetails.getId()));
 	}
 
 	@GetMapping("/me")

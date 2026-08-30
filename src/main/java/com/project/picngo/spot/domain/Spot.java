@@ -17,6 +17,7 @@ import org.hibernate.type.SqlTypes;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -94,6 +95,18 @@ public class Spot extends BaseTimeEntity {
     @Comment("TourAPI contentId. 사용자 등록 스팟은 null")
     @Column(name = "tour_content_id", length = 100)
     private String tourContentId;
+
+    @Comment("TourAPI 관광타입 ID (12: 관광지, 14: 문화시설, 15: 축제/행사, 39: 음식점/카페 등)")
+    @Column(name = "content_type_id")
+    private Integer contentTypeId;
+
+    @Comment("축제/행사 시작일 (contentTypeId=15)")
+    @Column(name = "event_start_date")
+    private LocalDate eventStartDate;
+
+    @Comment("축제/행사 종료일 (contentTypeId=15)")
+    @Column(name = "event_end_date")
+    private LocalDate eventEndDate;
 
     @Comment("대표 이미지 원본 URL. TourAPI: firstimage")
     @Column(name = "image_url", length = 500)
@@ -232,7 +245,8 @@ public class Spot extends BaseTimeEntity {
 
     public void updateFromTourApi(String overview, String parking, String usetime,
                                    String restdate, String infocenter,
-                                   String wheelchairAccess, String strollerAccess, String petFriendly) {
+                                   String wheelchairAccess, String strollerAccess, String petFriendly,
+                                   Integer contentTypeId, LocalDate eventStartDate, LocalDate eventEndDate) {
         // 설명문이 실제로 바뀌면 임베딩을 비워 백필 배치가 새 텍스트로 다시 계산하게 한다.
         // 그대로 두면 이름·주소만으로 계산된 옛 임베딩이 설명문이 생긴 뒤에도 안 바뀐다.
         if (!Objects.equals(this.overview, overview)) {
@@ -246,6 +260,21 @@ public class Spot extends BaseTimeEntity {
         this.wheelchairAccess = wheelchairAccess;
         this.strollerAccess = strollerAccess;
         this.petFriendly = petFriendly;
+        if (contentTypeId != null) {
+            this.contentTypeId = contentTypeId;
+        }
+        if (eventStartDate != null) {
+            this.eventStartDate = eventStartDate;
+        }
+        if (eventEndDate != null) {
+            this.eventEndDate = eventEndDate;
+        }
+    }
+
+    public void updateFromTourApi(String overview, String parking, String usetime,
+                                   String restdate, String infocenter,
+                                   String wheelchairAccess, String strollerAccess, String petFriendly) {
+        updateFromTourApi(overview, parking, usetime, restdate, infocenter, wheelchairAccess, strollerAccess, petFriendly, null, null, null);
     }
 
     public void incrementBookmarkCount() {
@@ -274,6 +303,9 @@ public class Spot extends BaseTimeEntity {
             SpotSource source,
             Boolean badge,
             String tourContentId,
+            Integer contentTypeId,
+            LocalDate eventStartDate,
+            LocalDate eventEndDate,
             String imageUrl,
             String thumbnailUrl,
             SpotStatus status,
@@ -303,6 +335,9 @@ public class Spot extends BaseTimeEntity {
         this.source = source;
         this.badge = badge == null ? false : badge;
         this.tourContentId = tourContentId;
+        this.contentTypeId = contentTypeId;
+        this.eventStartDate = eventStartDate;
+        this.eventEndDate = eventEndDate;
         this.imageUrl = imageUrl;
         this.thumbnailUrl = thumbnailUrl;
         this.status = status == null ? SpotStatus.PENDING : status;

@@ -5,15 +5,16 @@ import com.project.picngo.common.exception.code.ContestErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
+import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.contest.domain.Contest;
 import com.project.picngo.contest.domain.ContestEntry;
 import com.project.picngo.contest.domain.ContestPhase;
 import com.project.picngo.contest.domain.ContestRankingSnapshot;
 import com.project.picngo.contest.domain.ContestReport;
-import com.project.picngo.contest.domain.ContestSubscription;
 import com.project.picngo.contest.domain.ContestVote;
 import com.project.picngo.contest.dto.ContestCreateEntryRequest;
+import com.project.picngo.contest.dto.ContestCreateRequest;
 import com.project.picngo.contest.dto.ContestEntryRankSummary;
 import com.project.picngo.contest.dto.ContestEntryDetailResponse;
 import com.project.picngo.contest.dto.ContestEntryPageResponse;
@@ -73,11 +74,16 @@ public class ContestService {
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
     private final ImageStorageService imageStorageService;
+    private final ExifExtractor exifExtractor;
+
+    // 프론트 UI가 "3장 출품 · 3표"로 고정돼 있다. 회차마다 다르게 줄 이유가 아직 없어 기본값으로 둔다.
+    private static final int DEFAULT_MAX_ENTRIES_PER_USER = 3;
+    private static final int DEFAULT_VOTE_LIMIT = 3;
 
     // 현재 진행 중인 콘테스트 조회
     public ContestResponse getCurrentContest(Long userId) {
         User user = getUser(userId);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
 
         Contest contest = contestRepository
                 .findFirstBySubmitStartAtLessThanEqualAndResultOpenAtGreaterThanOrderBySubmitStartAtDesc(now, now)
@@ -86,19 +92,73 @@ public class ContestService {
         return toContestResponse(contest, user, now);
     }
 
+    // 콘테스트 회차 개설 (관리자)
+    //
+    // 기간은 받지 않는다 — 출품 2주·투표 2주·투표 종료 익일 09:00 발표는 Contest.create()의 규칙이고
+    // 사람이 정하는 건 테마뿐이다. 손으로 INSERT하던 때는 이 규칙을 지킬 방법이 없었다.
+    @Transactional
+    public ContestResponse createContest(Long userId, ContestCreateRequest request) {
+        User user = getUser(userId);
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        // 직전 회차의 발표 시각에 이어 붙인다. 겹치게 두면 집계 중 구간에서
+        // getCurrentContest가 새 회차를 골라 발표 대기 중인 직전 회차가 어디에서도 안 잡힌다.
+        LocalDateTime lastResultOpenAt = contestRepository.findFirstByOrderByResultOpenAtDesc()
+                .map(Contest::getResultOpenAt)
+                .orElse(null);
+
+        LocalDateTime submitStartAt = request.submitStartAt() != null
+                ? request.submitStartAt()
+                : (lastResultOpenAt != null && lastResultOpenAt.isAfter(now) ? lastResultOpenAt : now);
+
+        if (lastResultOpenAt != null && submitStartAt.isBefore(lastResultOpenAt)) {
+            throw new CustomException(ContestErrorCode.CONTEST_PERIOD_OVERLAP);
+        }
+
+        // 지정값은 위의 기본 계산을 건너뛴다 — 지난 시각을 넣으면 개설하자마자 출품이 끝나 있거나
+        // 이미 종료된 회차가 생긴다. 그런 상태가 필요한 건 시드뿐이고 docs/contest-seed.sql이 맡는다.
+        if (submitStartAt.isBefore(now)) {
+            throw new CustomException(ContestErrorCode.CONTEST_START_IN_PAST);
+        }
+
+        Contest contest = contestRepository.save(Contest.create(
+                request.title(),
+                request.description(),
+                request.themeImageUrl(),
+                submitStartAt,
+                request.maxEntriesPerUser() != null ? request.maxEntriesPerUser() : DEFAULT_MAX_ENTRIES_PER_USER,
+                request.voteLimit() != null ? request.voteLimit() : DEFAULT_VOTE_LIMIT
+        ));
+
+        return toContestResponse(contest, user, now);
+    }
+
+    // 다음 예정 콘테스트 조회 (없으면 null)
+    //
+    // 진행 중인 콘테스트가 없을 때 커뮤니티 탭이 "다음 회차 예고 + 알림 신청"을 그린다.
+    // getCurrentContest는 submitStartAt <= now 인 것만 찾으므로 아직 시작 전인 회차를 잡지 못한다.
+    public ContestResponse getUpcomingContest(Long userId) {
+        User user = getUser(userId);
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        return contestRepository.findFirstBySubmitStartAtAfterOrderBySubmitStartAtAsc(now)
+                .map(contest -> toContestResponse(contest, user, now))
+                .orElse(null);
+    }
+
     // 콘테스트 상세 조회
     public ContestResponse getContest(Long contestId, Long userId) {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
 
-        return toContestResponse(contest, user, LocalDateTime.now());
+        return toContestResponse(contest, user, LocalDateTime.now(Contest.ZONE));
     }
 
     // 지난 콘테스트 목록 조회
     public ContestPastPageResponse getPastContests(Long userId, Pageable pageable) {
         User user = getUser(userId);
         Page<Contest> contests = contestRepository.findAllByResultOpenAtBeforeOrderByResultOpenAtDesc(
-                LocalDateTime.now(),
+                LocalDateTime.now(Contest.ZONE),
                 pageable
         );
 
@@ -143,12 +203,15 @@ public class ContestService {
             return new ContestPastResponse(
                     contest.getId(),
                     contest.getTitle(),
-                    contest.getThemeImageUrl(),
+                    imageStorageService.getPresignedUrl(contest.getThemeImageUrl()),
+                    contest.getSubmitStartAt(),
+                    contest.getResultOpenAt(),
                     summary != null ? (int) summary.entryCount() : 0,
                     summary != null ? summary.participantCount() : 0,
                     summary != null ? (int) summary.totalVoteCount() : 0,
                     myRankMap.get(contest.getId()),
-                    winner != null ? winner.getUser().getNickname() : null
+                    winner != null ? winner.getUser().getNickname() : null,
+                    winner != null ? imageStorageService.getPresignedUrl(winner.getPhotoUrl()) : null
             );
         });
 
@@ -172,12 +235,12 @@ public class ContestService {
     ) {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
-        boolean showRanking = canShowCurrentRanking(phase);
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
+        boolean showRanking = canShowRanking(phase);
 
         Page<ContestEntry> entries = contestEntryRepository.findAllByContest(
                 contest,
-                PageRequest.of(page, size, resolveEntrySort(sort))
+                PageRequest.of(page, size, resolveEntrySort(sort, phase))
         );
 
         List<Long> entryIds = entries.getContent().stream()
@@ -223,8 +286,8 @@ public class ContestService {
         Contest contest = getContestById(contestId);
         ContestEntry entry = getEntryByContest(contest, entryId);
 
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
-        boolean showRanking = canShowCurrentRanking(phase);
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
+        boolean showRanking = canShowRanking(phase);
         boolean voted = contestVoteRepository.existsByEntryAndUser(entry, user);
         boolean mine = isMine(entry, user);
         long remainingVoteCount = getRemainingVoteCount(contest, user);
@@ -237,7 +300,9 @@ public class ContestService {
                 showRanking ? calculateRank(contest, entry) : null,
                 voted,
                 mine,
-                phase == ContestPhase.VOTING,
+                // 내 작품에는 투표할 수 없다 — voteEntry가 거절하므로 여기서도 false로 내려
+                // 클라이언트가 이 값만 보고 버튼 상태를 정할 수 있게 한다
+                phase == ContestPhase.VOTING && !mine,
                 mine && (phase == ContestPhase.SUBMITTING || phase == ContestPhase.VOTING),
                 contest.getVoteLimit(),
                 remainingVoteCount
@@ -264,13 +329,21 @@ public class ContestService {
         Spot spot = getSpotOrNull(request.spotId());
         ImageUploadResult uploadResult = imageStorageService.upload(photo, "contests/" + contest.getId());
 
+        // 클라이언트가 원본에서 읽어 보낸 값이 우선이다. 피커가 재인코딩하면서 메타데이터를
+        // 떨어뜨리는 경우가 많아, 업로드된 바이트에서 뽑는 건 폴백으로만 쓴다.
+        // 둘 다 없으면 null이고(스크린샷·편집본), 그건 정상 경로다.
+        LocalDateTime shotAt = request.shotAt() != null
+                ? request.shotAt()
+                : exifExtractor.extract(photo).takenAt();
+
         ContestEntry entry = ContestEntry.create(
                 contest,
                 user,
                 uploadResult.key(),
                 request.caption(),
                 spot,
-                resolveSpotName(request, spot)
+                resolveSpotName(request, spot),
+                shotAt
         );
 
         ContestEntry savedEntry = contestEntryRepository.save(entry);
@@ -288,7 +361,7 @@ public class ContestService {
             throw new CustomException(ContestErrorCode.NOT_MY_ENTRY);
         }
 
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
         if (phase == ContestPhase.RESULT || phase == ContestPhase.ENDED) {
             throw new CustomException(ContestErrorCode.NOT_SUBMITTING_PERIOD);
         }
@@ -306,6 +379,11 @@ public class ContestService {
         ContestEntry entry = getEntryByContest(contest, entryId);
 
         validatePhase(contest, ContestPhase.VOTING, ContestErrorCode.NOT_VOTING_PERIOD);
+
+        // 1인 3표라 자기 작품에 한 표씩만 줘도 순위가 그만큼 왜곡된다
+        if (isMine(entry, user)) {
+            throw new CustomException(ContestErrorCode.CANNOT_VOTE_OWN_ENTRY);
+        }
 
         if (contestVoteRepository.existsByEntryAndUser(entry, user)) {
             throw new CustomException(ContestErrorCode.ALREADY_VOTED);
@@ -349,8 +427,8 @@ public class ContestService {
     public ContestMyEntryResponse getMyEntry(Long contestId, Long userId) {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
-        boolean showRanking = canShowCurrentRanking(phase);
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
+        boolean showRanking = canShowRanking(phase);
 
         List<ContestEntryResponse> entries = contestEntryRepository.findAllByContestAndUser(contest, user).stream()
                 .map(entry -> toEntryResponse(contest, entry, user, showRanking))
@@ -405,8 +483,8 @@ public class ContestService {
         List<ContestMyHistoryResponse.HistoryItem> items = entries.stream()
                 .map(entry -> {
                     Contest contest = entry.getContest();
-                    ContestPhase phase = contest.getPhase(LocalDateTime.now());
-                    boolean showRanking = canShowCurrentRanking(phase);
+                    ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
+                    boolean showRanking = canShowRanking(phase);
                     Integer rank = showRanking
                             ? calculateRank(contest, entry)
                             : null;
@@ -414,6 +492,7 @@ public class ContestService {
                     return new ContestMyHistoryResponse.HistoryItem(
                             contest.getId(),
                             contest.getTitle(),
+                            contest.getSubmitStartAt(),
                             imageStorageService.getPresignedUrl(entry.getPhotoUrl()),
                             rank,
                             showRanking ? entry.getVoteCount() : null,
@@ -428,9 +507,9 @@ public class ContestService {
                 .min(Integer::compareTo)
                 .orElse(null);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
         long totalVoteCount = entries.stream()
-                .filter(entry -> canShowCurrentRanking(entry.getContest().getPhase(now)))
+                .filter(entry -> canShowRanking(entry.getContest().getPhase(now)))
                 .mapToLong(ContestEntry::getVoteCount)
                 .sum();
 
@@ -440,7 +519,7 @@ public class ContestService {
     // 순위 집계 조회
     public ContestRankingHistoryResponse getRankingHistory(Long contestId) {
         Contest contest = getContestById(contestId);
-        ContestPhase phase = contest.getPhase(LocalDateTime.now());
+        ContestPhase phase = contest.getPhase(LocalDateTime.now(Contest.ZONE));
 
         if (!canShowRankingHistory(phase)) {
             throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
@@ -463,6 +542,11 @@ public class ContestService {
                                         snapshot.getEntry().getId(),
                                         imageStorageService.getPresignedUrl(snapshot.getEntry().getPhotoUrl()),
                                         snapshot.getEntry().getUser().getNickname(),
+                                        // 직접 올린 사진은 S3 objectKey라 presign이 필요하다. 소셜 사진은
+                                        // 외부 URL인데 getPresignedUrl이 http로 시작하면 그대로 통과시킨다.
+                                        imageStorageService.getPresignedUrl(
+                                                snapshot.getEntry().getUser().getDisplayProfileImage()
+                                        ),
                                         snapshot.getEntry().getSpotName(),
                                         snapshot.getVoteCount()
                                 ))
@@ -479,7 +563,7 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
 
-        if (!canShowRanking(contest.getPhase(LocalDateTime.now()))) {
+        if (!canShowRanking(contest.getPhase(LocalDateTime.now(Contest.ZONE)))) {
             throw new CustomException(ContestErrorCode.RESULT_NOT_OPENED);
         }
 
@@ -494,6 +578,8 @@ public class ContestService {
         return new ContestResultResponse(
                 contest.getId(),
                 contest.getTitle(),
+                contest.getSubmitStartAt(),
+                contest.getVoteEndAt(),
                 (int) contestEntryRepository.countByContest(contest),
                 contestEntryRepository.countDistinctUserByContest(contest),
                 (int) contestVoteRepository.countByContest(contest),
@@ -509,11 +595,15 @@ public class ContestService {
         User user = getUser(userId);
         Contest contest = getContestById(contestId);
 
-        if (subscriptionRepository.existsByContestAndUser(contest, user)) {
-            throw new CustomException(ContestErrorCode.ALREADY_SUBSCRIBED);
-        }
+        // 멱등하게 둔다 — 프론트에서 탭 한 번으로 켜고 끄는 토글이라
+        // 연타나 상태 어긋남이 그대로 409로 튀면 사용자가 볼 이유가 없는 에러가 뜬다.
+        //
+        // exists 검사 후 save는 안 된다. 연타하면 두 요청이 같이 통과해 둘 다 save하고,
+        // uk_contest_subscription_user_contest에 걸린다. 그 제약 위반을 잡아서 무시해도
+        // 트랜잭션은 이미 rollback-only로 찍혀 커밋에서 UnexpectedRollbackException이 난다.
+        // 예외를 아예 만들지 않는 INSERT IGNORE로 DB에 판정을 맡긴다.
+        subscriptionRepository.insertIgnore(contest.getId(), user.getId(), LocalDateTime.now(Contest.ZONE));
 
-        subscriptionRepository.save(ContestSubscription.create(contest, user));
         return new ContestSubscriptionResponse(contest.getId(), true);
     }
 
@@ -548,8 +638,18 @@ public class ContestService {
         long participantCount = contestEntryRepository.countDistinctUserByContest(contest);
         int myEntryCount = (int) contestEntryRepository.countByContestAndUser(contest, user);
         long usedVoteCount = contestVoteRepository.countByContestAndUser(contest, user);
+        boolean subscribed = subscriptionRepository.existsByContestAndUser(contest, user);
 
-        return ContestResponse.of(contest, phase, entryCount, participantCount, myEntryCount, usedVoteCount);
+        return ContestResponse.of(
+                contest,
+                phase,
+                imageStorageService.getPresignedUrl(contest.getThemeImageUrl()),
+                entryCount,
+                participantCount,
+                myEntryCount,
+                usedVoteCount,
+                subscribed
+        );
     }
 
     private ContestEntryResponse toEntryResponse(
@@ -620,7 +720,11 @@ public class ContestService {
                 rank,
                 entry.getId(),
                 imageStorageService.getPresignedUrl(entry.getPhotoUrl()),
+                entry.getUser().getId(),
                 entry.getUser().getNickname(),
+                // 직접 올린 사진은 S3 objectKey라 presign이 필요하다. 소셜 사진은 외부 URL인데
+                // getPresignedUrl이 http로 시작하면 그대로 통과시킨다.
+                imageStorageService.getPresignedUrl(entry.getUser().getDisplayProfileImage()),
                 entry.getCaption(),
                 entry.getSpot() != null ? entry.getSpot().getId() : null,
                 entry.getSpotName(),
@@ -643,8 +747,22 @@ public class ContestService {
         return responses;
     }
 
-    private Sort resolveEntrySort(String sort) {
-        if ("votes".equalsIgnoreCase(sort)) {
+    /**
+     * 목록 정렬.
+     *
+     * 득표순은 숫자를 가려도 순서 자체가 순위다. 투표 기간에는 그게 의도된 노출이지만
+     * (목업이 득표순 칩을 두고 상위 3개는 표수까지 공개한다), 집계 중에는 다르다 —
+     * 투표가 끝난 뒤의 순서는 곧 최종 결과라, 열어두면 /result를 발표 시각까지 막아둔 게
+     * 아무 의미가 없어진다. 그래서 그 구간만 최신순으로 내린다.
+     *
+     * 409로 거절하지 않고 조용히 내리는 이유는, 에러로 답하면 "정렬이 되나 안 되나"로
+     * 결과 공개 여부를 다시 알려주는 꼴이기 때문이다.
+     */
+    // 인스턴스 상태를 쓰지 않으므로 static — 목 없이 phase별 정렬만 테스트한다
+    static Sort resolveEntrySort(String sort, ContestPhase phase) {
+        boolean voteOrderPublic = phase == ContestPhase.VOTING || phase == ContestPhase.ENDED;
+
+        if ("votes".equalsIgnoreCase(sort) && voteOrderPublic) {
             return Sort.by(Sort.Direction.DESC, "voteCount")
                     .and(Sort.by(Sort.Direction.ASC, "createdAt"));
         }
@@ -652,15 +770,25 @@ public class ContestService {
         return Sort.by(Sort.Direction.DESC, "createdAt");
     }
 
-    private boolean canShowRanking(ContestPhase phase) {
-        return phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
+    /**
+     * 개별 출품작의 순위·득표수를 공개해도 되는지.
+     *
+     * 결과 발표(resultOpenAt = 투표 종료 다음 날 09:00) 이후에만 참이다.
+     * RESULT는 그 전까지의 "집계 중" 구간이라 여기에 넣으면 안 된다 —
+     * 넣으면 투표가 끝나는 순간 결과가 열려 발표 시각이 아무 의미가 없어진다.
+     *
+     * 투표 기간에 공개되는 서열은 두 가지다 — 순위 변동 스냅샷(상위 3개, 표수 포함)과
+     * 득표순 정렬의 순서. 둘 다 목업이 의도한 노출이다. 이 함수가 가리는 건 개별 작품에
+     * 붙는 숫자(순위·득표수)이고, 내 작품도 예외가 아니다
+     * (프론트 "내 출품" 탭도 이 구간에는 순위 자리에 "집계 중"을 띄운다).
+     */
+    // 인스턴스 상태를 쓰지 않으므로 static — 목 없이 phase 매트릭스만 테스트한다
+    // (ReviewService.countUploadable과 같은 방식).
+    static boolean canShowRanking(ContestPhase phase) {
+        return phase == ContestPhase.ENDED;
     }
 
-    private boolean canShowCurrentRanking(ContestPhase phase) {
-        return phase == ContestPhase.VOTING || phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
-    }
-
-    private boolean canShowRankingHistory(ContestPhase phase) {
+    static boolean canShowRankingHistory(ContestPhase phase) {
         return phase == ContestPhase.VOTING || phase == ContestPhase.RESULT || phase == ContestPhase.ENDED;
     }
 
@@ -749,7 +877,7 @@ public class ContestService {
     }
 
     private void validatePhase(Contest contest, ContestPhase requiredPhase, ContestErrorCode errorCode) {
-        if (contest.getPhase(LocalDateTime.now()) != requiredPhase) {
+        if (contest.getPhase(LocalDateTime.now(Contest.ZONE)) != requiredPhase) {
             throw new CustomException(errorCode);
         }
     }

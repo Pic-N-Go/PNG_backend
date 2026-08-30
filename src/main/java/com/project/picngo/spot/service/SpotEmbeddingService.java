@@ -49,7 +49,7 @@ public class SpotEmbeddingService {
     }
 
     private boolean embedSpot(Spot spot) {
-        return embed(spot.getId(), spot.getName(), spot.getAddress(), spot.getOverview());
+        return embed(spot.getId(), spot.getName(), spot.getAddress(), spot.getOverview(), spot.getCategories());
     }
 
     /**
@@ -59,7 +59,12 @@ public class SpotEmbeddingService {
      */
     @Transactional
     public boolean embed(Long id, String name, String address, String overview) {
-        String text = buildText(name, address, overview);
+        return embed(id, name, address, overview, null);
+    }
+
+    @Transactional
+    public boolean embed(Long id, String name, String address, String overview, java.util.Set<com.project.picngo.common.domain.SpotCategory> categories) {
+        String text = buildText(name, address, overview, categories);
         if (text.isBlank()) {
             return false;
         }
@@ -75,14 +80,20 @@ public class SpotEmbeddingService {
                 });
     }
 
-    // 이름/주소/개요를 하나의 문장으로 합쳐 의미 검색 대상 텍스트로 삼는다.
-    private String buildText(String name, String address, String overview) {
+    // 이름/주소/카테고리/개요를 하나의 문장으로 합쳐 의미 검색 대상 텍스트로 삼는다.
+    private String buildText(String name, String address, String overview, java.util.Set<com.project.picngo.common.domain.SpotCategory> categories) {
         StringBuilder sb = new StringBuilder();
         if (name != null && !name.isBlank()) {
             sb.append(name.trim()).append(". ");
         }
         if (address != null && !address.isBlank()) {
             sb.append(address.trim()).append(". ");
+        }
+        if (categories != null && !categories.isEmpty()) {
+            String categoryKeywords = categories.stream()
+                    .map(com.project.picngo.common.domain.SpotCategory::getKeywords)
+                    .collect(java.util.stream.Collectors.joining(", "));
+            sb.append("테마: ").append(categoryKeywords).append(". ");
         }
         if (overview != null && !overview.isBlank()) {
             sb.append(overview.trim());

@@ -14,7 +14,8 @@ public record ContestEntryDetailResponse(
         Long spotId,
         String spotName,
         ContestPhase phase,
-        int voteCount,
+        // 순위와 같은 규칙으로 가린다 — 투표 기간에는 개별 작품의 득표수를 공개하지 않는다
+        Integer voteCount,
         Integer rank,
         boolean voted,
         boolean mine,
@@ -22,6 +23,8 @@ public record ContestEntryDetailResponse(
         boolean canDelete,
         int voteLimit,
         long remainingVoteCount,
+        // EXIF에서 뽑은 촬영 시각. EXIF가 없는 사진이면 null이다
+        LocalDateTime shotAt,
         LocalDateTime createdAt
 ) {
 
@@ -47,14 +50,15 @@ public record ContestEntryDetailResponse(
                 entry.getSpot() != null ? entry.getSpot().getId() : null,
                 entry.getSpotName(),
                 phase,
-                entry.getVoteCount(),
-                showRanking ? rank : null,              // 공개 기간에만 순위 노출
+                showRanking ? entry.getVoteCount() : null,
+                showRanking ? rank : null,
                 voted,
                 mine,
                 canVote,
                 canDelete,
                 voteLimit,
                 remainingVoteCount,
+                entry.getShotAt(),
                 entry.getCreatedAt()
         );
     }

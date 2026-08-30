@@ -57,9 +57,9 @@ class EditDistanceTest {
     }
 
     @Test
-    @DisplayName("허용 오차는 검색어가 길수록 늘지만 상한이 있다")
+    @DisplayName("허용 오차는 3글자 이상부터 유효하며 검색어가 길수록 늘지만 상한이 있다")
     void allowedDistanceGrowsWithLengthUpToACap() {
-        assertThat(EditDistance.allowedDistance(2)).isEqualTo(1);
+        assertThat(EditDistance.allowedDistance(2)).isEqualTo(0);
         assertThat(EditDistance.allowedDistance(3)).isEqualTo(1);
         assertThat(EditDistance.allowedDistance(6)).isEqualTo(2);
         assertThat(EditDistance.allowedDistance(9)).isEqualTo(3);
