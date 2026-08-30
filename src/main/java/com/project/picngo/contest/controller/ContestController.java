@@ -39,6 +39,17 @@ public class ContestController implements ContestControllerApiSpec {
         return ResponseEntity.ok(contestService.getCurrentContest(userDetails.getId()));
     }
 
+    // 다음 예정 콘테스트 조회 (없으면 204)
+    @GetMapping("/contests/upcoming")
+    public ResponseEntity<ContestResponse> getUpcomingContest(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        ContestResponse response = contestService.getUpcomingContest(userDetails.getId());
+
+        // 다음 회차가 아직 안 잡힌 상태는 정상이다 — 404로 내리면 클라이언트가 오류와 구분할 수 없다
+        return response == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(response);
+    }
+
     // 콘테스트 상세 조회
     @GetMapping("/contests/{contestId}")
     public ResponseEntity<ContestResponse> getContest(

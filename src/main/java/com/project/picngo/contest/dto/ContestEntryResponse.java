@@ -12,10 +12,13 @@ public record ContestEntryResponse(
         String caption,
         Long spotId,
         String spotName,
-        int voteCount,
+        // 순위와 같은 규칙으로 가린다 — 투표 기간에는 개별 작품의 득표수를 공개하지 않는다
+        Integer voteCount,
         Integer rank,
         boolean voted,
         boolean mine,
+        // EXIF에서 뽑은 촬영 시각. EXIF가 없는 사진이면 null이다
+        LocalDateTime shotAt,
         LocalDateTime createdAt
 ) {
 
@@ -35,10 +38,11 @@ public record ContestEntryResponse(
                 entry.getCaption(),
                 entry.getSpot() != null ? entry.getSpot().getId() : null,
                 entry.getSpotName(),
-                entry.getVoteCount(),
-                showRanking ? rank : null,              // 순위 공개 여부
+                showRanking ? entry.getVoteCount() : null,
+                showRanking ? rank : null,
                 voted,
                 mine,
+                entry.getShotAt(),
                 entry.getCreatedAt()
         );
     }

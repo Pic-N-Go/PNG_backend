@@ -23,16 +23,19 @@ public record ContestResponse(
         int remainingEntryCount,
         int voteLimit,
         long usedVoteCount,
-        long remainingVoteCount
+        long remainingVoteCount,
+        boolean subscribed
 ) {
 
     public static ContestResponse of(
             Contest contest,
             ContestPhase phase,
+            String themeImageUrl,
             int entryCount,
             long participantCount,
             int myEntryCount,
-            long usedVoteCount
+            long usedVoteCount,
+            boolean subscribed
     ) {
         int remainingEntryCount = Math.max(0, contest.getMaxEntriesPerUser() - myEntryCount);
         long remainingVoteCount = Math.max(0, contest.getVoteLimit() - usedVoteCount);
@@ -41,7 +44,7 @@ public record ContestResponse(
                 contest.getId(),
                 contest.getTitle(),
                 contest.getDescription(),
-                contest.getThemeImageUrl(),
+                themeImageUrl,
                 phase,
                 contest.getSubmitStartAt(),
                 contest.getSubmitEndAt(),
@@ -55,7 +58,8 @@ public record ContestResponse(
                 remainingEntryCount,
                 contest.getVoteLimit(),
                 usedVoteCount,
-                remainingVoteCount
+                remainingVoteCount,
+                subscribed
         );
     }
 }
