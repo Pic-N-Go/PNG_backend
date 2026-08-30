@@ -6,6 +6,8 @@ import com.project.picngo.chat.dto.ChatMessageResponse;
 import com.project.picngo.chat.dto.ChatMessageSendRequest;
 import com.project.picngo.chat.repository.ChatMessageRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,8 @@ import java.util.List;
 public class ChatMessageService {
     private final ChatRoomService chatRoomService;
     private final ChatMessageRepository chatMessageRepository;
+
+    private static final int MAX_MESSAGE_SIZE = 50;
 
     @Transactional
     public ChatMessageResponse sendMessage(
@@ -38,11 +42,15 @@ public class ChatMessageService {
         return ChatMessageResponse.from(chatMessageRepository.save(message));
     }
 
-    public List<ChatMessageResponse> getMessages(Long spotId) {
+    public List<ChatMessageResponse> getMessages(Long spotId, Long beforeId, int size) {
         ChatRoom chatRoom = chatRoomService.getBySpotId(spotId);
 
-        List<ChatMessage> messages = chatMessageRepository
-                .findTop50ByChatRoomIdOrderByCreatedAtDesc(chatRoom.getId());
+        int normalizedSize = Math.min(Math.max(size, 1), MAX_MESSAGE_SIZE);
+        Pageable pageable = PageRequest.of(0, normalizedSize);
+
+        List<ChatMessage> messages = beforeId == null ?
+                chatMessageRepository.findByChatRoomIdOrderByIdDesc(chatRoom.getId(), pageable)
+                : chatMessageRepository.findByChatRoomIdAndIdLessThanOrderByIdDesc(chatRoom.getId(), beforeId, pageable);
 
         Collections.reverse(messages);
 

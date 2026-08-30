@@ -13,11 +13,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,20 +61,74 @@ class ChatMessageServiceTest {
     }
 
     @Test
-    @DisplayName("최근 메시지 50개를 오래된 메시지부터 정렬해 반환한다")
-    void getMessagesReturnsChronologicalOrder() {
+    @DisplayName("beforeId가 없으면 요청한 개수의 최근 메시지를 오래된 순서부터 반환한다")
+    void getMessagesReturnsLatestMessagesInChronologicalOrder() {
         ChatRoom room = roomWithId(10L);
         ChatMessage newest = message(3L, "셋째");
         ChatMessage middle = message(2L, "둘째");
         ChatMessage oldest = message(1L, "첫째");
         when(chatRoomService.getBySpotId(1L)).thenReturn(room);
-        when(chatMessageRepository.findTop50ByChatRoomIdOrderByCreatedAtDesc(10L))
+        when(chatMessageRepository.findByChatRoomIdOrderByIdDesc(eq(10L), any(Pageable.class)))
                 .thenReturn(new ArrayList<>(List.of(newest, middle, oldest)));
 
-        List<ChatMessageResponse> result = chatMessageService.getMessages(1L);
+        List<ChatMessageResponse> result = chatMessageService.getMessages(1L, null, 20);
 
         assertEquals(List.of("첫째", "둘째", "셋째"),
                 result.stream().map(ChatMessageResponse::content).toList());
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(chatMessageRepository).findByChatRoomIdOrderByIdDesc(
+                eq(10L),
+                pageableCaptor.capture()
+        );
+        assertEquals(0, pageableCaptor.getValue().getPageNumber());
+        assertEquals(20, pageableCaptor.getValue().getPageSize());
+    }
+
+    @Test
+    @DisplayName("beforeId가 있으면 해당 ID보다 오래된 메시지를 오래된 순서부터 반환한다")
+    void getMessagesReturnsOlderMessagesBeforeCursor() {
+        ChatRoom room = roomWithId(10L);
+        ChatMessage newest = message(80L, "셋째");
+        ChatMessage middle = message(79L, "둘째");
+        ChatMessage oldest = message(78L, "첫째");
+        when(chatRoomService.getBySpotId(1L)).thenReturn(room);
+        when(chatMessageRepository.findByChatRoomIdAndIdLessThanOrderByIdDesc(
+                eq(10L),
+                eq(81L),
+                any(Pageable.class)
+        )).thenReturn(new ArrayList<>(List.of(newest, middle, oldest)));
+
+        List<ChatMessageResponse> result = chatMessageService.getMessages(1L, 81L, 20);
+
+        assertEquals(List.of("첫째", "둘째", "셋째"),
+                result.stream().map(ChatMessageResponse::content).toList());
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(chatMessageRepository).findByChatRoomIdAndIdLessThanOrderByIdDesc(
+                eq(10L),
+                eq(81L),
+                pageableCaptor.capture()
+        );
+        assertEquals(20, pageableCaptor.getValue().getPageSize());
+    }
+
+    @Test
+    @DisplayName("요청 개수가 50개를 초과하면 최대 50개로 제한한다")
+    void getMessagesLimitsRequestedSizeToFifty() {
+        ChatRoom room = roomWithId(10L);
+        when(chatRoomService.getBySpotId(1L)).thenReturn(room);
+        when(chatMessageRepository.findByChatRoomIdOrderByIdDesc(eq(10L), any(Pageable.class)))
+                .thenReturn(new ArrayList<>());
+
+        chatMessageService.getMessages(1L, null, 100);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(chatMessageRepository).findByChatRoomIdOrderByIdDesc(
+                eq(10L),
+                pageableCaptor.capture()
+        );
+        assertEquals(50, pageableCaptor.getValue().getPageSize());
     }
 
     @Test
