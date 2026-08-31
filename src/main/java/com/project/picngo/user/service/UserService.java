@@ -168,7 +168,7 @@ public class UserService {
 				// 이름으로 원복된다. 사진은 카카오가 유일한 출처라 계속 동기화한다
 				// (앱 자체 업로드가 생기면 그때 직접 올린 사진을 지키는 분기가 필요하다).
 				user.updateSocialProfile(profileImageUrl);
-				return new SocialUserResult(user, false);
+				return new SocialUserResult(user, !user.isOnboarded());
 			})
 			.orElseGet(() -> {
 				Optional<User> byEmail = userRepository.findByEmail(email);

@@ -104,6 +104,7 @@ class SocialNicknameTest {
     @DisplayName("재로그인 시 닉네임을 카카오 이름으로 덮지 않는다")
     void keepsNicknameOnRelogin() {
         User existing = mock(User.class);
+        when(existing.isOnboarded()).thenReturn(true);
         when(userRepository.findByProviderAndProviderId(any(), anyString())).thenReturn(Optional.of(existing));
 
         UserService.SocialUserResult result = service.getOrCreateSocialUser(
@@ -112,6 +113,19 @@ class SocialNicknameTest {
         assertFalse(result.newUser(), "기존 계정이면 newUser가 false여야 한다");
         verify(existing).updateSocialProfile("https://img/new.jpg");
         verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("온보딩을 마치지 않은 소셜 유저가 재로그인하면 newUser가 true여야 한다")
+    void pendingOnboardingUserReturnsNewUserTrue() {
+        User pending = mock(User.class);
+        when(pending.isOnboarded()).thenReturn(false);
+        when(userRepository.findByProviderAndProviderId(any(), anyString())).thenReturn(Optional.of(pending));
+
+        UserService.SocialUserResult result = service.getOrCreateSocialUser(
+                "a@kakao.local", "카카오이름", "https://img/new.jpg", SocialProvider.KAKAO, "1");
+
+        assertTrue(result.newUser(), "온보딩 미완료 계정이면 재로그인해도 newUser가 true여야 한다");
     }
 
     @Test
