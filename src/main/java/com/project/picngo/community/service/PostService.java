@@ -3,8 +3,10 @@ package com.project.picngo.community.service;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.CommunityErrorCode;
+import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
 import com.project.picngo.common.image.dto.PhotoExifResponse;
@@ -93,6 +95,7 @@ public class PostService {
 
     @Transactional
     public PostResponse createPost(Long userId, PostCreateRequest request, List<MultipartFile> images) {
+        validateExifConsent(request.technicalExifConsent(), request.locationExifConsent());
         validatePostImages(images);
 
         User author = userRepository.findById(userId)
@@ -108,14 +111,16 @@ public class PostService {
                 request.weather(),
                 request.cameraModel(),
                 request.lensModel(),
-                normalizeTags(request.tags())
+                normalizeTags(request.tags()),
+                request.technicalExifConsent(),
+                request.locationExifConsent()
         ));
 
         List<String> uploadedKeys = new ArrayList<>();
         try {
             for (int index = 0; index < images.size(); index++) {
                 MultipartFile file = images.get(index);
-                PhotoExifInfo exif = exifExtractor.extract(file);
+                PhotoExifInfo exif = exifExtractor.extract(file, post.getTechnicalExifConsent(), post.getLocationExifConsent());
                 ImageUploadResult uploaded = imageStorageService.upload(file, "community/" + userId);
                 uploadedKeys.add(uploaded.key());
 
@@ -240,7 +245,7 @@ public class PostService {
             for (int index = 0; index < files.size(); index++) {
                 MultipartFile file = files.get(index);
 
-                PhotoExifInfo exif = exifExtractor.extract(file);
+                PhotoExifInfo exif = exifExtractor.extract(file, post.getTechnicalExifConsent(), post.getLocationExifConsent());
 
                 ImageUploadResult uploaded = imageStorageService.upload(file, "community/" + userId);
 
@@ -479,6 +484,16 @@ public class PostService {
         if (userId == null || !Objects.equals(post.getAuthor().getId(), userId)) {
             throw new CustomException(CommunityErrorCode.POST_FORBIDDEN);
         }
+    }
+
+    private void validateExifConsent(ExifConsentStatus technicalConsent, ExifConsentStatus locationConsent) {
+        if (!isConsentDecision(technicalConsent) || !isConsentDecision(locationConsent)) {
+            throw new CustomException(ImageErrorCode.INVALID_EXIF_CONSENT);
+        }
+    }
+
+    private boolean isConsentDecision(ExifConsentStatus status) {
+        return status == ExifConsentStatus.GRANTED || status == ExifConsentStatus.DECLINED;
     }
 
     // 이미지 입력 정제 최소 1개, 최대 5개 제한
