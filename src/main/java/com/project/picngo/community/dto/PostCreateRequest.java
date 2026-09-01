@@ -1,5 +1,6 @@
 package com.project.picngo.community.dto;
 
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.community.domain.PostWeather;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -24,6 +25,10 @@ public record PostCreateRequest(
         @Size(max = 150)
         String lensModel,
         @Size(max = 10)
-        List<@NotBlank @Size(max = 30) String> tags
+        List<@NotBlank @Size(max = 30) String> tags,
+        @NotNull
+        ExifConsentStatus technicalExifConsent,
+        @NotNull
+        ExifConsentStatus locationExifConsent
 ) {
 }
