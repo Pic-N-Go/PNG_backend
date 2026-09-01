@@ -2,6 +2,7 @@ package com.project.picngo.community.service;
 
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.community.domain.Post;
@@ -314,7 +315,7 @@ class CommunityNotificationTest {
             );
             when(imageStorageService.upload(any(), anyString()))
                     .thenReturn(new ImageUploadResult("community/1/photo.jpg", "https://s3.example.com/photo.jpg"));
-            when(exifExtractor.extract(any())).thenReturn(mock(PhotoExifInfo.class));
+            when(exifExtractor.extract(any(), any(), any())).thenReturn(mock(PhotoExifInfo.class));
 
             PostCreateRequest request = new PostCreateRequest(
                     "새로운 출사 명소 리뷰입니다.",
@@ -323,7 +324,9 @@ class CommunityNotificationTest {
                     PostWeather.CLEAR,
                     "Sony A7M4",
                     "24-70 GM",
-                    List.of("야경", "출사")
+                    List.of("야경", "출사"),
+                    ExifConsentStatus.DECLINED,
+                    ExifConsentStatus.DECLINED
             );
 
             postService.createPost(1L, request, List.of(file));

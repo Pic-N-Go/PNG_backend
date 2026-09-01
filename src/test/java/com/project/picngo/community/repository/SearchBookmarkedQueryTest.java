@@ -1,5 +1,6 @@
 package com.project.picngo.community.repository;
 
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.community.domain.Post;
 import com.project.picngo.community.domain.PostBookmark;
 import com.project.picngo.community.domain.PostWeather;
@@ -50,7 +51,8 @@ class SearchBookmarkedQueryTest {
     // shootingTime·weather는 NOT NULL이라 값을 채워야 저장된다.
     private Post post(User author, String content) {
         return postRepository.save(Post.create(
-                author, content, null, LocalTime.of(5, 30), PostWeather.CLEAR, null, null, List.of()));
+                author, content, null, LocalTime.of(5, 30), PostWeather.CLEAR, null, null, List.of(),
+                ExifConsentStatus.UNKNOWN, ExifConsentStatus.UNKNOWN));
     }
 
     private void bookmark(Post post, Long userId) {
