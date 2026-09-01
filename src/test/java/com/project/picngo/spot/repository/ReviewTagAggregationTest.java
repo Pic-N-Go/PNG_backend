@@ -1,5 +1,6 @@
 package com.project.picngo.spot.repository;
 
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.ReviewTag;
@@ -77,6 +78,8 @@ class ReviewTagAggregationTest {
                 .content("좋아요")
                 .timePeriod(TimePeriod.SUNSET)
                 .tags(tags)
+                .technicalExifConsent(ExifConsentStatus.UNKNOWN)
+                .locationExifConsent(ExifConsentStatus.UNKNOWN)
                 .build());
     }
 }

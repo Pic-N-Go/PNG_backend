@@ -1,5 +1,6 @@
 package com.project.picngo.spot.dto;
 
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.SpotSource;
@@ -53,6 +54,8 @@ class MyReviewInfoTest {
                 .rating(5)
                 .content("좋아요")
                 .timePeriod(TimePeriod.SUNSET)
+                .technicalExifConsent(ExifConsentStatus.UNKNOWN)
+                .locationExifConsent(ExifConsentStatus.UNKNOWN)
                 .build();
 
         return MyReviewListResponse.MyReviewInfo.of(review, Set.of(), List.of()).spotImageUrl();

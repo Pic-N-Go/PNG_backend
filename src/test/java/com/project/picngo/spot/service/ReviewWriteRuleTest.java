@@ -1,12 +1,15 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.ImageErrorCode;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.service.ImageStorageService;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.TimePeriod;
-import com.project.picngo.spot.dto.ReviewRequest;
+import com.project.picngo.spot.dto.ReviewCreateRequest;
+import com.project.picngo.spot.dto.ReviewUpdateRequest;
 import com.project.picngo.spot.repository.ReviewPhotoRepository;
 import com.project.picngo.spot.repository.ReviewRepository;
 import com.project.picngo.spot.repository.SpotRepository;
@@ -23,6 +26,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -46,9 +52,38 @@ class ReviewWriteRuleTest {
 
     @InjectMocks private ReviewService reviewService;
 
-    private static ReviewRequest request(int rating) {
-        return new ReviewRequest(rating, "이 스팟 정말 좋았습니다 추천합니다", TimePeriod.SUNSET,
+    private static ReviewCreateRequest request(int rating) {
+        return new ReviewCreateRequest(rating, "이 스팟 정말 좋았습니다 추천합니다", TimePeriod.SUNSET,
+                null, null, LocalDate.of(2026, 7, 20),
+                ExifConsentStatus.DECLINED, ExifConsentStatus.DECLINED);
+    }
+
+    private static ReviewUpdateRequest updateRequest(int rating) {
+        return new ReviewUpdateRequest(rating, "이 스팟 정말 좋았습니다 추천합니다", TimePeriod.SUNSET,
                 null, null, LocalDate.of(2026, 7, 20));
+    }
+
+    @Test
+    @DisplayName("리뷰 작성 시 EXIF 동의 상태가 UNKNOWN이면 거부한다")
+    void rejectsUnknownExifConsent() {
+        ReviewCreateRequest request = new ReviewCreateRequest(
+                5,
+                "이 스팟 정말 좋았습니다 추천합니다",
+                TimePeriod.SUNSET,
+                null,
+                null,
+                LocalDate.of(2026, 7, 20),
+                ExifConsentStatus.UNKNOWN,
+                ExifConsentStatus.DECLINED
+        );
+
+        CustomException exception = assertThrows(
+                CustomException.class,
+                () -> reviewService.createReview(USER_ID, SPOT_ID, request, List.of())
+        );
+
+        assertEquals(ImageErrorCode.INVALID_EXIF_CONSENT, exception.getErrorCode());
+        verifyNoInteractions(spotRepository, reviewRepository, imageStorageService);
     }
 
     @Test
@@ -101,7 +136,7 @@ class ReviewWriteRuleTest {
         given(reviewRepository.findById(REVIEW_ID)).willReturn(Optional.of(review));
         given(reviewPhotoRepository.findByReview_IdInOrderByIdAsc(List.of(REVIEW_ID))).willReturn(List.of());
 
-        reviewService.updateReview(USER_ID, REVIEW_ID, request(1));
+        reviewService.updateReview(USER_ID, REVIEW_ID, updateRequest(1));
 
         // 별점을 바꿨으면 스팟 평균이 다시 계산돼야 한다
         verify(reviewRepository).findAvgAndCountBySpotId(SPOT_ID);

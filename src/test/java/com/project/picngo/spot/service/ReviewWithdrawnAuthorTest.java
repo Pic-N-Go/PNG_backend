@@ -1,5 +1,6 @@
 package com.project.picngo.spot.service;
 
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
@@ -56,6 +57,8 @@ class ReviewWithdrawnAuthorTest {
                 .userId(author.getId())
                 .rating(5)
                 .content("좋아요")
+                .technicalExifConsent(ExifConsentStatus.UNKNOWN)
+                .locationExifConsent(ExifConsentStatus.UNKNOWN)
                 .build();
         ReflectionTestUtils.setField(review, "id", 11L);
 
