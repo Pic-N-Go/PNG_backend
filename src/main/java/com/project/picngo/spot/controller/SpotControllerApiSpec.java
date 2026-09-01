@@ -6,8 +6,8 @@ import com.project.picngo.spot.dto.MapBoundsRequest;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
+import com.project.picngo.spot.dto.ReviewCreateRequest;
 import com.project.picngo.spot.dto.ReviewListResponse;
-import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
 import com.project.picngo.spot.dto.SpotPhotoResponse;
@@ -27,7 +27,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
@@ -162,11 +161,23 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 
-    @Operation(summary = "리뷰 작성", description = "스팟에 리뷰를 작성합니다. 사진은 최대 5장까지 함께 업로드할 수 있습니다. 이미 이 스팟에 리뷰를 작성했으면 409를 반환합니다.")
+    @Operation(
+            summary = "리뷰 작성",
+            description = """
+                    스팟에 리뷰를 작성하며 사진은 최대 5장까지 함께 업로드할 수 있습니다.
+                    multipart/form-data의 request 파트는 Content-Type application/json으로 전송합니다.
+                    technicalExifConsent와 locationExifConsent는 필수이며 GRANTED 또는 DECLINED만 허용합니다.
+                    technicalExifConsent가 GRANTED이면 카메라·렌즈·ISO·노출 등 기술 정보를 추출하고,
+                    locationExifConsent가 GRANTED이면 GPS 위도·경도와 촬영 주소를 추출합니다.
+                    각 항목이 DECLINED이면 해당 범주의 EXIF 정보는 추출하지 않습니다.
+                    이미 이 스팟에 리뷰를 작성했으면 409를 반환합니다.
+                    """
+    )
     ResponseEntity<ReviewResponse> createReview(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id,
-            @Valid @RequestPart("request") ReviewRequest request,
+            @Parameter(description = "리뷰 작성 정보 및 EXIF 동의 상태(JSON)")
+            @Valid @RequestPart("request") ReviewCreateRequest request,
             @Parameter(description = "리뷰 사진 목록, 최대 5장")
             @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     );
