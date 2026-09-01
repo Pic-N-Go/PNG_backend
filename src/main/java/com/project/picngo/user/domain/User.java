@@ -7,6 +7,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
@@ -93,6 +94,10 @@ public class User extends BaseTimeEntity {
 	@Column(name = "category", length = 50)
 	private Set<SpotCategory> spotCategories = new HashSet<>();
 
+	@Comment("온보딩(약관 동의 및 프로필 설정) 완료 여부")
+	@Column(name = "is_onboarded", nullable = false)
+	private boolean isOnboarded = false;
+
 	@Builder
 	private User(
 		String email,
@@ -101,7 +106,8 @@ public class User extends BaseTimeEntity {
 		String socialProfileImageUrl,
 		Role role,
 		SocialProvider provider,
-		String providerId
+		String providerId,
+		Boolean isOnboarded
 	) {
 		this.email = email;
 		this.password = password;
@@ -110,6 +116,7 @@ public class User extends BaseTimeEntity {
 		this.role = role;
 		this.provider = provider;
 		this.providerId = providerId;
+		this.isOnboarded = isOnboarded != null ? isOnboarded : false;
 	}
 
 	public static User createLocalUser(
@@ -124,6 +131,7 @@ public class User extends BaseTimeEntity {
 				.nickname(nickname)
 				.role(Role.USER)
 				.provider(SocialProvider.LOCAL)
+				.isOnboarded(true)
 				.build();
 
 		user.updateSpotCategories(spotCategories);
@@ -152,7 +160,12 @@ public class User extends BaseTimeEntity {
 			.role(Role.USER)
 			.provider(provider)
 			.providerId(providerId)
+			.isOnboarded(false)
 			.build();
+	}
+
+	public void completeOnboarding() {
+		this.isOnboarded = true;
 	}
 
 	/**
@@ -201,6 +214,7 @@ public class User extends BaseTimeEntity {
 	public void updateProfile(String nickname, String bio){
 		this.nickname = nickname;
 		this.bio = bio;
+		this.isOnboarded = true;
 	}
 
 	// ── 탈퇴 / 복구 / 파기 ──────────────────────────────────────────

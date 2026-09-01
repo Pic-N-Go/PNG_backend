@@ -1,8 +1,10 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
+import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.ReviewErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
 import com.project.picngo.common.image.dto.PhotoExifResponse;
@@ -164,7 +166,9 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse createReview(Long userId, Long spotId, ReviewRequest request, List<MultipartFile> photos) {
+    public ReviewResponse createReview(Long userId, Long spotId, ReviewCreateRequest request, List<MultipartFile> photos) {
+        validateExifConsent(request.technicalExifConsent(), request.locationExifConsent());
+
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
@@ -184,6 +188,8 @@ public class ReviewService {
                 .timePeriod(request.timePeriod())
                 .visitedAt(request.visitedAt())
                 .tags(request.tags())
+                .technicalExifConsent(request.technicalExifConsent())
+                .locationExifConsent(request.locationExifConsent())
                 .build();
 
         // 커밋까지 미루면 제약 위반이 아래 catch 밖에서 터져 업로드된 S3 객체가 고아로 남는다.
@@ -214,7 +220,7 @@ public class ReviewService {
     }
 
     @Transactional
-    public ReviewResponse updateReview(Long userId, Long reviewId, ReviewRequest request) {
+    public ReviewResponse updateReview(Long userId, Long reviewId, ReviewUpdateRequest request) {
         Review review = findMyReview(userId, reviewId);
         review.update(
                 request.rating(),
@@ -407,7 +413,7 @@ public class ReviewService {
                 continue;
             }
 
-            PhotoExifInfo exif = exifExtractor.extract(photo);
+            PhotoExifInfo exif = exifExtractor.extract(photo, review.getTechnicalExifConsent(), review.getLocationExifConsent());
 
             ImageUploadResult uploadResult = imageStorageService.upload(photo, "reviews/" + review.getId());
             uploadedKeys.add(uploadResult.key());
@@ -434,6 +440,16 @@ public class ReviewService {
         if (existingCount + countUploadable(newPhotos) > MAX_REVIEW_PHOTO_COUNT) {
             throw new CustomException(ReviewErrorCode.REVIEW_PHOTO_TOO_MANY);
         }
+    }
+
+    private void validateExifConsent(ExifConsentStatus technicalConsent, ExifConsentStatus locationConsent) {
+        if (!isConsentDecision(technicalConsent) || !isConsentDecision(locationConsent)) {
+            throw new CustomException(ImageErrorCode.INVALID_EXIF_CONSENT);
+        }
+    }
+
+    private boolean isConsentDecision(ExifConsentStatus status) {
+        return status == ExifConsentStatus.GRANTED || status == ExifConsentStatus.DECLINED;
     }
 
     private void deleteUploadedImages(List<String> uploadedKeys) {

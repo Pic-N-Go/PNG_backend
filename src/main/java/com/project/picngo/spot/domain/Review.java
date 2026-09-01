@@ -1,6 +1,7 @@
 package com.project.picngo.spot.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.spot.domain.enums.TimePeriod;
 import jakarta.persistence.*;
@@ -71,8 +72,18 @@ public class Review extends BaseTimeEntity {
     @Column
     private LocalDate visitedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "technical_exif_consent", nullable = false, length = 20)
+    private ExifConsentStatus technicalExifConsent;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "location_exif_consent", nullable = false, length = 20)
+    private ExifConsentStatus locationExifConsent;
+
     @Builder
-    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo, TimePeriod timePeriod, LocalDate visitedAt, Set<ReviewTag> tags) {
+    public Review(Spot spot, Long userId, Integer rating, String content, String equipmentInfo,
+                  TimePeriod timePeriod, LocalDate visitedAt, Set<ReviewTag> tags,
+                  ExifConsentStatus technicalExifConsent, ExifConsentStatus locationExifConsent) {
         this.spot = spot;
         this.userId = userId;
         this.rating = rating;
@@ -80,6 +91,8 @@ public class Review extends BaseTimeEntity {
         this.equipmentInfo = equipmentInfo;
         this.timePeriod = timePeriod;
         this.visitedAt = visitedAt;
+        this.technicalExifConsent = technicalExifConsent;
+        this.locationExifConsent = locationExifConsent;
         if (tags != null) {
             this.tags.addAll(tags);
         }

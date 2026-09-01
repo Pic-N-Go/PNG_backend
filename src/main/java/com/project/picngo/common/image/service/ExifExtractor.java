@@ -8,6 +8,7 @@ import com.drew.metadata.Tag;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.ExifSubIFDDirectory;
 import com.drew.metadata.exif.GpsDirectory;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
 import com.project.picngo.external.KakaoAddressClient;
 import lombok.RequiredArgsConstructor;
@@ -59,45 +60,67 @@ public class ExifExtractor {
     private static final int TAG_LENS_MODEL = 0xA434;
 
     public PhotoExifInfo extract(MultipartFile file) {
+        return extract(file, ExifConsentStatus.GRANTED, ExifConsentStatus.GRANTED);
+    }
+
+    public PhotoExifInfo extract(MultipartFile file, ExifConsentStatus technicalConsent, ExifConsentStatus locationConsent) {
+        boolean technicalAllowed = technicalConsent == ExifConsentStatus.GRANTED;
+        boolean locationAllowed = locationConsent == ExifConsentStatus.GRANTED;
+
+        if (!technicalAllowed && !locationAllowed) {
+            return empty(file, false);
+        }
+
         try (InputStream inputStream = file.getInputStream()) {
             Metadata metadata = ImageMetadataReader.readMetadata(inputStream);
 
-            GpsDirectory gpsDirectory = metadata.getFirstDirectoryOfType(GpsDirectory.class);
-            ExifSubIFDDirectory exifDirectory = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
-            ExifIFD0Directory ifd0Directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
-
             Double latitude = null;
             Double longitude = null;
+            String address = null;
 
-            GeoLocation geoLocation = gpsDirectory == null ? null : gpsDirectory.getGeoLocation();
-            if (isUsableGeoLocation(geoLocation)) {
-                latitude = geoLocation.getLatitude();
-                longitude = geoLocation.getLongitude();
+            if (locationAllowed) {
+                GpsDirectory gpsDirectory = metadata.getFirstDirectoryOfType(GpsDirectory.class);
+                GeoLocation geoLocation = gpsDirectory == null ? null : gpsDirectory.getGeoLocation();
+
+                if (isUsableGeoLocation(geoLocation)) {
+                    latitude = geoLocation.getLatitude();
+                    longitude = geoLocation.getLongitude();
+                    address = kakaoAddressClient.coord2Address(latitude, longitude);
+                }
             }
 
-            String address = kakaoAddressClient.coord2Address(latitude, longitude);
+            ExifSubIFDDirectory exifDirectory = null;
+            ExifIFD0Directory ifd0Directory = null;
+            LocalDateTime takenAt = null;
+            Integer imageWidth = null;
+            Integer imageHeight = null;
 
-            /*
-             * EXIF DateTimeOriginal은 정의상 "촬영한 카메라의 벽시계"다. 문자열을 그대로 읽는다.
-             *
-             * getDateOriginal()을 쓰면 안 된다 — 오프셋 태그(0x9011)가 없으면 GMT로 파싱하고
-             * 있으면 그 오프셋으로 파싱하는데, 우리는 결과를 systemDefault()로 다시 눕힌다.
-             * 파싱 존과 렌더 존이 따로 놀아서 "05:32 광안리 일출"이 아이폰(+09:00 기록)에서는
-             * 전날 20:32로, 안드로이드(오프셋 없음)에서는 14:32로 저장된다.
-             */
-            LocalDateTime takenAt = parseExifDateTime(string(exifDirectory, ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL));
+            if (technicalAllowed) {
+                exifDirectory = metadata.getFirstDirectoryOfType(ExifSubIFDDirectory.class);
+                ifd0Directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
 
-            Integer imageWidth = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_WIDTH, TAG_IMAGE_WIDTH);
-            Integer imageHeight = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_HEIGHT, TAG_IMAGE_HEIGHT);
+                /*
+                 * EXIF DateTimeOriginal은 정의상 "촬영한 카메라의 벽시계"다. 문자열을 그대로 읽는다.
+                 *
+                 * getDateOriginal()을 쓰면 안 된다 — 오프셋 태그(0x9011)가 없으면 GMT로 파싱하고
+                 * 있으면 그 오프셋으로 파싱하는데, 우리는 결과를 systemDefault()로 다시 눕힌다.
+                 * 파싱 존과 렌더 존이 따로 놀아서 "05:32 광안리 일출"이 아이폰(+09:00 기록)에서는
+                 * 전날 20:32로, 안드로이드(오프셋 없음)에서는 14:32로 저장된다.
+                 */
+                takenAt = parseExifDateTime(string(exifDirectory, ExifSubIFDDirectory.TAG_DATETIME_ORIGINAL));
 
-            if (imageWidth == null || imageHeight == null) {
-                ImageSize imageSize = readImageSize(file);
-                if (imageSize != null) {
-                    if (imageWidth == null) {
-                        imageWidth = imageSize.width();
-                    }
-                    if (imageHeight == null) {
-                        imageHeight = imageSize.height();
+                imageWidth = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_WIDTH, TAG_IMAGE_WIDTH);
+                imageHeight = firstInteger(exifDirectory, ifd0Directory, TAG_EXIF_IMAGE_HEIGHT, TAG_IMAGE_HEIGHT);
+
+                if (imageWidth == null || imageHeight == null) {
+                    ImageSize imageSize = readImageSize(file);
+                    if (imageSize != null) {
+                        if (imageWidth == null) {
+                            imageWidth = imageSize.width();
+                        }
+                        if (imageHeight == null) {
+                            imageHeight = imageSize.height();
+                        }
                     }
                 }
             }
@@ -129,7 +152,7 @@ public class ExifExtractor {
                     imageWidth,
                     imageHeight,
                     description(exifDirectory, TAG_COLOR_SPACE),
-                    findTagValue(metadata, "Detected File Type Name", "Detected File Type Long Name"),
+                    technicalAllowed ? findTagValue(metadata, "Detected File Type Name", "Detected File Type Long Name") : null,
 
                     description(exifDirectory, TAG_MAX_APERTURE),
                     description(exifDirectory, TAG_SUBJECT_DISTANCE),
@@ -137,14 +160,14 @@ public class ExifExtractor {
                     firstString(ifd0Directory, TAG_ARTIST),
                     firstString(ifd0Directory, TAG_COPYRIGHT),
                     firstString(ifd0Directory, TAG_IMAGE_DESCRIPTION),
-                    findTagValue(metadata, "Caption/Abstract", "Caption"),
+                    technicalAllowed ? findTagValue(metadata, "Caption/Abstract", "Caption") : null,
 
                     file.getOriginalFilename(),
                     file.getSize()
             );
         } catch (Exception e) {
             log.warn("EXIF metadata extraction failed", e);
-            return empty(file);
+            return empty(file, technicalAllowed);
         }
     }
 
@@ -165,8 +188,8 @@ public class ExifExtractor {
         }
     }
 
-    private PhotoExifInfo empty(MultipartFile file) {
-        ImageSize imageSize = readImageSize(file);
+    private PhotoExifInfo empty(MultipartFile file, boolean technicalAllowed) {
+        ImageSize imageSize = technicalAllowed ? readImageSize(file) : null;
 
         return new PhotoExifInfo(
                 null,

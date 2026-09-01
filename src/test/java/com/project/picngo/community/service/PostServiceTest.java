@@ -3,9 +3,11 @@ package com.project.picngo.community.service;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.CommunityErrorCode;
+import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.service.ExifExtractor;
 import com.project.picngo.common.image.service.ImageStorageService;
 import com.project.picngo.community.domain.Post;
@@ -94,6 +96,30 @@ class PostServiceTest {
         assertEquals(false, response.active());
         assertEquals(0L, response.count());
         verify(postRepository, never()).changeLikeCount(any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("게시글 작성 시 EXIF 동의 상태가 UNKNOWN이면 거부한다")
+    void postWithUnknownExifConsentIsRejected() {
+        PostCreateRequest request = new PostCreateRequest(
+                "content",
+                null,
+                LocalTime.of(5, 30),
+                PostWeather.CLEAR,
+                null,
+                null,
+                List.of(),
+                ExifConsentStatus.UNKNOWN,
+                ExifConsentStatus.DECLINED
+        );
+
+        CustomException exception = assertThrows(
+                CustomException.class,
+                () -> service.createPost(2L, request, List.of())
+        );
+
+        assertEquals(ImageErrorCode.INVALID_EXIF_CONSENT, exception.getErrorCode());
+        verifyNoInteractions(userRepository, postRepository, imageStorageService);
     }
 
     @Test
@@ -251,7 +277,7 @@ class PostServiceTest {
         when(retainedImage.getId()).thenReturn(20L);
         when(imageRepository.findByPostIdOrderByPostOrderAsc(1L))
                 .thenReturn(List.of(removedImage, retainedImage), List.of());
-        when(exifExtractor.extract(newImage)).thenReturn(exif);
+        when(exifExtractor.extract(eq(newImage), any(), any())).thenReturn(exif);
         when(imageStorageService.upload(newImage, "community/9"))
                 .thenReturn(new ImageUploadResult("community/9/new.jpg", "new-url"));
         when(imageRepository.save(any(PostImage.class)))
@@ -475,7 +501,7 @@ class PostServiceTest {
         MultipartFile second = imageFile();
         PhotoExifInfo exif = mock(PhotoExifInfo.class);
         when(userRepository.findById(2L)).thenReturn(Optional.of(author));
-        when(exifExtractor.extract(any())).thenReturn(exif);
+        when(exifExtractor.extract(any(), any(), any())).thenReturn(exif);
         when(imageStorageService.upload(first, "community/2"))
                 .thenReturn(new ImageUploadResult("first-key", "first-url"));
         when(imageStorageService.upload(second, "community/2"))
@@ -504,7 +530,7 @@ class PostServiceTest {
         MultipartFile second = imageFile();
         when(userRepository.findById(2L)).thenReturn(Optional.of(mock(User.class)));
         when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(exifExtractor.extract(any())).thenReturn(mock(PhotoExifInfo.class));
+        when(exifExtractor.extract(any(), any(), any())).thenReturn(mock(PhotoExifInfo.class));
         when(imageStorageService.upload(first, "community/2"))
                 .thenReturn(new ImageUploadResult("first-key", "first-url"));
         when(imageStorageService.upload(second, "community/2"))
@@ -547,11 +573,13 @@ class PostServiceTest {
                 PostWeather.PARTLY_CLOUDY,
                 null,
                 null,
-                List.of("야경명소")
+                List.of("야경명소"),
+                ExifConsentStatus.DECLINED,
+                ExifConsentStatus.DECLINED
         );
         when(userRepository.findById(2L)).thenReturn(Optional.of(author));
         when(spotRepository.findById(9L)).thenReturn(Optional.of(spot));
-        when(exifExtractor.extract(image)).thenReturn(mock(PhotoExifInfo.class));
+        when(exifExtractor.extract(eq(image), any(), any())).thenReturn(mock(PhotoExifInfo.class));
         when(imageStorageService.upload(image, "community/2"))
                 .thenReturn(new ImageUploadResult("image-key", "image-url"));
         when(postRepository.save(any(Post.class)))
@@ -583,7 +611,9 @@ class PostServiceTest {
                 PostWeather.CLEAR,
                 null,
                 null,
-                List.of()
+                List.of(),
+                ExifConsentStatus.DECLINED,
+                ExifConsentStatus.DECLINED
         );
 
         CustomException exception = assertThrows(
@@ -723,7 +753,9 @@ class PostServiceTest {
                 PostWeather.CLEAR,
                 null,
                 null,
-                List.of()
+                List.of(),
+                ExifConsentStatus.DECLINED,
+                ExifConsentStatus.DECLINED
         );
     }
 

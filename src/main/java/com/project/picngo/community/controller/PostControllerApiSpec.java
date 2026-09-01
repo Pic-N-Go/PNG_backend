@@ -59,6 +59,10 @@ public interface PostControllerApiSpec {
                     게시글 JSON과 이미지 파일을 multipart/form-data로 함께 전송합니다.
                     request 파트의 Content-Type은 application/json이어야 하며 이미지는 1~5장까지 등록할 수 있습니다.
                     파일당 최대 크기는 20MB이고 MIME 타입이 image/로 시작해야 합니다.
+                    technicalExifConsent와 locationExifConsent는 필수이며 GRANTED 또는 DECLINED만 허용합니다.
+                    technicalExifConsent가 GRANTED이면 카메라·렌즈·ISO·노출 등 기술 정보를 추출하고,
+                    locationExifConsent가 GRANTED이면 GPS 위도·경도와 촬영 주소를 추출합니다.
+                    각 항목이 DECLINED이면 해당 범주의 EXIF 정보는 추출하지 않습니다.
                     """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = @ApiResponse(responseCode = "201", description = "게시글 작성 성공")
@@ -79,6 +83,7 @@ public interface PostControllerApiSpec {
                     retainedImageIds를 생략하면 기존 이미지를 모두 유지하고, 전달하면 해당 ID와 순서대로 유지합니다.
                     빈 배열을 전달하면 기존 이미지를 모두 제거하므로 newImages를 최소 한 장 함께 전송해야 합니다.
                     수정 후 최종 이미지 개수는 1~5장이어야 합니다.
+                    새 이미지의 EXIF 정보는 게시글 작성 시 저장한 동의 상태에 따라 추출합니다.
                     """,
             security = @SecurityRequirement(name = "bearerAuth")
     )

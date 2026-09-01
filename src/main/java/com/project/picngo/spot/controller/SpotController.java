@@ -133,7 +133,7 @@ public class SpotController implements SpotControllerApiSpec {
     public ResponseEntity<ReviewResponse> createReview(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
-            @Valid @RequestPart("request") ReviewRequest request,
+            @Valid @RequestPart("request") ReviewCreateRequest request,
             @RequestPart(value = "photos", required = false) List<MultipartFile> photos
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
