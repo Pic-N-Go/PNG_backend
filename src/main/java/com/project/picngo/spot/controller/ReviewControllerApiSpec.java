@@ -3,8 +3,8 @@ package com.project.picngo.spot.controller;
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.ReviewExifResponse;
 import com.project.picngo.spot.dto.ReviewPhotoResponse;
-import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
+import com.project.picngo.spot.dto.ReviewUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,11 +31,12 @@ public interface ReviewControllerApiSpec {
     ResponseEntity<ReviewResponse> updateReview(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "리뷰 ID") @PathVariable Long id,
-            @RequestBody ReviewRequest request
+            @RequestBody ReviewUpdateRequest request
     );
 
     @Operation(summary = "리뷰 사진 추가",
-            description = "본인 리뷰에만 추가할 수 있습니다. 기존 사진 + 신규 파일 합계가 5장을 넘으면 400.")
+            description = "본인 리뷰에만 추가할 수 있습니다. 기존 사진 + 신규 파일 합계가 5장을 넘으면 400을 반환합니다. "
+                    + "새 사진의 EXIF 정보는 리뷰 작성 시 저장한 동의 상태에 따라 추출합니다.")
     ResponseEntity<List<ReviewPhotoResponse>> addReviewPhotos(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "리뷰 ID") @PathVariable Long id,

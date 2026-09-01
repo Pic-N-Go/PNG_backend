@@ -9,6 +9,7 @@ public enum ImageErrorCode implements BaseErrorCode {
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패했습니다."),
     IMAGE_PRESIGNED_URL_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 접근 URL 생성에 실패했습니다."),
     INVALID_IMAGE_FILE(HttpStatus.BAD_REQUEST, "올바른 이미지 파일이 아닙니다."),
+    INVALID_EXIF_CONSENT(HttpStatus.BAD_REQUEST, "EXIF 동의 상태는 GRANTED 또는 DECLINED여야 합니다."),
     IMAGE_DELETE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 삭제에 실패했습니다.");
 
     private final HttpStatus status;

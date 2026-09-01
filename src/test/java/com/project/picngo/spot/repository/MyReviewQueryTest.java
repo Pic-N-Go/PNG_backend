@@ -1,5 +1,6 @@
 package com.project.picngo.spot.repository;
 
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.enums.SpotSource;
@@ -130,6 +131,8 @@ class MyReviewQueryTest {
                 .rating(rating)
                 .content("좋아요")
                 .timePeriod(TimePeriod.SUNSET)
+                .technicalExifConsent(ExifConsentStatus.UNKNOWN)
+                .locationExifConsent(ExifConsentStatus.UNKNOWN)
                 .build());
     }
 
@@ -140,6 +143,8 @@ class MyReviewQueryTest {
                 .rating(rating)
                 .content("좋아요")
                 .timePeriod(TimePeriod.SUNSET)
+                .technicalExifConsent(ExifConsentStatus.UNKNOWN)
+                .locationExifConsent(ExifConsentStatus.UNKNOWN)
                 .build());
     }
 }

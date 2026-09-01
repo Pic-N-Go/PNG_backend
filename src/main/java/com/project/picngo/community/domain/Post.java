@@ -1,6 +1,7 @@
 package com.project.picngo.community.domain;
 
 import com.project.picngo.common.domain.BaseTimeEntity;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.user.domain.User;
 import jakarta.persistence.*;
@@ -58,6 +59,14 @@ public class Post extends BaseTimeEntity {
     @Column(name = "bookmark_count", nullable = false)
     private long bookmarkCount;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "technical_exif_consent", nullable = false, length = 20)
+    private ExifConsentStatus technicalExifConsent;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "location_exif_consent", nullable = false, length = 20)
+    private ExifConsentStatus locationExifConsent;
+
     @ElementCollection
     @CollectionTable(name = "community_post_tags", joinColumns = @JoinColumn(name = "post_id"))
     @Column(name = "tag", nullable = false, length = 30)
@@ -77,7 +86,9 @@ public class Post extends BaseTimeEntity {
             PostWeather weather,
             String cameraModel,
             String lensModel,
-            List<String> tags
+            List<String> tags,
+            ExifConsentStatus technicalExifConsent,
+            ExifConsentStatus locationExifConsent
     ) {
         this.author = author;
         this.content = content;
@@ -86,6 +97,8 @@ public class Post extends BaseTimeEntity {
         this.weather = weather;
         this.cameraModel = normalize(cameraModel);
         this.lensModel = normalize(lensModel);
+        this.technicalExifConsent = technicalExifConsent;
+        this.locationExifConsent = locationExifConsent;
         if (tags != null) {
             this.tags.addAll(tags);
         }
@@ -99,7 +112,9 @@ public class Post extends BaseTimeEntity {
             PostWeather weather,
             String cameraModel,
             String lensModel,
-            List<String> tags
+            List<String> tags,
+            ExifConsentStatus technicalExifConsent,
+            ExifConsentStatus locationExifConsent
     ) {
         return new Post(
                 author,
@@ -109,7 +124,9 @@ public class Post extends BaseTimeEntity {
                 weather,
                 cameraModel,
                 lensModel,
-                tags
+                tags,
+                technicalExifConsent,
+                locationExifConsent
         );
     }
 

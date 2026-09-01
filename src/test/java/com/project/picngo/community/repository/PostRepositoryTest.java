@@ -3,6 +3,7 @@ package com.project.picngo.community.repository;
 import com.project.picngo.community.domain.Post;
 import com.project.picngo.community.domain.PostImage;
 import com.project.picngo.community.domain.PostWeather;
+import com.project.picngo.common.image.domain.ExifConsentStatus;
 import com.project.picngo.common.image.dto.PhotoExifInfo;
 import com.project.picngo.user.domain.Follow;
 import com.project.picngo.user.domain.User;
@@ -205,7 +206,9 @@ class PostRepositoryTest {
                 PostWeather.CLEAR,
                 null,
                 null,
-                List.of()
+                List.of(),
+                ExifConsentStatus.UNKNOWN,
+                ExifConsentStatus.UNKNOWN
         );
     }
 
