@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface PostImageRepository extends JpaRepository<PostImage, Long> {
-    List<PostImage> findAllByIdInAndOwnerId(List<Long> ids, Long ownerId);
     List<PostImage> findByPostIdOrderByPostOrderAsc(Long postId);
 
     @Query("""
