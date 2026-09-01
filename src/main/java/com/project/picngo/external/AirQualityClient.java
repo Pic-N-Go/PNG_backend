@@ -10,6 +10,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.function.Supplier;
 
@@ -17,18 +20,20 @@ import java.util.function.Supplier;
 @Component
 public class AirQualityClient {
 
-    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(3);
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(5);
 
     private final WebClient webClient;
     private final String serviceKey;
+    private final String baseUrl;
     private final CircuitBreaker circuitBreaker;
 
     public AirQualityClient(WebClient.Builder builder,
                             CircuitBreakerRegistry circuitBreakerRegistry,
                             @Value("${air.quality.key}") String serviceKey,
                             @Value("${air.quality.base-url}") String baseUrl) {
-        this.webClient = builder.baseUrl(baseUrl).build();
+        this.webClient = builder.build();
         this.serviceKey = serviceKey;
+        this.baseUrl = baseUrl;
         // 기상청과 같은 apis.data.go.kr지만 서킷은 분리한다. 이 호스트는 공공데이터포털이라는
         // 게이트웨이일 뿐이고 뒤의 실제 서비스는 기관별로 따로 돌아간다(여기는 한국환경공단).
         // 에어코리아가 죽어도 기상청 예보는 계속 나가야 한다.
@@ -37,16 +42,24 @@ public class AirQualityClient {
 
     public Item getAirQuality(String sidoName) {
         try {
+            String targetBaseUrl = baseUrl.replace("https://apis.data.go.kr", "http://apis.data.go.kr");
+            String encodedSido = URLEncoder.encode(sidoName, StandardCharsets.UTF_8);
+            String keyToSend = (serviceKey != null && serviceKey.contains("%"))
+                    ? serviceKey
+                    : URLEncoder.encode(serviceKey != null ? serviceKey : "", StandardCharsets.UTF_8);
+
+            String urlStr = targetBaseUrl + "/getCtprvnRltmMesureDnsty"
+                    + "?serviceKey=" + keyToSend
+                    + "&sidoName=" + encodedSido
+                    + "&pageNo=1"
+                    + "&numOfRows=40"
+                    + "&returnType=json"
+                    + "&ver=1.0";
+            URI uri = URI.create(urlStr);
+
             Supplier<AirQualityResponse> call = CircuitBreaker.decorateSupplier(circuitBreaker, () ->
                     webClient.get()
-                            .uri(uriBuilder -> uriBuilder.path("/getCtprvnRltmMesureDnsty")
-                                    .queryParam("serviceKey", serviceKey)
-                                    .queryParam("sidoName", sidoName)
-                                    .queryParam("pageNo", 1)
-                                    .queryParam("numOfRows", 40)
-                                    .queryParam("returnType", "json")
-                                    .queryParam("ver", "1.0")
-                                    .build())
+                            .uri(uri)
                             .retrieve()
                             .bodyToMono(AirQualityResponse.class)
                             .timeout(CALL_TIMEOUT)

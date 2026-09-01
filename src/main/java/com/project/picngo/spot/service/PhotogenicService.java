@@ -2,11 +2,11 @@ package com.project.picngo.spot.service;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.SpotErrorCode;
-import com.project.picngo.external.AirQualityClient;
-import com.project.picngo.external.WeatherClient;
+import com.project.picngo.external.SidoNameMapper;
 import com.project.picngo.external.dto.AirQualityResponse.Item;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import com.project.picngo.external.service.WeatherCacheService;
 import com.project.picngo.spot.domain.SeasonEvent;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.dto.PhotogenicResponse;
@@ -45,8 +45,7 @@ public class PhotogenicService {
 
     private final SpotRepository spotRepository;
     private final SeasonEventRepository seasonEventRepository;
-    private final AirQualityClient airQualityClient;
-    private final WeatherClient weatherClient;
+    private final WeatherCacheService weatherCacheService;
 
     public PhotogenicResponse calculate(Long spotId, LocalDate date, LocalTime time) {
         LocalDate resolvedDate = date != null ? date : LocalDate.now(KST);
@@ -55,14 +54,16 @@ public class PhotogenicService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
-        String region = extractRegion(spot.getAddress());
+        String region = SidoNameMapper.normalize(spot.getAddress());
         FactorInfo seasonFactor = calculateSeason(region, spot.getCat3(), resolvedDate);
 
         Item air = null;
-        try {
-            air = airQualityClient.getAirQuality(region);
-        } catch (Exception e) {
-            log.warn("에어코리아 API 호출 실패, 대기질 점수 0점 처리: {}", e.getMessage());
+        if (region != null) {
+            try {
+                air = weatherCacheService.getCachedAirQuality(region);
+            } catch (Exception e) {
+                log.warn("에어코리아 API 호출 실패, 대기질 점수 0점 처리: {}", e.getMessage());
+            }
         }
         FactorInfo fineDustFactor = calculateFineDust(air);
         FactorInfo ozoneFactor = calculateOzone(air);
@@ -88,7 +89,7 @@ public class PhotogenicService {
     private FactorInfo calculateWeather(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
             String dateStr = date.format(DATE_FMT);
-            List<WeatherForecastResponse> forecasts = weatherClient.getShortTermForecast(lat, lng, dateStr);
+            List<WeatherForecastResponse> forecasts = weatherCacheService.getCached7DayForecast(lat, lng, dateStr);
             if (forecasts == null || forecasts.isEmpty()) return new FactorInfo("데이터 없음", 0);
 
             WeatherForecastResponse closest = forecasts.stream()
@@ -116,7 +117,7 @@ public class PhotogenicService {
     // 골든아워 만점 5점 — 일출/일몰 전후 30분 이내
     private GoldenHourInfo calculateGoldenHour(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
-            GoldenHourResponse goldenHour = weatherClient.getGoldenHour(lat, lng, date.toString());
+            GoldenHourResponse goldenHour = weatherCacheService.getCachedGoldenHour(lat, lng, date.toString());
             if (goldenHour == null) return new GoldenHourInfo("데이터 없음", 0, null, null);
             if (goldenHour.sunriseTime() == null || goldenHour.sunsetTime() == null) {
                 return new GoldenHourInfo("데이터 없음", 0, null, null);
@@ -241,12 +242,5 @@ public class PhotogenicService {
 
     private boolean isInRange(MonthDay target, MonthDay start, MonthDay end) {
         return !target.isBefore(start) && !target.isAfter(end);
-    }
-
-    // ponytail: 에어코리아 sidoName은 "서울", "부산" 등 단축형만 허용
-    private String extractRegion(String address) {
-        if (address == null) return "";
-        String first = address.split(" ")[0];
-        return first.replace("특별시", "").replace("광역시", "").replace("특별자치시", "").replace("특별자치도", "");
     }
 }
