@@ -42,9 +42,14 @@ public class AirQualityClient {
 
     public Item getAirQuality(String sidoName) {
         try {
+            String targetBaseUrl = baseUrl.replace("https://apis.data.go.kr", "http://apis.data.go.kr");
             String encodedSido = URLEncoder.encode(sidoName, StandardCharsets.UTF_8);
-            String urlStr = baseUrl + "/getCtprvnRltmMesureDnsty"
-                    + "?serviceKey=" + serviceKey
+            String keyToSend = (serviceKey != null && serviceKey.contains("%"))
+                    ? serviceKey
+                    : URLEncoder.encode(serviceKey != null ? serviceKey : "", StandardCharsets.UTF_8);
+
+            String urlStr = targetBaseUrl + "/getCtprvnRltmMesureDnsty"
+                    + "?serviceKey=" + keyToSend
                     + "&sidoName=" + encodedSido
                     + "&pageNo=1"
                     + "&numOfRows=40"
