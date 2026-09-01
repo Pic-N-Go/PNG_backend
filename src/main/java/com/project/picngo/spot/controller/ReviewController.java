@@ -3,8 +3,8 @@ package com.project.picngo.spot.controller;
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.ReviewExifResponse;
 import com.project.picngo.spot.dto.ReviewPhotoResponse;
-import com.project.picngo.spot.dto.ReviewRequest;
 import com.project.picngo.spot.dto.ReviewResponse;
+import com.project.picngo.spot.dto.ReviewUpdateRequest;
 import com.project.picngo.spot.service.ReviewService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +43,7 @@ public class ReviewController implements ReviewControllerApiSpec {
     public ResponseEntity<ReviewResponse> updateReview(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long id,
-            @Valid @RequestBody ReviewRequest request
+            @Valid @RequestBody ReviewUpdateRequest request
     ) {
         return ResponseEntity.ok(reviewService.updateReview(userDetails.getId(), id, request));
     }
