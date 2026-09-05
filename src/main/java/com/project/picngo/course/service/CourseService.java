@@ -64,7 +64,7 @@ public class CourseService {
     }
 
     public List<CourseResponse> getCourses(Long userId) {
-        return courseRepository.findAllByUserId(userId).stream()
+        List<Course> courses = courseRepository.findAllByUserId(userId).stream()
                 .sorted(java.util.Comparator
                         // 1순위: 완료 여부 (진행예정/진행중: false -> 상단 배치, 완료: true -> 하단 배치)
                         .comparing(Course::isCompleted)
@@ -73,7 +73,22 @@ public class CourseService {
                         // 3순위 (동률 시): 최신 생성 순 (내림차순)
                         .thenComparing(Course::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
                 )
-                .map(this::toCourseResponse)
+                .toList();
+
+        List<Long> allSpotIds = courses.stream()
+                .filter(c -> c.getCourseSpots() != null)
+                .flatMap(c -> c.getCourseSpots().stream())
+                .map(CourseSpot::getSpotId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, Spot> spotMap = allSpotIds.isEmpty() ? Map.of() :
+                spotRepository.findAllById(allSpotIds).stream()
+                        .collect(Collectors.toMap(Spot::getId, s -> s));
+
+        return courses.stream()
+                .map(c -> toCourseResponse(c, spotMap))
                 .toList();
     }
 
@@ -346,12 +361,39 @@ public class CourseService {
     // ==================== Entity → DTO 변환 ====================
 
     private CourseResponse toCourseResponse(Course course) {
+        return toCourseResponse(course, Map.of());
+    }
+
+    private CourseResponse toCourseResponse(Course course, Map<Long, Spot> spotMap) {
+        List<String> thumbnailUrls = List.of();
+        int spotCount = 0;
+        if (course.getCourseSpots() != null && !course.getCourseSpots().isEmpty()) {
+            spotCount = course.getCourseSpots().size();
+            thumbnailUrls = course.getCourseSpots().stream()
+                    .sorted(java.util.Comparator.comparing(CourseSpot::getDayNumber)
+                            .thenComparing(CourseSpot::getSequenceOrder))
+                    .map(cs -> {
+                        Spot s = spotMap.get(cs.getSpotId());
+                        if (s == null) return null;
+                        String thumb = s.getThumbnailUrl();
+                        if (thumb != null && !thumb.isBlank()) return thumb;
+                        String img = s.getImageUrl();
+                        return (img != null && !img.isBlank()) ? img : null;
+                    })
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .limit(3)
+                    .toList();
+        }
+
         return new CourseResponse(
                 course.getId(),
                 course.getTitle(),
                 course.getStartDate(),
                 course.getEndDate(),
-                course.getCreatedAt()
+                course.getCreatedAt(),
+                thumbnailUrls,
+                spotCount
         );
     }
 
@@ -375,6 +417,19 @@ public class CourseService {
     }
 
     private CourseSpotResponse toCourseSpotResponse(CourseSpot spot, Spot actualSpot) {
+        String photoUrl = null;
+        if (actualSpot != null) {
+            String thumb = actualSpot.getThumbnailUrl();
+            if (thumb != null && !thumb.isBlank()) {
+                photoUrl = thumb;
+            } else {
+                String img = actualSpot.getImageUrl();
+                if (img != null && !img.isBlank()) {
+                    photoUrl = img;
+                }
+            }
+        }
+
         return new CourseSpotResponse(
                 spot.getId(),
                 spot.getSpotId(),
@@ -384,7 +439,7 @@ public class CourseService {
                 actualSpot != null ? actualSpot.getLongitude() : null,
                 NavigationInfo.of(actualSpot),
                 actualSpot != null ? actualSpot.getCategoryNames() : null,
-                actualSpot != null ? actualSpot.getThumbnailUrl() : null,
+                photoUrl,
                 actualSpot != null ? actualSpot.getPhotogenicScore() : null,
                 spot.getDayNumber(),
                 spot.getSequenceOrder(),
