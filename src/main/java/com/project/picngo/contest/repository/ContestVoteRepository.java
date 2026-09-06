@@ -45,6 +45,9 @@ public interface ContestVoteRepository extends JpaRepository<ContestVote, Long> 
     // 콘테스트 전체 투표 수 조회
     long countByContest(Contest contest);
 
+    @Query("select distinct v.user.id from ContestVote v where v.contest = :contest")
+    List<Long> findDistinctUserIdsByContest(@Param("contest") Contest contest);
+
     @Query("""
             select v.entry.id
             from ContestVote v
