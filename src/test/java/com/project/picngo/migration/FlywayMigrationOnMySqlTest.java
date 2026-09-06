@@ -137,6 +137,11 @@ class FlywayMigrationOnMySqlTest {
                     + "AND COLUMN_NAME = 'category'"))
                     .as("spot 테이블의 레거시 category 컬럼은 V18에 의해 삭제되어야 한다")
                     .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.TABLES "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot_tag'"))
+                    .as("spot_tag 테이블은 V19에 의해 삭제되어야 한다")
+                    .isZero();
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }
@@ -250,6 +255,11 @@ class FlywayMigrationOnMySqlTest {
                     + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
                     + "AND COLUMN_NAME = 'category'"))
                     .as("spot 테이블의 레거시 category 컬럼이 없어야 한다")
+                    .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.TABLES "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot_tag'"))
+                    .as("기존 DB에서도 spot_tag 테이블이 없어야 한다")
                     .isZero();
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
