@@ -2,6 +2,7 @@ package com.project.picngo.contest.service;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ContestErrorCode;
+import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
@@ -38,6 +39,13 @@ import com.project.picngo.contest.repository.ContestReportRepository;
 import com.project.picngo.contest.repository.ContestRepository;
 import com.project.picngo.contest.repository.ContestSubscriptionRepository;
 import com.project.picngo.contest.repository.ContestVoteRepository;
+import com.project.picngo.contest.dto.AdminContestDetailResponse;
+import com.project.picngo.contest.dto.AdminContestEntryResponse;
+import com.project.picngo.contest.dto.AdminContestReportResponse;
+import com.project.picngo.contest.dto.AdminContestSummaryResponse;
+import com.project.picngo.contest.dto.ContestUpdateRequest;
+import com.project.picngo.contest.domain.ContestSubscription;
+import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.domain.User;
@@ -52,8 +60,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,6 +85,7 @@ public class ContestService {
     private final SpotRepository spotRepository;
     private final ImageStorageService imageStorageService;
     private final ExifExtractor exifExtractor;
+    private final NotificationService notificationService;
 
     // 프론트 UI가 "3장 출품 · 3표"로 고정돼 있다. 회차마다 다르게 줄 이유가 아직 없어 기본값으로 둔다.
     private static final int DEFAULT_MAX_ENTRIES_PER_USER = 3;
@@ -367,6 +378,8 @@ public class ContestService {
         }
 
         contestVoteRepository.deleteAllByEntry(entry);
+        rankingSnapshotRepository.deleteAllByEntry(entry);
+        contestReportRepository.deleteAllByEntry(entry);
         imageStorageService.delete(entry.getPhotoUrl());
         contestEntryRepository.delete(entry);
     }
@@ -880,5 +893,217 @@ public class ContestService {
         if (contest.getPhase(LocalDateTime.now(Contest.ZONE)) != requiredPhase) {
             throw new CustomException(errorCode);
         }
+    }
+
+    // ── 관리자 전용 기능 ──────────────────────────────────────────────
+
+    // 관리자용 콘테스트 전체 목록 조회
+    public Page<AdminContestSummaryResponse> getAdminContests(Pageable pageable) {
+        Page<Contest> contests = contestRepository.findAllByOrderByCreatedAtDesc(pageable);
+        List<Long> contestIds = contests.getContent().stream().map(Contest::getId).toList();
+
+        Map<Long, ContestPastSummary> summaryMap = contestIds.isEmpty()
+                ? Map.of()
+                : contestEntryRepository.findPastSummariesByContestIds(contestIds).stream()
+                .collect(Collectors.toMap(ContestPastSummary::contestId, Function.identity()));
+
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+        return contests.map(c -> {
+            ContestPastSummary summary = summaryMap.get(c.getId());
+            long totalEntries = summary != null ? summary.entryCount() : 0L;
+            long totalVotes = summary != null ? summary.totalVoteCount() : 0L;
+            return AdminContestSummaryResponse.of(
+                    c,
+                    imageStorageService.getPresignedUrl(c.getThemeImageUrl()),
+                    c.getPhase(now),
+                    totalEntries,
+                    totalVotes
+            );
+        });
+    }
+
+    // 관리자용 콘테스트 단건 상세 조회
+    public AdminContestDetailResponse getAdminContestDetail(Long contestId) {
+        Contest contest = getContestById(contestId);
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        long subscriberCount = subscriptionRepository.findAllByContest(contest).size();
+        long totalEntries = contestEntryRepository.countByContest(contest);
+        long participantCount = contestEntryRepository.countDistinctUserByContest(contest);
+        long totalVotes = contestVoteRepository.countByContest(contest);
+
+        return AdminContestDetailResponse.of(
+                contest,
+                imageStorageService.getPresignedUrl(contest.getThemeImageUrl()),
+                contest.getPhase(now),
+                subscriberCount,
+                totalEntries,
+                participantCount,
+                totalVotes
+        );
+    }
+
+    // 관리자용 콘테스트 테마 대표 사진 업로드
+    public ImageUploadResult uploadThemeImage(MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new CustomException(ImageErrorCode.IMAGE_FILE_EMPTY);
+        }
+        return imageStorageService.upload(image, "contests/themes");
+    }
+
+    // 관리자용 콘테스트 정보 및 일정 수정
+    @Transactional
+    public AdminContestDetailResponse updateContest(Long contestId, ContestUpdateRequest request) {
+        Contest contest = getContestById(contestId);
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        if (request.submitStartAt() != null) {
+            // 출품이 이미 시작되었거나 지난 콘테스트는 시작일을 변경할 수 없다
+            if (contest.getPhase(now) != ContestPhase.UPCOMING) {
+                throw new CustomException(ContestErrorCode.CANNOT_MODIFY_STARTED_CONTEST);
+            }
+
+            if (request.submitStartAt().isBefore(now)) {
+                throw new CustomException(ContestErrorCode.CONTEST_START_IN_PAST);
+            }
+
+            LocalDateTime newResultOpenAt = request.submitStartAt()
+                    .plusWeeks(4)
+                    .atZone(Contest.ZONE)
+                    .toLocalDate()
+                    .plusDays(1)
+                    .atTime(LocalTime.of(9, 0));
+
+            if (contestRepository.existsOverlappingContest(contestId, request.submitStartAt(), newResultOpenAt)) {
+                throw new CustomException(ContestErrorCode.CONTEST_PERIOD_OVERLAP);
+            }
+        }
+
+        contest.update(request.title(), request.description(), request.themeImageUrl(), request.submitStartAt());
+        contestRepository.save(contest);
+
+        return getAdminContestDetail(contestId);
+    }
+
+    // 콘테스트 출품 시작 알림 발송 (스케줄러 또는 관리자 수동 호출)
+    @Transactional
+    public int sendStartNotification(Long contestId) {
+        Contest contest = getContestById(contestId);
+        List<ContestSubscription> subscriptions = subscriptionRepository.findAllByContest(contest);
+
+        int sentCount = 0;
+        for (ContestSubscription sub : subscriptions) {
+            String title = String.format("[콘테스트 오픈] '%s' 출품이 시작되었습니다!", contest.getTitle());
+            String content = "지금 바로 멋진 사진을 출품하고 투표에 참여해 보세요.";
+            String deepLink = "/contests/" + contest.getId();
+            String dedupeKey = String.format("CONTEST_START:%d:%d", contest.getId(), sub.getUser().getId());
+
+            notificationService.sendPushNotification(
+                    sub.getUser().getId(),
+                    "COMMUNITY_CONTEST_START",
+                    title,
+                    content,
+                    deepLink,
+                    null,
+                    dedupeKey
+            );
+            sentCount++;
+        }
+
+        contest.markStartNotificationSent();
+        contestRepository.save(contest);
+        return sentCount;
+    }
+
+    // 콘테스트 결과 발표 알림 발송 (스케줄러 또는 관리자 수동 호출)
+    @Transactional
+    public int sendResultNotification(Long contestId) {
+        Contest contest = getContestById(contestId);
+
+        Set<Long> targetUserIds = new HashSet<>();
+        targetUserIds.addAll(subscriptionRepository.findDistinctUserIdsByContest(contest));
+        targetUserIds.addAll(contestEntryRepository.findDistinctUserIdsByContest(contest));
+        targetUserIds.addAll(contestVoteRepository.findDistinctUserIdsByContest(contest));
+
+        int sentCount = 0;
+        for (Long userId : targetUserIds) {
+            String title = String.format("[콘테스트 결과 발표] '%s' 결과가 발표되었습니다!", contest.getTitle());
+            String content = "지금 바로 수상작과 최종 순위를 확인해 보세요.";
+            String deepLink = "/contests/" + contest.getId() + "/result";
+            String dedupeKey = String.format("CONTEST_RESULT:%d:%d", contest.getId(), userId);
+
+            notificationService.sendPushNotification(
+                    userId,
+                    "COMMUNITY_CONTEST_RESULT",
+                    title,
+                    content,
+                    deepLink,
+                    null,
+                    dedupeKey
+            );
+            sentCount++;
+        }
+
+        contest.markResultNotificationSent();
+        contestRepository.save(contest);
+        return sentCount;
+    }
+
+    // 관리자용 콘테스트 강제 마감 및 즉시 결과 발표 (알림 연동)
+    @Transactional
+    public AdminContestDetailResponse forcePublishResult(Long contestId) {
+        Contest contest = getContestById(contestId);
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        contest.forceCloseAndPublishResult(now);
+        contestRepository.save(contest);
+
+        // 결과 발표 알림 전원 즉시 발송
+        sendResultNotification(contestId);
+
+        return getAdminContestDetail(contestId);
+    }
+
+    // 관리자용 특정 콘테스트의 출품작 목록 조회 (신고 건수 포함)
+    public Page<AdminContestEntryResponse> getAdminContestEntries(Long contestId, Pageable pageable) {
+        Contest contest = getContestById(contestId);
+        Page<ContestEntry> entries = contestEntryRepository.findAllByContest(contest, pageable);
+
+        List<Long> entryIds = entries.getContent().stream().map(ContestEntry::getId).toList();
+        Map<Long, Long> reportCountMap = entryIds.isEmpty()
+                ? Map.of()
+                : contestReportRepository.countReportsByEntryIds(entryIds).stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        return entries.map(entry -> AdminContestEntryResponse.of(
+                entry,
+                reportCountMap.getOrDefault(entry.getId(), 0L)
+        ));
+    }
+
+    // 관리자용 출품작 강제 삭제
+    @Transactional
+    public void adminDeleteEntry(Long entryId, Long adminId, String reason) {
+        ContestEntry entry = contestEntryRepository.findById(entryId)
+                .orElseThrow(() -> new CustomException(ContestErrorCode.ENTRY_NOT_FOUND));
+
+        contestVoteRepository.deleteAllByEntry(entry);
+        rankingSnapshotRepository.deleteAllByEntry(entry);
+        contestReportRepository.deleteAllByEntry(entry);
+
+        if (entry.getPhotoUrl() != null) {
+            imageStorageService.delete(entry.getPhotoUrl());
+        }
+
+        contestEntryRepository.delete(entry);
+    }
+
+    // 관리자용 전체 신고 내역 조회
+    public Page<AdminContestReportResponse> getAdminReports(Pageable pageable) {
+        Page<ContestReport> reports = contestReportRepository.findAllByOrderByCreatedAtDesc(pageable);
+        return reports.map(AdminContestReportResponse::from);
     }
 }
