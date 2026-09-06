@@ -53,7 +53,7 @@ public class AdminAuditLogService {
         );
 
         adminAuditLogRepository.save(auditLog);
-        log.info("🛡️ [Admin Audit Log] adminUserId={}, action={}, target={}:{}, details={}",
+        log.info("[Admin Audit Log] adminUserId={}, action={}, target={}:{}, details={}",
                 adminUserId, actionType, targetEntity, targetId, details);
     }
 
