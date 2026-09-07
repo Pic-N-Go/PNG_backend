@@ -44,10 +44,25 @@ public class TourApiSyncService {
         return total;
     }
 
+    /**
+     * 상세 조회 3종이 모두 비었으면 API 장애로 보고 저장하지 않는다.
+     *
+     * 상세 조회 클라이언트는 실패를 예외로 던지지 않고 null(이미지는 빈 목록)을 돌려준다.
+     * 그대로 저장하면 개요·소개·이미지가 빠진 스팟이 쌓이면서도 "완료"로 집계되는데,
+     * 배치에서는 이런 조용한 부분 실패가 가장 위험하다.
+     *
+     * 셋 중 일부만 비는 것은 원래 상세가 없는 스팟일 수 있으므로 기존대로 저장한다.
+     * 셋이 전부 빈 경우만 장애로 본다.
+     */
+    private boolean isDetailFetchFailed(Item detail, IntroItem intro, List<ImageItem> images) {
+        return detail == null && intro == null && (images == null || images.isEmpty());
+    }
+
     public int syncType(int contentTypeId, Integer areaCode, int startPage, int endPage) {
         int pageNo = startPage;
         int saved = 0;
         int skipped = 0;
+        int failed = 0;
         int totalCount = Integer.MAX_VALUE;
         String todayStr = LocalDate.now().format(YYYYMMDD);
 
@@ -100,6 +115,13 @@ public class TourApiSyncService {
                 List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
                 sleep(API_CALL_DELAY_MS);
 
+                if (isDetailFetchFailed(detail, intro, images)) {
+                    failed++;
+                    log.warn("[TourApiSyncService] 상세 조회 전부 실패, 저장 건너뜀: contentId={}, title={}",
+                            item.contentid(), item.title());
+                    continue;
+                }
+
                 boolean processed = spotUpsertService.upsertSpot(item, detail, intro, images);
                 if (processed) {
                     saved++;
@@ -109,20 +131,24 @@ public class TourApiSyncService {
                     syncStatusManager.updateProgress(
                             saved,
                             totalCount,
-                            String.format("동기화 진행 중 (type: %d, 지역: %s) - 신규: %d건, 건너뜀: %d건 / 총 %d건",
-                                    contentTypeId, areaCode != null ? areaCode : "전체", saved, skipped, totalCount)
+                            String.format("동기화 진행 중 (type: %d, 지역: %s) - 신규: %d건, 건너뜀: %d건, 실패: %d건 / 총 %d건",
+                                    contentTypeId, areaCode != null ? areaCode : "전체", saved, skipped, failed, totalCount)
                     );
                 }
             }
 
-            log.info("[TourApiSyncService] contentTypeId={}, areaCode={}, page={}/{} (신규 {}건, 건너뜀 {}건)",
+            log.info("[TourApiSyncService] contentTypeId={}, areaCode={}, page={}/{} (신규 {}건, 건너뜀 {}건, 실패 {}건)",
                     contentTypeId, areaCode, pageNo,
-                    (int) Math.ceil((double) totalCount / PAGE_SIZE), saved, skipped);
+                    (int) Math.ceil((double) totalCount / PAGE_SIZE), saved, skipped, failed);
             pageNo++;
         }
 
-        log.info("[TourApiSyncService] contentTypeId={} 동기화 완료: areaCode={}, 신규 {}건 저장, 기존 건너뜀 {}건",
-                contentTypeId, areaCode, saved, skipped);
+        if (failed > 0) {
+            log.warn("[TourApiSyncService] contentTypeId={} 상세 조회 실패 {}건 - 해당 스팟은 저장하지 않았다. "
+                    + "관광공사 API 장애일 수 있으니 복구 후 재동기화할 것", contentTypeId, failed);
+        }
+        log.info("[TourApiSyncService] contentTypeId={} 동기화 완료: areaCode={}, 신규 {}건 저장, 기존 건너뜀 {}건, 상세 실패 {}건",
+                contentTypeId, areaCode, saved, skipped, failed);
         return saved;
     }
 
@@ -137,6 +163,7 @@ public class TourApiSyncService {
 
     public int syncSample(int countPerType) {
         int totalSaved = 0;
+        int totalFailed = 0;
         String todayStr = LocalDate.now().format(YYYYMMDD);
 
         for (int type : TARGET_TYPES) {
@@ -187,6 +214,13 @@ public class TourApiSyncService {
                 List<ImageItem> images = tourApiClient.getDetailImages(item.contentid());
                 sleep(API_CALL_DELAY_MS);
 
+                if (isDetailFetchFailed(detail, intro, images)) {
+                    totalFailed++;
+                    log.warn("[TourApiSyncService] 샘플 수집 중 상세 조회 전부 실패, 저장 건너뜀: contentId={}, title={}",
+                            item.contentid(), item.title());
+                    continue;
+                }
+
                 boolean processed = spotUpsertService.upsertSpot(item, detail, intro, images);
                 if (processed) {
                     savedForType++;
@@ -195,7 +229,10 @@ public class TourApiSyncService {
                 }
             }
         }
-        log.info("[TourApiSyncService] TourAPI 샘플 동기화 완료: 총 {}건 저장", totalSaved);
+        if (totalFailed > 0) {
+            log.warn("[TourApiSyncService] 샘플 동기화 중 상세 조회 실패 {}건 - 해당 스팟은 저장하지 않았다", totalFailed);
+        }
+        log.info("[TourApiSyncService] TourAPI 샘플 동기화 완료: 총 {}건 저장, 상세 실패 {}건", totalSaved, totalFailed);
         return totalSaved;
     }
 
