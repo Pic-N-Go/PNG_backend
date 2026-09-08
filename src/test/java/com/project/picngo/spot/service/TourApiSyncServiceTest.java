@@ -126,6 +126,8 @@ class TourApiSyncServiceTest {
         given(tourApiClient.getAreaBasedListRaw(39, areaCode, "FD050100", 1, 100)).willReturn(createMockResponse(Collections.emptyList(), 0));
 
         given(spotRepository.findExistingTourContentIds(List.of("1002"))).willReturn(Collections.emptySet());
+        // 상세 조회가 하나라도 응답하면 정상 저장 대상이다 (전부 비어야만 실패로 본다)
+        given(tourApiClient.getDetailCommon("1002")).willReturn(createItem("1002", "12", "월미도"));
         given(spotUpsertService.upsertSpot(any(), any(), any(), any())).willReturn(true);
 
         int totalSaved = tourApiSyncService.sync(areaCode);
@@ -135,6 +137,57 @@ class TourApiSyncServiceTest {
         verify(tourApiClient).getDetailIntro("1002", 12);
         verify(tourApiClient).getDetailImages("1002");
         verify(spotUpsertService).upsertSpot(eq(item), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("상세 조회 3종이 모두 비면 저장하지 않는다 - API 장애를 성공으로 집계하지 않기 위함")
+    void skipSpotWhenAllDetailFetchesFail() {
+        int areaCode = 2;
+        Item item = createItem("1003", "12", "송도 센트럴파크");
+        TourApiResponse response = createMockResponse(List.of(item), 1);
+
+        given(tourApiClient.getAreaBasedListRaw(12, areaCode, 1, 100)).willReturn(response);
+        given(tourApiClient.getAreaBasedListRaw(14, areaCode, 1, 100)).willReturn(createMockResponse(Collections.emptyList(), 0));
+        given(tourApiClient.getFestivalList(anyString(), eq(areaCode), isNull(), eq(1), eq(100))).willReturn(createMockResponse(Collections.emptyList(), 0));
+        given(tourApiClient.getAreaBasedListRaw(39, areaCode, "FD050100", 1, 100)).willReturn(createMockResponse(Collections.emptyList(), 0));
+
+        given(spotRepository.findExistingTourContentIds(List.of("1003"))).willReturn(Collections.emptySet());
+
+        // 상세 조회 클라이언트는 실패해도 예외를 던지지 않는다 - null과 빈 목록으로 돌아온다
+        given(tourApiClient.getDetailCommon("1003")).willReturn(null);
+        given(tourApiClient.getDetailIntro("1003", 12)).willReturn(null);
+        given(tourApiClient.getDetailImages("1003")).willReturn(Collections.emptyList());
+
+        int totalSaved = tourApiSyncService.sync(areaCode);
+
+        assertThat(totalSaved).isEqualTo(0);
+        verify(spotUpsertService, never()).upsertSpot(any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("상세 조회가 일부만 비면 원래 상세가 없는 스팟일 수 있으므로 그대로 저장한다")
+    void saveSpotWhenOnlySomeDetailFetchesAreEmpty() {
+        int areaCode = 2;
+        Item item = createItem("1004", "12", "강화 석모도");
+        TourApiResponse response = createMockResponse(List.of(item), 1);
+
+        given(tourApiClient.getAreaBasedListRaw(12, areaCode, 1, 100)).willReturn(response);
+        given(tourApiClient.getAreaBasedListRaw(14, areaCode, 1, 100)).willReturn(createMockResponse(Collections.emptyList(), 0));
+        given(tourApiClient.getFestivalList(anyString(), eq(areaCode), isNull(), eq(1), eq(100))).willReturn(createMockResponse(Collections.emptyList(), 0));
+        given(tourApiClient.getAreaBasedListRaw(39, areaCode, "FD050100", 1, 100)).willReturn(createMockResponse(Collections.emptyList(), 0));
+
+        given(spotRepository.findExistingTourContentIds(List.of("1004"))).willReturn(Collections.emptySet());
+
+        // 개요는 왔지만 소개·이미지가 없는 스팟 - 장애가 아니라 원래 데이터가 그런 경우다
+        given(tourApiClient.getDetailCommon("1004")).willReturn(createItem("1004", "12", "강화 석모도"));
+        given(tourApiClient.getDetailIntro("1004", 12)).willReturn(null);
+        given(tourApiClient.getDetailImages("1004")).willReturn(Collections.emptyList());
+        given(spotUpsertService.upsertSpot(any(), any(), any(), any())).willReturn(true);
+
+        int totalSaved = tourApiSyncService.sync(areaCode);
+
+        assertThat(totalSaved).isEqualTo(1);
+        verify(spotUpsertService).upsertSpot(eq(item), any(), isNull(), anyList());
     }
 
     @Test

@@ -104,6 +104,32 @@ and s.status = :status and s.isActive = true
             Pageable pageable
     );
 
+    @Query("""
+select s from Spot s
+where exists (select c from s.categories c where c in :categories)
+and s.address like concat('%', :region, '%')
+and s.status = :status and s.isActive = true
+order by (s.reviewCount + s.bookmarkCount) desc
+""")
+    List<Spot> findByRegionAndCategories(
+            @Param("region") String region,
+            @Param("categories") Collection<SpotCategory> categories,
+            @Param("status") SpotStatus status,
+            Pageable pageable
+    );
+
+    @Query("""
+select s from Spot s
+where s.address like concat('%', :region, '%')
+and s.status = :status and s.isActive = true
+order by (s.reviewCount + s.bookmarkCount) desc
+""")
+    List<Spot> findByRegion(
+            @Param("region") String region,
+            @Param("status") SpotStatus status,
+            Pageable pageable
+    );
+
     // 키워드로 스팟 이름, 주소 검색 (카테고리 필터 없음)
     //
     // overview(설명)는 검색 대상에서 뺐다. 긴 산문이라 두 글자만 겹쳐도 걸려서,
