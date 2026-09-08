@@ -31,4 +31,8 @@ public interface ContestRankingSnapshotRepository extends JpaRepository<ContestR
 
     // 이미 집계된 날짜인지 확인
     boolean existsByContestAndSnapshotDate(Contest contest, LocalDate snapshotDate);
+
+    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from ContestRankingSnapshot s where s.entry = :entry")
+    void deleteAllByEntry(@Param("entry") com.project.picngo.contest.domain.ContestEntry entry);
 }

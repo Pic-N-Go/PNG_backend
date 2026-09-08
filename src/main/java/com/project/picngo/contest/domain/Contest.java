@@ -52,6 +52,12 @@ public class Contest {
     private boolean active;
 
     @Column(nullable = false)
+    private boolean startNotificationSent;
+
+    @Column(nullable = false)
+    private boolean resultNotificationSent;
+
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
@@ -100,7 +106,64 @@ public class Contest {
         contest.maxEntriesPerUser = maxEntriesPerUser;
         contest.voteLimit = voteLimit;
         contest.active = true;
+        contest.startNotificationSent = false;
+        contest.resultNotificationSent = false;
         return contest;
+    }
+
+    public void markStartNotificationSent() {
+        this.startNotificationSent = true;
+    }
+
+    public void markResultNotificationSent() {
+        this.resultNotificationSent = true;
+    }
+
+    /**
+     * 관리자에 의한 콘테스트 강제 마감 및 즉시 결과 발표.
+     * 아직 도래하지 않은 출품/투표 마감 및 결과 발표 시각을 현재 시각으로 당겨 즉시 ENDED 상태로 전환한다.
+     */
+    public void forceCloseAndPublishResult(LocalDateTime now) {
+        if (now.isBefore(this.submitStartAt)) {
+            this.submitStartAt = now;
+        }
+        if (now.isBefore(this.submitEndAt)) {
+            this.submitEndAt = now;
+        }
+        if (now.isBefore(this.voteStartAt)) {
+            this.voteStartAt = now;
+        }
+        if (now.isBefore(this.voteEndAt)) {
+            this.voteEndAt = now;
+        }
+        this.resultOpenAt = now.minusSeconds(1);
+    }
+
+    /**
+     * 콘테스트 정보 및 일정 수정.
+     * submitStartAt이 주어지면 출품 2주, 투표 2주, 결과 발표 익일 09:00 일정도 함께 재계산된다.
+     */
+    public void update(String title, String description, String themeImageUrl, LocalDateTime submitStartAt) {
+        if (title != null && !title.isBlank()) {
+            this.title = title;
+        }
+        if (description != null) {
+            this.description = description;
+        }
+        if (themeImageUrl != null) {
+            this.themeImageUrl = themeImageUrl;
+        }
+        if (submitStartAt != null) {
+            this.submitStartAt = submitStartAt;
+            this.submitEndAt = submitStartAt.plusWeeks(SUBMIT_WEEKS);
+            this.voteStartAt = this.submitEndAt;
+            this.voteEndAt = this.voteStartAt.plusWeeks(VOTE_WEEKS);
+            this.resultOpenAt = this.voteEndAt
+                    .atZone(ZONE)
+                    .toLocalDate()
+                    .plusDays(1)
+                    .atTime(RESULT_ANNOUNCE_TIME);
+        }
     }
 
     public ContestPhase getPhase(LocalDateTime now) {

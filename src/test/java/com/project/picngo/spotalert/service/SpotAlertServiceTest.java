@@ -5,7 +5,6 @@ import com.project.picngo.external.service.WeatherCacheService;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
-import com.project.picngo.spot.repository.SpotTagRepository;
 import com.project.picngo.spotalert.domain.SpotAlert;
 import com.project.picngo.spotalert.dto.SpotAlertActiveUpdateRequest;
 import com.project.picngo.spotalert.dto.SpotAlertSettingResponse;
@@ -38,8 +37,6 @@ class SpotAlertServiceTest {
     private UserRepository userRepository;
     @Mock
     private SpotRepository spotRepository;
-    @Mock
-    private SpotTagRepository spotTagRepository;
     @Mock
     private NotificationSettingRepository notificationSettingRepository;
     @Mock

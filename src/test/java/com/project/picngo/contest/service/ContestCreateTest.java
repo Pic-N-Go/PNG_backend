@@ -3,8 +3,11 @@ package com.project.picngo.contest.service;
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ContestErrorCode;
 import com.project.picngo.contest.domain.Contest;
+import com.project.picngo.contest.domain.ContestPhase;
+import com.project.picngo.contest.dto.AdminContestDetailResponse;
 import com.project.picngo.contest.dto.ContestCreateRequest;
 import com.project.picngo.contest.dto.ContestResponse;
+import com.project.picngo.contest.dto.ContestUpdateRequest;
 import com.project.picngo.contest.repository.ContestEntryRepository;
 import com.project.picngo.contest.repository.ContestRepository;
 import com.project.picngo.contest.repository.ContestSubscriptionRepository;
@@ -21,12 +24,14 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -51,6 +56,7 @@ class ContestCreateTest {
     @Mock private com.project.picngo.spot.repository.SpotRepository spotRepository;
     @Mock private com.project.picngo.contest.repository.ContestRankingSnapshotRepository rankingSnapshotRepository;
     @Mock private com.project.picngo.contest.repository.ContestReportRepository contestReportRepository;
+    @Mock private com.project.picngo.notification.service.NotificationService notificationService;
 
     @InjectMocks private ContestService contestService;
 
@@ -150,5 +156,95 @@ class ContestCreateTest {
 
         assertThatCode(() -> contestService.createContest(USER_ID, request(last.getResultOpenAt())))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("콘테스트 강제 마감 및 결과 발표 시 상태가 ENDED로 변하고 참가자/투표자/구독자에게 알림이 발송된다")
+    void forcePublishResultClosesContestAndNotifiesUsers() {
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+        Contest contest = Contest.create("가을 단풍전", "설명", "url", now.minusWeeks(1), 3, 3);
+        org.springframework.test.util.ReflectionTestUtils.setField(contest, "id", 1L);
+
+        given(contestRepository.findById(1L)).willReturn(Optional.of(contest));
+        given(contestRepository.save(any(Contest.class))).willAnswer(call -> call.getArgument(0));
+
+        given(subscriptionRepository.findDistinctUserIdsByContest(contest)).willReturn(List.of(10L, 20L));
+        given(contestEntryRepository.findDistinctUserIdsByContest(contest)).willReturn(List.of(20L, 30L));
+        given(contestVoteRepository.findDistinctUserIdsByContest(contest)).willReturn(List.of(30L, 40L));
+
+        AdminContestDetailResponse response = contestService.forcePublishResult(1L);
+
+        assertThat(response.phase()).isEqualTo(ContestPhase.ENDED);
+        assertThat(contest.isResultNotificationSent()).isTrue();
+
+        // 10L, 20L, 30L, 40L 총 4명(중복 제거된 합집합)에게 각각 1회씩 발송
+        org.mockito.Mockito.verify(notificationService, org.mockito.Mockito.times(4))
+                .sendPushNotification(any(), org.mockito.ArgumentMatchers.eq("COMMUNITY_CONTEST_RESULT"), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("출품 전(UPCOMING) 상태인 콘테스트의 시작 날짜를 변경하면 전체 일정이 자동 재계산된다")
+    void updateContestScheduleInUpcomingPhase() {
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+        LocalDateTime originalStart = now.plusWeeks(1);
+        LocalDateTime newStart = now.plusWeeks(2);
+
+        Contest contest = Contest.create("가을 단풍전", "설명", "url", originalStart, 3, 3);
+        org.springframework.test.util.ReflectionTestUtils.setField(contest, "id", 1L);
+
+        given(contestRepository.findById(1L)).willReturn(Optional.of(contest));
+        given(contestRepository.save(any(Contest.class))).willAnswer(call -> call.getArgument(0));
+        given(contestRepository.existsOverlappingContest(eq(1L), eq(newStart), any())).willReturn(false);
+
+        ContestUpdateRequest request = new ContestUpdateRequest(
+                "수정된 단풍전", "새 설명", "new-url.jpg", newStart
+        );
+
+        AdminContestDetailResponse response = contestService.updateContest(1L, request);
+
+        assertThat(response.title()).isEqualTo("수정된 단풍전");
+        assertThat(response.submitStartAt()).isEqualTo(newStart);
+        assertThat(response.submitEndAt()).isEqualTo(newStart.plusWeeks(2));
+        assertThat(response.voteEndAt()).isEqualTo(newStart.plusWeeks(4));
+    }
+
+    @Test
+    @DisplayName("출품이 이미 시작된(SUBMITTING) 콘테스트의 시작 날짜를 변경하려 하면 예외가 발생한다")
+    void updateContestFailsWhenAlreadyStarted() {
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+        LocalDateTime originalStart = now.minusDays(3); // 이미 시작됨 (SUBMITTING)
+
+        Contest contest = Contest.create("가을 단풍전", "설명", "url", originalStart, 3, 3);
+        org.springframework.test.util.ReflectionTestUtils.setField(contest, "id", 1L);
+
+        given(contestRepository.findById(1L)).willReturn(Optional.of(contest));
+
+        ContestUpdateRequest request = new ContestUpdateRequest(
+                null, null, null, now.plusWeeks(1)
+        );
+
+        assertThatThrownBy(() -> contestService.updateContest(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ContestErrorCode.CANNOT_MODIFY_STARTED_CONTEST);
+    }
+
+    @Test
+    @DisplayName("새로운 시작일을 과거로 변경하려 하면 예외가 발생한다")
+    void updateContestFailsWhenNewStartInPast() {
+        LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+        LocalDateTime originalStart = now.plusWeeks(1);
+
+        Contest contest = Contest.create("가을 단풍전", "설명", "url", originalStart, 3, 3);
+        org.springframework.test.util.ReflectionTestUtils.setField(contest, "id", 1L);
+
+        given(contestRepository.findById(1L)).willReturn(Optional.of(contest));
+
+        ContestUpdateRequest request = new ContestUpdateRequest(
+                null, null, null, now.minusDays(1)
+        );
+
+        assertThatThrownBy(() -> contestService.updateContest(1L, request))
+                .isInstanceOf(CustomException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ContestErrorCode.CONTEST_START_IN_PAST);
     }
 }
