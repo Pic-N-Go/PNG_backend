@@ -129,11 +129,10 @@ public class AuthService {
 
         refreshTokenService.saveRefreshToken(refreshToken, user.getId());
 		log.info("\n==================================================" +
-				"\n[🔑 로그인 성공 JWT 토큰 수신]" +
-				"\n- UserId: {} ({})" +
-				"\n- Access Token: Bearer {}" +
+				"\n[🔑 로그인 성공]" +
+				"\n- UserId: {}" +
 				"\n==================================================",
-				user.getId(), user.getEmail(), accessToken);
+				user.getId());
 		return TokenResponse.bearer(
 			accessToken,
 			jwtTokenProvider.getAccessTokenExpirationSeconds(),
