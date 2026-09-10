@@ -29,9 +29,6 @@ class CourseCuratorAgentTest {
     @Mock
     private OpenAiChatClient openAiChatClient;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
-
     @InjectMocks
     private CourseCuratorAgent curatorAgent;
 

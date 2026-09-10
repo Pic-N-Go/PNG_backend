@@ -18,6 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 /**
  * [지휘자: 리더 오케스트레이터 에이전트]
  * 사용자의 복합적인 자연어 출사 요청을 분석하고, 전문 서브 에이전트들을 조율하여
@@ -29,11 +32,14 @@ import java.util.Optional;
 public class LeaderAgent {
 
     private final OpenAiChatClient openAiChatClient;
-    private final ObjectMapper objectMapper;
     private final SpotSearchAgent spotSearchAgent;
     private final RouteOptimizerAgent routeOptimizerAgent;
     private final WeatherAgent weatherAgent;
     private final CourseCuratorAgent courseCuratorAgent;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public CuratedCourseDraft planCourse(String userPrompt, String requestedRegion, LocalDate targetDate) {
         log.info("══════════════════════════════════════════════════════");

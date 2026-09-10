@@ -32,9 +32,6 @@ class LeaderAgentTest {
     @Mock
     private OpenAiChatClient openAiChatClient;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
-
     @Mock
     private SpotSearchAgent spotSearchAgent;
 

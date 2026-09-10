@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 /**
  * [워커 4: 코스 큐레이터 전문 에이전트]
  * 날씨, 골든아워, 정렬된 스팟 데이터를 바탕으로 시간대별 촬영 팁과 감성 코스 가이드를 조립합니다.
@@ -29,7 +32,9 @@ import java.util.Optional;
 public class CourseCuratorAgent {
 
     private final OpenAiChatClient openAiChatClient;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public CuratedCourseDraft curateCourse(
             PlanGoal goal,

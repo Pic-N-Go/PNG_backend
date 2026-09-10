@@ -22,6 +22,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,7 +36,10 @@ public class AiCoursePlanService {
     private final NotificationService notificationService;
     private final AiCoursePlanProducer aiCoursePlanProducer;
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private static final String TASK_KEY_PREFIX = "ai:course:task:";
     private static final Duration TASK_TTL = Duration.ofHours(2);

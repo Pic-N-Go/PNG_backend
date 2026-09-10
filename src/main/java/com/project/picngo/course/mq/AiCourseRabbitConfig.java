@@ -29,4 +29,12 @@ public class AiCourseRabbitConfig {
     public Binding aiCoursePlanBinding(Queue aiCoursePlanQueue, DirectExchange aiCoursePlanExchange) {
         return BindingBuilder.bind(aiCoursePlanQueue).to(aiCoursePlanExchange).with(ROUTING_KEY);
     }
+
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+    public com.fasterxml.jackson.databind.ObjectMapper objectMapper() {
+        return new com.fasterxml.jackson.databind.ObjectMapper()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    }
 }
