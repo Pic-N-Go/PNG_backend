@@ -20,7 +20,7 @@ public record PlanGoal(
     }
 
     public static PlanGoal fallback(String prompt, String region, LocalDate targetDate) {
-        String resolvedRegion = (region != null && !region.isBlank()) ? region : "서울";
+        String resolvedRegion = extractRegionFromPrompt(prompt, region);
         LocalDate resolvedDate = (targetDate != null) ? targetDate : LocalDate.now().plusDays(1);
         int resolvedDuration = parseDurationDays(prompt);
         return new PlanGoal(
@@ -31,6 +31,21 @@ public record PlanGoal(
                 "감성 출사 추천 코스",
                 List.of("노을", "야경", "산책")
         );
+    }
+
+    public static String extractRegionFromPrompt(String prompt, String defaultRegion) {
+        if (defaultRegion != null && !defaultRegion.isBlank() && !defaultRegion.equals("미지정") && !defaultRegion.equals("전국")) {
+            return defaultRegion;
+        }
+        if (prompt == null || prompt.isBlank()) {
+            return "서울";
+        }
+        for (String r : List.of("제주", "부산", "강원", "강릉", "속초", "경주", "여수", "순천", "전주", "춘천", "대구", "인천", "광주", "대전", "울산", "수원", "포항", "통영", "거제", "남해")) {
+            if (prompt.contains(r)) {
+                return r;
+            }
+        }
+        return "서울";
     }
 
     public static int parseDurationDays(String prompt) {

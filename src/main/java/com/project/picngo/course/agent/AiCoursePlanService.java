@@ -80,6 +80,10 @@ public class AiCoursePlanService {
             // 1. LeaderAgent 오케스트레이션 실행 (의도 분석 -> 스팟 탐색 -> 동선 최적화 -> 날씨/골든아워 -> 큐레이션)
             CuratedCourseDraft draft = leaderAgent.planCourse(message.prompt(), message.region(), message.targetDate());
 
+            if (draft.spots() == null || draft.spots().isEmpty()) {
+                throw new IllegalStateException("추천 가능한 스팟이 없어 코스를 기획할 수 없습니다.");
+            }
+
             // 2. Course Entity 생성 및 DB 저장 (durationDays 반영)
             int durationDays = Math.max(1, draft.durationDays());
             LocalDate startDate = message.targetDate();
@@ -103,7 +107,8 @@ public class AiCoursePlanService {
                         .memo(item.photographyTip())
                         .travelTimeMinutes(item.estimatedTravelMinutes())
                         .build();
-                courseSpotRepository.save(spot);
+                CourseSpot savedSpot = courseSpotRepository.save(spot);
+                savedCourse.getCourseSpots().add(savedSpot);
             }
 
             log.info("💾 [AI Worker] 코스 DB 저장 완료: courseId={}, title='{}', 스팟 {}개",

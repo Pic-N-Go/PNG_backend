@@ -126,7 +126,14 @@ public class LeaderAgent {
 
             if (jsonOpt.isPresent()) {
                 JsonNode root = objectMapper.readTree(jsonOpt.get());
-                String extractedRegion = root.path("region").asText(region != null ? region : "서울");
+                String rawRegion = root.path("region").asText("");
+                String extractedRegion;
+                if (rawRegion.isBlank() || rawRegion.equals("미정") || rawRegion.equals("전국") || rawRegion.equals("국내")) {
+                    extractedRegion = PlanGoal.extractRegionFromPrompt(prompt, region);
+                } else {
+                    extractedRegion = rawRegion;
+                }
+                extractedRegion = SpotSearchAgent.normalizeRegion(extractedRegion);
                 String theme = root.path("theme").asText("감성 출사 코스");
 
                 int durationDays = root.path("durationDays").asInt(0);
