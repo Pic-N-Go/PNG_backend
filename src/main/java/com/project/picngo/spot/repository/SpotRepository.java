@@ -88,8 +88,15 @@ and s.status = :status and s.isActive = true
             Pageable pageable
     );
 
+    @Query("""
+select s from Spot s
+where s.latitude between 33.0 and 38.9
+and s.longitude between 124.0 and 132.0
+and s.status = :status and s.isActive = true
+order by (s.reviewCount + s.bookmarkCount) desc
+""")
     List<Spot> findListByStatusAndIsActiveTrue(
-            SpotStatus status,
+            @Param("status") SpotStatus status,
             Pageable pageable
     );
 
@@ -107,28 +114,42 @@ and s.status = :status and s.isActive = true
     @Query("""
 select s from Spot s
 where exists (select c from s.categories c where c in :categories)
-and s.address like concat('%', :region, '%')
+and (s.address like concat('%', :region, '%') or (:altRegion is not null and s.address like concat('%', :altRegion, '%')))
+and s.latitude between 33.0 and 38.9
+and s.longitude between 124.0 and 132.0
 and s.status = :status and s.isActive = true
 order by (s.reviewCount + s.bookmarkCount) desc
 """)
     List<Spot> findByRegionAndCategories(
             @Param("region") String region,
+            @Param("altRegion") String altRegion,
             @Param("categories") Collection<SpotCategory> categories,
             @Param("status") SpotStatus status,
             Pageable pageable
     );
 
+    default List<Spot> findByRegionAndCategories(String region, Collection<SpotCategory> categories, SpotStatus status, Pageable pageable) {
+        return findByRegionAndCategories(region, null, categories, status, pageable);
+    }
+
     @Query("""
 select s from Spot s
-where s.address like concat('%', :region, '%')
+where (s.address like concat('%', :region, '%') or (:altRegion is not null and s.address like concat('%', :altRegion, '%')))
+and s.latitude between 33.0 and 38.9
+and s.longitude between 124.0 and 132.0
 and s.status = :status and s.isActive = true
 order by (s.reviewCount + s.bookmarkCount) desc
 """)
     List<Spot> findByRegion(
             @Param("region") String region,
+            @Param("altRegion") String altRegion,
             @Param("status") SpotStatus status,
             Pageable pageable
     );
+
+    default List<Spot> findByRegion(String region, SpotStatus status, Pageable pageable) {
+        return findByRegion(region, null, status, pageable);
+    }
 
     // 키워드로 스팟 이름, 주소 검색 (카테고리 필터 없음)
     //

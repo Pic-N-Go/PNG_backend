@@ -102,6 +102,11 @@ public class LeaderAgent {
                     당신은 출사 여행 플래너의 리더 에이전트입니다.
                     사용자의 요청에서 '지역(region)', '출사 테마(theme)', '관련 카테고리(categories)', '여행 일수(durationDays)'를 추출하여 JSON으로 응답하세요.
                     
+                    region 추출 규칙:
+                    - 대한민국 광역/기초 행정구역명(도/시/군/구) 위주로 추출하세요. (예: 충남, 충청남도, 태안, 보령, 부산, 제주, 강릉, 경주 등)
+                    - '서해', '동해', '남해', '바다' 같은 방위/자연지물은 region에 포함하지 말고, 순수 행정구역명만 추출하세요. (예: '충남 서해' -> '충남')
+                    - 지역 언급이 없으면 '서울'로 설정하세요.
+                    
                     durationDays 규칙:
                     - '1박 2일' -> 2
                     - '2박 3일' -> 3
@@ -111,13 +116,15 @@ public class LeaderAgent {
                     
                     가능한 categories 목록 (최대 3개 선택):
                     ["BEACH", "PARK", "MOUNTAIN", "HANOK", "FOREST", "HERITAGE", "CAFE", "CITY", "NIGHT_VIEW", "FESTIVAL", "FLOWER", "SUNRISE_SUNSET", "MILKY_WAY"]
+                    - 바다/해변/서해/동해 언급 시: BEACH, SUNRISE_SUNSET 추천
+                    - 카페/커피 언급 시: CAFE 추천
                     
                     응답 형식 예시:
                     {
-                      "region": "부산",
-                      "theme": "노을과 야경 출사",
+                      "region": "충남",
+                      "theme": "서해 바다와 감성 카페 출사",
                       "durationDays": 2,
-                      "categories": ["SUNRISE_SUNSET", "NIGHT_VIEW", "BEACH"]
+                      "categories": ["BEACH", "CAFE", "SUNRISE_SUNSET"]
                     }
                     """;
 
