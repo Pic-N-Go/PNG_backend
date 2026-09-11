@@ -108,4 +108,66 @@ class LeaderAgentTest {
         verify(weatherAgent).analyzeWeather(35.047, 128.966, date);
         verify(courseCuratorAgent).curateCourse(any(), anyList(), anyList(), eq(weather));
     }
+
+    @Test
+    @DisplayName("1박2일 요청 시 durationDays=2를 추출하고 일수에 비례하여 스팟을 요청한다")
+    void planCourse_multiDayRequest_extractsDurationDaysAndScalesSpots() {
+        // given
+        String prompt = "부산 1박 2일 감성 바다 출사 코스 추천해줘";
+        String region = "부산";
+        LocalDate date = LocalDate.of(2026, 9, 12);
+
+        String jsonIntent = """
+                {
+                  "region": "부산",
+                  "theme": "1박2일 바다 감성 출사",
+                  "durationDays": 2,
+                  "categories": ["BEACH", "SUNRISE_SUNSET"]
+                }
+                """;
+        given(openAiChatClient.isConfigured()).willReturn(true);
+        given(openAiChatClient.chatJson(anyString(), anyString(), anyInt()))
+                .willReturn(Optional.of(jsonIntent));
+
+        SpotCandidate s1 = new SpotCandidate(1L, "해운대", "부산", 35.1, 129.1, SpotCategory.BEACH, "");
+        SpotCandidate s2 = new SpotCandidate(2L, "광안리", "부산", 35.15, 129.11, SpotCategory.BEACH, "");
+        List<SpotCandidate> candidates = List.of(s1, s2);
+        given(spotSearchAgent.searchCandidates(any(PlanGoal.class))).willReturn(candidates);
+
+        OptimizedRoute optimizedRoute = new OptimizedRoute(List.of(s1, s2), List.of(0, 20));
+        // durationDays(2) * spotsPerDay(3) = 6개 스팟 요청
+        given(routeOptimizerAgent.optimizeRoute(eq(candidates), eq(6))).willReturn(optimizedRoute);
+
+        WeatherBrief weather = new WeatherBrief("맑음", "18:00 ~ 19:00", "18:30");
+        given(weatherAgent.analyzeWeather(anyDouble(), anyDouble(), eq(date))).willReturn(weather);
+
+        CuratedSpotItem item1 = new CuratedSpotItem(1L, "해운대", 1, 1, "DAY 1 팁", 0);
+        CuratedSpotItem item2 = new CuratedSpotItem(2L, "광안리", 2, 1, "DAY 2 팁", 0);
+        CuratedCourseDraft draft = new CuratedCourseDraft("부산 1박2일 코스", "바다 감성", "개요", 2, List.of(item1, item2));
+        given(courseCuratorAgent.curateCourse(any(), eq(List.of(s1, s2)), eq(List.of(0, 20)), eq(weather)))
+                .willReturn(draft);
+
+        // when
+        CuratedCourseDraft result = leaderAgent.planCourse(prompt, region, date);
+
+        // then
+        assertThat(result.durationDays()).isEqualTo(2);
+        assertThat(result.spots().get(0).dayNumber()).isEqualTo(1);
+        assertThat(result.spots().get(1).dayNumber()).isEqualTo(2);
+        verify(routeOptimizerAgent).optimizeRoute(candidates, 6);
+    }
+
+    @Test
+    @DisplayName("자연어 프롬프트에서 여행 일수를 정규식과 규칙으로 정확히 파싱한다")
+    void parseDurationDays_test() {
+        assertThat(PlanGoal.parseDurationDays("1박 2일 부산 여행")).isEqualTo(2);
+        assertThat(PlanGoal.parseDurationDays("2박3일 제주도 출사 코스")).isEqualTo(3);
+        assertThat(PlanGoal.parseDurationDays("3박 4일 강원도")).isEqualTo(4);
+        assertThat(PlanGoal.parseDurationDays("당일치기 서울 출사")).isEqualTo(1);
+        assertThat(PlanGoal.parseDurationDays("이틀 동안 경주 코스")).isEqualTo(2);
+        assertThat(PlanGoal.parseDurationDays("3일 코스 추천해줘")).isEqualTo(3);
+        assertThat(PlanGoal.parseDurationDays("사흘간 부산 여행")).isEqualTo(3);
+        assertThat(PlanGoal.parseDurationDays("")).isEqualTo(1);
+        assertThat(PlanGoal.parseDurationDays(null)).isEqualTo(1);
+    }
 }

@@ -80,21 +80,25 @@ public class AiCoursePlanService {
             // 1. LeaderAgent 오케스트레이션 실행 (의도 분석 -> 스팟 탐색 -> 동선 최적화 -> 날씨/골든아워 -> 큐레이션)
             CuratedCourseDraft draft = leaderAgent.planCourse(message.prompt(), message.region(), message.targetDate());
 
-            // 2. Course Entity 생성 및 DB 저장
+            // 2. Course Entity 생성 및 DB 저장 (durationDays 반영)
+            int durationDays = Math.max(1, draft.durationDays());
+            LocalDate startDate = message.targetDate();
+            LocalDate endDate = startDate.plusDays(durationDays - 1);
+
             Course course = Course.builder()
                     .userId(userId)
                     .title(draft.title())
-                    .startDate(message.targetDate())
-                    .endDate(message.targetDate())
+                    .startDate(startDate)
+                    .endDate(endDate)
                     .build();
             Course savedCourse = courseRepository.save(course);
 
-            // 3. CourseSpot Entity 생성 및 저장
+            // 3. CourseSpot Entity 생성 및 저장 (일차별 dayNumber 및 sequenceOrder 반영)
             for (CuratedSpotItem item : draft.spots()) {
                 CourseSpot spot = CourseSpot.builder()
                         .course(savedCourse)
                         .spotId(item.spotId())
-                        .dayNumber(1)
+                        .dayNumber(item.dayNumber())
                         .sequenceOrder(item.sequenceOrder())
                         .memo(item.photographyTip())
                         .travelTimeMinutes(item.estimatedTravelMinutes())

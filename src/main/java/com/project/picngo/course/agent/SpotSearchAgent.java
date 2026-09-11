@@ -25,15 +25,17 @@ public class SpotSearchAgent {
     private final SpotRepository spotRepository;
 
     public List<SpotCandidate> searchCandidates(PlanGoal goal) {
-        log.info("SpotSearchAgent 후보 검색 시작: region={}, categories={}", goal.region(), goal.categories());
+        log.info("SpotSearchAgent 후보 검색 시작: region={}, durationDays={}, categories={}",
+                goal.region(), goal.durationDays(), goal.categories());
 
+        int limit = Math.max(15, goal.durationDays() * 6);
         List<Spot> spots = List.of();
         if (goal.categories() != null && !goal.categories().isEmpty()) {
             spots = spotRepository.findByRegionAndCategories(
                     goal.region(),
                     goal.categories(),
                     SpotStatus.APPROVED,
-                    PageRequest.of(0, 15)
+                    PageRequest.of(0, limit)
             );
         }
 
@@ -42,7 +44,7 @@ public class SpotSearchAgent {
             spots = spotRepository.findByRegion(
                     goal.region(),
                     SpotStatus.APPROVED,
-                    PageRequest.of(0, 15)
+                    PageRequest.of(0, limit)
             );
         }
 
