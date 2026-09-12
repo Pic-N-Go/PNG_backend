@@ -22,6 +22,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,7 +36,10 @@ public class AiCoursePlanService {
     private final NotificationService notificationService;
     private final AiCoursePlanProducer aiCoursePlanProducer;
     private final StringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private static final String TASK_KEY_PREFIX = "ai:course:task:";
     private static final Duration TASK_TTL = Duration.ofHours(2);
@@ -74,26 +80,35 @@ public class AiCoursePlanService {
             // 1. LeaderAgent 오케스트레이션 실행 (의도 분석 -> 스팟 탐색 -> 동선 최적화 -> 날씨/골든아워 -> 큐레이션)
             CuratedCourseDraft draft = leaderAgent.planCourse(message.prompt(), message.region(), message.targetDate());
 
-            // 2. Course Entity 생성 및 DB 저장
+            if (draft.spots() == null || draft.spots().isEmpty()) {
+                throw new IllegalStateException("추천 가능한 스팟이 없어 코스를 기획할 수 없습니다.");
+            }
+
+            // 2. Course Entity 생성 및 DB 저장 (durationDays 반영)
+            int durationDays = Math.max(1, draft.durationDays());
+            LocalDate startDate = message.targetDate();
+            LocalDate endDate = startDate.plusDays(durationDays - 1);
+
             Course course = Course.builder()
                     .userId(userId)
                     .title(draft.title())
-                    .startDate(message.targetDate())
-                    .endDate(message.targetDate())
+                    .startDate(startDate)
+                    .endDate(endDate)
                     .build();
             Course savedCourse = courseRepository.save(course);
 
-            // 3. CourseSpot Entity 생성 및 저장
+            // 3. CourseSpot Entity 생성 및 저장 (일차별 dayNumber 및 sequenceOrder 반영)
             for (CuratedSpotItem item : draft.spots()) {
                 CourseSpot spot = CourseSpot.builder()
                         .course(savedCourse)
                         .spotId(item.spotId())
-                        .dayNumber(1)
+                        .dayNumber(item.dayNumber())
                         .sequenceOrder(item.sequenceOrder())
                         .memo(item.photographyTip())
                         .travelTimeMinutes(item.estimatedTravelMinutes())
                         .build();
-                courseSpotRepository.save(spot);
+                CourseSpot savedSpot = courseSpotRepository.save(spot);
+                savedCourse.getCourseSpots().add(savedSpot);
             }
 
             log.info("💾 [AI Worker] 코스 DB 저장 완료: courseId={}, title='{}', 스팟 {}개",

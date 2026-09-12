@@ -29,9 +29,6 @@ class CourseCuratorAgentTest {
     @Mock
     private OpenAiChatClient openAiChatClient;
 
-    @Spy
-    private ObjectMapper objectMapper = new ObjectMapper();
-
     @InjectMocks
     private CourseCuratorAgent curatorAgent;
 
@@ -88,5 +85,49 @@ class CourseCuratorAgentTest {
         assertThat(draft.title()).isEqualTo("서울 한강 조망 야경 출사 코스");
         assertThat(draft.spots()).hasSize(1);
         assertThat(draft.spots().get(0).photographyTip()).contains("삼각대를 거치하고");
+    }
+
+    @Test
+    @DisplayName("2일 코스 큐레이션 시 일자별(DAY 1, DAY 2)로 dayNumber와 sequenceOrder가 올바르게 분배된다")
+    void curateCourse_multiDay_assignsDayNumberAndResetsSequenceOrder() {
+        // given: 2일 코스에 4개 스팟 제공
+        PlanGoal goal = new PlanGoal("제주", LocalDate.now(), 2, List.of(SpotCategory.BEACH), "제주 해변 출사", List.of());
+        SpotCandidate s1 = new SpotCandidate(1L, "함덕해변", "제주", 33.5, 126.6, SpotCategory.BEACH, "");
+        SpotCandidate s2 = new SpotCandidate(2L, "김녕해수욕장", "제주", 33.55, 126.7, SpotCategory.BEACH, "");
+        SpotCandidate s3 = new SpotCandidate(3L, "협재해변", "제주", 33.39, 126.2, SpotCategory.BEACH, "");
+        SpotCandidate s4 = new SpotCandidate(4L, "금능해변", "제주", 33.38, 126.23, SpotCategory.BEACH, "");
+
+        WeatherBrief weather = new WeatherBrief("맑음", "18:00 ~ 19:00", "18:30");
+        given(openAiChatClient.isConfigured()).willReturn(false); // 룰베이스 폴백 검증
+
+        // when
+        CuratedCourseDraft draft = curatorAgent.curateCourse(
+                goal,
+                List.of(s1, s2, s3, s4),
+                List.of(0, 20, 45, 10),
+                weather
+        );
+
+        // then
+        assertThat(draft.durationDays()).isEqualTo(2);
+        assertThat(draft.spots()).hasSize(4);
+
+        // DAY 1 검증
+        assertThat(draft.spots().get(0).dayNumber()).isEqualTo(1);
+        assertThat(draft.spots().get(0).sequenceOrder()).isEqualTo(1);
+        assertThat(draft.spots().get(0).estimatedTravelMinutes()).isEqualTo(0);
+
+        assertThat(draft.spots().get(1).dayNumber()).isEqualTo(1);
+        assertThat(draft.spots().get(1).sequenceOrder()).isEqualTo(2);
+        assertThat(draft.spots().get(1).estimatedTravelMinutes()).isEqualTo(20);
+
+        // DAY 2 검증 (dayNumber 2, sequenceOrder 1부터 리셋, 새 날 시작 이동시간 0분)
+        assertThat(draft.spots().get(2).dayNumber()).isEqualTo(2);
+        assertThat(draft.spots().get(2).sequenceOrder()).isEqualTo(1);
+        assertThat(draft.spots().get(2).estimatedTravelMinutes()).isEqualTo(0);
+
+        assertThat(draft.spots().get(3).dayNumber()).isEqualTo(2);
+        assertThat(draft.spots().get(3).sequenceOrder()).isEqualTo(2);
+        assertThat(draft.spots().get(3).estimatedTravelMinutes()).isEqualTo(10);
     }
 }

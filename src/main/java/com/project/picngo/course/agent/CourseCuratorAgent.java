@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 /**
  * [워커 4: 코스 큐레이터 전문 에이전트]
  * 날씨, 골든아워, 정렬된 스팟 데이터를 바탕으로 시간대별 촬영 팁과 감성 코스 가이드를 조립합니다.
@@ -29,7 +32,9 @@ import java.util.Optional;
 public class CourseCuratorAgent {
 
     private final OpenAiChatClient openAiChatClient;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public CuratedCourseDraft curateCourse(
             PlanGoal goal,
@@ -37,8 +42,9 @@ public class CourseCuratorAgent {
             List<Integer> travelMinutesList,
             WeatherBrief weather
     ) {
+        int duration = Math.max(1, goal.durationDays());
         if (orderedSpots == null || orderedSpots.isEmpty()) {
-            return new CuratedCourseDraft("추천 출사 코스", goal.theme(), "추천 가능한 스팟이 부족합니다.", List.of());
+            return new CuratedCourseDraft("추천 출사 코스", goal.theme(), "추천 가능한 스팟이 부족합니다.", duration, List.of());
         }
 
         // LLM이 설정되어 있으면 촬영 팁 및 타이틀 생성 시도
@@ -79,19 +85,33 @@ public class CourseCuratorAgent {
                 }
                 """;
 
+        int duration = Math.max(1, goal.durationDays());
+        int totalSpots = spots.size();
+
         StringBuilder userContext = new StringBuilder();
         userContext.append("지역: ").append(goal.region()).append("\n");
         userContext.append("테마: ").append(goal.theme()).append("\n");
+        userContext.append(String.format("여행 일정: %d일 코스 (총 %d곳)\n", duration, totalSpots));
         userContext.append("날씨: ").append(weather.weatherSummary())
                 .append(", 일몰: ").append(weather.sunsetTime())
                 .append(", 골든아워: ").append(weather.goldenHourTime()).append("\n\n");
-        userContext.append("방문 순서별 스팟 목록:\n");
+        userContext.append("일정별 스팟 목록:\n");
 
-        for (int i = 0; i < spots.size(); i++) {
+        int curDay = 1;
+        int orderInCurDay = 1;
+        for (int i = 0; i < totalSpots; i++) {
             SpotCandidate s = spots.get(i);
+            int day = (totalSpots > 0) ? Math.min(duration, (i * duration / totalSpots) + 1) : 1;
+            if (day != curDay) {
+                curDay = day;
+                orderInCurDay = 1;
+            }
             int travelMin = (i < travelTimes.size()) ? travelTimes.get(i) : 0;
-            userContext.append(String.format("%d. [ID: %d] %s (%s) - 이전 장소로부터 이동: %d분 소요\n",
-                    i + 1, s.id(), s.name(), s.address(), travelMin));
+            if (orderInCurDay == 1) {
+                travelMin = 0;
+            }
+            userContext.append(String.format("[DAY %d - %d번째] ID: %d, %s (%s) - 이동: %d분 소요\n",
+                    day, orderInCurDay++, s.id(), s.name(), s.address(), travelMin));
         }
 
         Optional<String> jsonOpt = openAiChatClient.chatJson(systemPrompt, userContext.toString(), 1000);
@@ -115,22 +135,33 @@ public class CourseCuratorAgent {
 
         // 출력 가드레일: 입력으로 주어진 스팟 순서 그대로 조립하고, 매핑되지 않은 스팟은 기본 팁 제공
         List<CuratedSpotItem> curatedSpots = new ArrayList<>();
+        int currentDay = 1;
+        int orderInDay = 1;
         for (int i = 0; i < spots.size(); i++) {
             SpotCandidate spot = spots.get(i);
+            int day = (totalSpots > 0) ? Math.min(duration, (i * duration / totalSpots) + 1) : 1;
+            if (day != currentDay) {
+                currentDay = day;
+                orderInDay = 1;
+            }
             int travelMin = (i < travelTimes.size()) ? travelTimes.get(i) : 0;
+            if (orderInDay == 1) {
+                travelMin = 0;
+            }
             String tip = tipsMap.getOrDefault(spot.id(),
                     String.format("%s의 매력적인 풍경과 색감을 담아보세요. (골든아워 %s 활용 추천)", spot.name(), weather.goldenHourTime()));
 
             curatedSpots.add(new CuratedSpotItem(
                     spot.id(),
                     spot.name(),
-                    i + 1,
+                    day,
+                    orderInDay++,
                     tip,
                     travelMin
             ));
         }
 
-        return Optional.of(new CuratedCourseDraft(title, goal.theme(), overview, curatedSpots));
+        return Optional.of(new CuratedCourseDraft(title, goal.theme(), overview, duration, curatedSpots));
     }
 
     private CuratedCourseDraft fallbackCurate(
@@ -139,27 +170,42 @@ public class CourseCuratorAgent {
             List<Integer> travelTimes,
             WeatherBrief weather
     ) {
-        String title = String.format("%s %s 출사 코스", goal.region(), goal.theme());
-        String overview = String.format("%s 날씨에 어울리는 %s 추천 코스입니다. (골든아워: %s)",
-                weather.weatherSummary(), goal.region(), weather.goldenHourTime());
+        int duration = Math.max(1, goal.durationDays());
+        int totalSpots = spots.size();
+        String title = String.format("%s %s (%d일 코스)", goal.region(), goal.theme(), duration);
+        String overview = String.format("%s 날씨에 어울리는 %s %d일 추천 코스입니다. (골든아워: %s)",
+                weather.weatherSummary(), goal.region(), duration, weather.goldenHourTime());
 
         List<CuratedSpotItem> curatedSpots = new ArrayList<>();
+        int currentDay = 1;
+        int orderInDay = 1;
         for (int i = 0; i < spots.size(); i++) {
             SpotCandidate spot = spots.get(i);
+            int day = (totalSpots > 0) ? Math.min(duration, (i * duration / totalSpots) + 1) : 1;
+            if (day != currentDay) {
+                currentDay = day;
+                orderInDay = 1;
+            }
             int travelMin = (i < travelTimes.size()) ? travelTimes.get(i) : 0;
-            String tip = (i == spots.size() - 1)
+            if (orderInDay == 1) {
+                travelMin = 0;
+            }
+            String tip = (orderInDay == 1 && i > 0)
+                    ? String.format("%d일차를 여는 상쾌한 분위기의 %s 풍경을 담아보세요.", day, spot.name())
+                    : (i == spots.size() - 1)
                     ? String.format("일몰(%s) 및 야경 시간대에 맞춰 아름다운 황혼을 담아보세요.", weather.sunsetTime())
                     : String.format("%s의 시원한 풍경을 다양한 화각으로 담아보세요.", spot.name());
 
             curatedSpots.add(new CuratedSpotItem(
                     spot.id(),
                     spot.name(),
-                    i + 1,
+                    day,
+                    orderInDay++,
                     tip,
                     travelMin
             ));
         }
 
-        return new CuratedCourseDraft(title, goal.theme(), overview, curatedSpots);
+        return new CuratedCourseDraft(title, goal.theme(), overview, duration, curatedSpots);
     }
 }

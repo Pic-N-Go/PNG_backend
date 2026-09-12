@@ -18,6 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 /**
  * [지휘자: 리더 오케스트레이터 에이전트]
  * 사용자의 복합적인 자연어 출사 요청을 분석하고, 전문 서브 에이전트들을 조율하여
@@ -29,11 +32,14 @@ import java.util.Optional;
 public class LeaderAgent {
 
     private final OpenAiChatClient openAiChatClient;
-    private final ObjectMapper objectMapper;
     private final SpotSearchAgent spotSearchAgent;
     private final RouteOptimizerAgent routeOptimizerAgent;
     private final WeatherAgent weatherAgent;
     private final CourseCuratorAgent courseCuratorAgent;
+
+    private final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public CuratedCourseDraft planCourse(String userPrompt, String requestedRegion, LocalDate targetDate) {
         log.info("══════════════════════════════════════════════════════");
@@ -44,8 +50,9 @@ public class LeaderAgent {
 
         // Step 1: 자연어 의도 분석 및 목표(PlanGoal) 구조화
         PlanGoal goal = analyzeIntent(userPrompt, requestedRegion, targetDate);
-        log.info("📌 [Step 1 완료] 구조화된 목표: region={}, theme={}, categories={}",
-                goal.region(), goal.theme(), goal.categories());
+        int durationDays = Math.max(1, goal.durationDays());
+        log.info("📌 [Step 1 완료] 구조화된 목표: region={}, theme={}, durationDays={}, categories={}",
+                goal.region(), goal.theme(), durationDays, goal.categories());
 
         // Step 2: 실존 스팟 후보지 탐색 (환각 방지)
         List<SpotCandidate> candidates = spotSearchAgent.searchCandidates(goal);
@@ -53,12 +60,15 @@ public class LeaderAgent {
 
         if (candidates.isEmpty()) {
             log.warn("해당 지역에 등록된 스팟이 없어 기획을 중단합니다: region={}", goal.region());
-            return new CuratedCourseDraft(goal.region() + " 출사 코스", goal.theme(), "해당 지역에 추천할 수 있는 스팟이 없습니다.", List.of());
+            return new CuratedCourseDraft(goal.region() + " 출사 코스", goal.theme(), "해당 지역에 추천할 수 있는 스팟이 없습니다.", durationDays, List.of());
         }
 
         // Step 3: 동선 최적화 (Greedy Nearest Neighbor 알고리즘)
-        OptimizedRoute route = routeOptimizerAgent.optimizeRoute(candidates, 4);
-        log.info("📌 [Step 3 완료] 동선 최적화 완료: 선정 스팟 {}곳", route.orderedSpots().size());
+        // 하루당 3곳 기준 (당일치기는 4곳 추천)
+        int spotsPerDay = 3;
+        int targetCount = (durationDays == 1) ? 4 : (durationDays * spotsPerDay);
+        OptimizedRoute route = routeOptimizerAgent.optimizeRoute(candidates, targetCount);
+        log.info("📌 [Step 3 완료] 동선 최적화 완료: 선정 스팟 {}곳 (요청 일수: {}일)", route.orderedSpots().size(), durationDays);
 
         // Step 4: 기상 상태 및 골든아워 분석
         SpotCandidate firstSpot = route.orderedSpots().get(0);
@@ -90,16 +100,31 @@ public class LeaderAgent {
         try {
             String systemPrompt = """
                     당신은 출사 여행 플래너의 리더 에이전트입니다.
-                    사용자의 요청에서 '지역(region)', '출사 테마(theme)', '관련 카테고리(categories)'를 추출하여 JSON으로 응답하세요.
+                    사용자의 요청에서 '지역(region)', '출사 테마(theme)', '관련 카테고리(categories)', '여행 일수(durationDays)'를 추출하여 JSON으로 응답하세요.
+                    
+                    region 추출 규칙:
+                    - 대한민국 광역/기초 행정구역명(도/시/군/구) 위주로 추출하세요. (예: 충남, 충청남도, 태안, 보령, 부산, 제주, 강릉, 경주 등)
+                    - '서해', '동해', '남해', '바다' 같은 방위/자연지물은 region에 포함하지 말고, 순수 행정구역명만 추출하세요. (예: '충남 서해' -> '충남')
+                    - 지역 언급이 없으면 '서울'로 설정하세요.
+                    
+                    durationDays 규칙:
+                    - '1박 2일' -> 2
+                    - '2박 3일' -> 3
+                    - '3박 4일' -> 4
+                    - '당일치기', '오늘', '내일' 또는 기간 언급 없음 -> 1
+                    - 1 이상 7 이하의 정수
                     
                     가능한 categories 목록 (최대 3개 선택):
                     ["BEACH", "PARK", "MOUNTAIN", "HANOK", "FOREST", "HERITAGE", "CAFE", "CITY", "NIGHT_VIEW", "FESTIVAL", "FLOWER", "SUNRISE_SUNSET", "MILKY_WAY"]
+                    - 바다/해변/서해/동해 언급 시: BEACH, SUNRISE_SUNSET 추천
+                    - 카페/커피 언급 시: CAFE 추천
                     
                     응답 형식 예시:
                     {
-                      "region": "부산",
-                      "theme": "노을과 야경 출사",
-                      "categories": ["SUNRISE_SUNSET", "NIGHT_VIEW", "BEACH"]
+                      "region": "충남",
+                      "theme": "서해 바다와 감성 카페 출사",
+                      "durationDays": 2,
+                      "categories": ["BEACH", "CAFE", "SUNRISE_SUNSET"]
                     }
                     """;
 
@@ -108,8 +133,21 @@ public class LeaderAgent {
 
             if (jsonOpt.isPresent()) {
                 JsonNode root = objectMapper.readTree(jsonOpt.get());
-                String extractedRegion = root.path("region").asText(region != null ? region : "서울");
+                String rawRegion = root.path("region").asText("");
+                String extractedRegion;
+                if (rawRegion.isBlank() || rawRegion.equals("미정") || rawRegion.equals("전국") || rawRegion.equals("국내")) {
+                    extractedRegion = PlanGoal.extractRegionFromPrompt(prompt, region);
+                } else {
+                    extractedRegion = rawRegion;
+                }
+                extractedRegion = SpotSearchAgent.normalizeRegion(extractedRegion);
                 String theme = root.path("theme").asText("감성 출사 코스");
+
+                int durationDays = root.path("durationDays").asInt(0);
+                if (durationDays <= 0) {
+                    durationDays = PlanGoal.parseDurationDays(prompt);
+                }
+                durationDays = Math.min(7, Math.max(1, durationDays));
 
                 List<SpotCategory> categories = new ArrayList<>();
                 JsonNode catNode = root.path("categories");
@@ -125,7 +163,7 @@ public class LeaderAgent {
                 }
 
                 LocalDate date = (targetDate != null) ? targetDate : LocalDate.now().plusDays(1);
-                return new PlanGoal(extractedRegion, date, categories, theme, List.of());
+                return new PlanGoal(extractedRegion, date, durationDays, categories, theme, List.of());
             }
 
         } catch (Exception e) {
