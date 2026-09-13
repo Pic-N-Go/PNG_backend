@@ -151,4 +151,87 @@ class TourApiResponseTest {
         assertThat(foodItem.getEffectiveParking()).isEqualTo("전용 주차장 20대");
         assertThat(foodItem.getEffectiveInfocenter()).isEqualTo("02-123-4567");
     }
+
+    @Test
+    @DisplayName("TourAPI 응답에서 items가 빈 문자열(\"\")로 오는 경우 예외 없이 빈 리스트로 역직렬화된다")
+    void testEmptyItemsStringCoercion() throws Exception {
+        String emptyItemsJson = """
+                {
+                  "response": {
+                    "header": { "resultCode": "0000", "resultMsg": "OK" },
+                    "body": {
+                      "items": "",
+                      "numOfRows": 10,
+                      "pageNo": 1,
+                      "totalCount": 0
+                    }
+                  }
+                }
+                """;
+
+        TourApiResponse response = objectMapper.readValue(emptyItemsJson, TourApiResponse.class);
+        assertThat(response.response().body().items()).isNotNull();
+        assertThat(response.response().body().items().item()).isEmpty();
+
+        // IntroResponse 빈 문자열 검증
+        String emptyIntroJson = """
+                {
+                  "response": {
+                    "body": {
+                      "items": ""
+                    }
+                  }
+                }
+                """;
+        TourApiIntroResponse introResponse = objectMapper.readValue(emptyIntroJson, TourApiIntroResponse.class);
+        assertThat(introResponse.response().body().items()).isNotNull();
+        assertThat(introResponse.response().body().items().item()).isEmpty();
+
+        // ImageResponse 빈 문자열 검증
+        com.project.picngo.external.dto.TourApiImageResponse imageResponse =
+                objectMapper.readValue(emptyIntroJson, com.project.picngo.external.dto.TourApiImageResponse.class);
+        assertThat(imageResponse.response().body().items()).isNotNull();
+        assertThat(imageResponse.response().body().items().item()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("WebClient로 TourAPI 응답 수신 시 items가 빈 문자열(\"\")이어도 정상 디코딩된다")
+    void testWebClientDecodingWithEmptyItemsString() {
+        String emptyFestivalJson = """
+                {
+                  "response": {
+                    "header": { "resultCode": "0000", "resultMsg": "OK" },
+                    "body": {
+                      "items": "",
+                      "numOfRows": 100,
+                      "pageNo": 1,
+                      "totalCount": 0
+                    }
+                  }
+                }
+                """;
+
+        org.springframework.web.reactive.function.client.ExchangeFunction exchangeFunction = request ->
+                reactor.core.publisher.Mono.just(
+                        org.springframework.web.reactive.function.client.ClientResponse.create(org.springframework.http.HttpStatus.OK)
+                                .header("Content-Type", "application/json")
+                                .body(emptyFestivalJson)
+                                .build()
+                );
+
+        org.springframework.web.reactive.function.client.WebClient webClient =
+                org.springframework.web.reactive.function.client.WebClient.builder()
+                        .exchangeFunction(exchangeFunction)
+                        .build();
+
+        TourApiResponse response = webClient.get()
+                .uri("https://apis.data.go.kr/B551011/KorService2/searchFestival2")
+                .retrieve()
+                .bodyToMono(TourApiResponse.class)
+                .block();
+
+        assertThat(response).isNotNull();
+        assertThat(response.response().body().items()).isNotNull();
+        assertThat(response.response().body().items().item()).isEmpty();
+    }
 }

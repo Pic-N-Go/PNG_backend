@@ -55,13 +55,17 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
-        log.warn("MethodArgumentNotValidException: {}", e.getMessage());
-        
+        log.warn(
+                "요청 값 검증 실패: object={}, errorCount={}",
+                e.getBindingResult().getObjectName(),
+                e.getBindingResult().getErrorCount()
+        );
+
         String errorMessage = e.getBindingResult().getAllErrors().stream()
                 .findFirst()
                 .map(error -> error.getDefaultMessage())
                 .orElse(CommonErrorCode.INVALID_INPUT_VALUE.getMessage());
-                
+
         return ResponseEntity
                 .status(CommonErrorCode.INVALID_INPUT_VALUE.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.INVALID_INPUT_VALUE, errorMessage));

@@ -44,9 +44,8 @@ public class NotificationService {
         log.info("\n==================================================" +
                 "\n[📱 FCM 기기 토큰 등록/갱신 성공]" +
                 "\n- UserId: {}" +
-                "\n- FCM Token: {}" +
                 "\n==================================================",
-                userId, token);
+                userId);
         NotificationSetting setting = notificationSettingRepository.findByUserId(userId)
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
         setting.updateFcmToken(token);
@@ -100,7 +99,7 @@ public class NotificationService {
     public void updateSettings(Long userId, NotificationSettingUpdateRequest request) {
         NotificationSetting setting = notificationSettingRepository.findByUserId(userId)
                 .orElseGet(() -> notificationSettingRepository.save(NotificationSetting.builder().userId(userId).build()));
-        
+
         setting.updateSettings(
                 request.isSpotAlertPushEnabled(),
                 request.isGoldenHourPushEnabled(),
@@ -154,12 +153,12 @@ public class NotificationService {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
         int deletedCount;
         int totalDeleted = 0;
-        
+
         do {
             deletedCount = notificationRepository.deleteByCreatedAtBeforeWithLimit(cutoff, 1000);
             totalDeleted += deletedCount;
         } while (deletedCount == 1000);
-        
+
         log.info("Old notifications before {} have been deleted. Total deleted: {}", cutoff, totalDeleted);
     }
 }

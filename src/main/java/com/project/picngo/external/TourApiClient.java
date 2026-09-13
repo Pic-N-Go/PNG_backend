@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 
 import java.time.Duration;
@@ -50,7 +51,7 @@ public class TourApiClient {
 
     public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer areaCode, Integer lDongRegnCd, String lclsSystm3, int pageNo, int numOfRows) {
         try {
-            return webClient.get()
+            TourApiResponse response = webClient.get()
                     .uri(uriBuilder -> {
                         var builder = uriBuilder.path("/areaBasedList2")
                                 .queryParam("serviceKey", serviceKey)
@@ -78,10 +79,21 @@ public class TourApiClient {
                     .bodyToMono(TourApiResponse.class)
                     .timeout(CALL_TIMEOUT)
                     .block();
+
+            validateResponse(response, "areaBasedList");
+            return response;
+        } catch (WebClientResponseException e) {
+            log.error("[TourApiClient] areaBasedList HTTP 오류 [status={}]: body={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            throw new IllegalStateException(String.format("TourAPI areaBasedList HTTP 오류 [%s]: %s",
+                    e.getStatusCode(), e.getResponseBodyAsString()), e);
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("TourAPI areaBasedList 호출 실패: {}", e.getMessage());
+            log.error("[TourApiClient] areaBasedList 호출 실패 (contentTypeId={}, areaCode={}, pageNo={}): cause={}",
+                    contentTypeId, areaCode, pageNo, e.getMessage());
+            throw new IllegalStateException(String.format("TourAPI areaBasedList 호출 실패: %s", e.getMessage()), e);
         }
-        return null;
     }
 
     public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer areaCode, String lclsSystm3, int pageNo, int numOfRows) {
@@ -98,7 +110,7 @@ public class TourApiClient {
 
     public TourApiResponse getFestivalList(String eventStartDate, Integer areaCode, Integer lDongRegnCd, int pageNo, int numOfRows) {
         try {
-            return webClient.get()
+            TourApiResponse response = webClient.get()
                     .uri(uriBuilder -> {
                         var builder = uriBuilder.path("/searchFestival2")
                                 .queryParam("serviceKey", serviceKey)
@@ -121,14 +133,40 @@ public class TourApiClient {
                     .bodyToMono(TourApiResponse.class)
                     .timeout(CALL_TIMEOUT)
                     .block();
+
+            validateResponse(response, "searchFestival");
+            return response;
+        } catch (WebClientResponseException e) {
+            log.error("[TourApiClient] searchFestival HTTP 오류 [status={}]: body={}",
+                    e.getStatusCode(), e.getResponseBodyAsString());
+            throw new IllegalStateException(String.format("TourAPI searchFestival HTTP 오류 [%s]: %s",
+                    e.getStatusCode(), e.getResponseBodyAsString()), e);
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("TourAPI searchFestival2 호출 실패: {}", e.getMessage());
+            log.error("[TourApiClient] searchFestival 호출 실패 (areaCode={}, pageNo={}): cause={}",
+                    areaCode, pageNo, e.getMessage());
+            throw new IllegalStateException(String.format("TourAPI searchFestival 호출 실패: %s", e.getMessage()), e);
         }
-        return null;
     }
 
     public TourApiResponse getFestivalList(String eventStartDate, Integer areaCode, int pageNo, int numOfRows) {
         return getFestivalList(eventStartDate, areaCode, null, pageNo, numOfRows);
+    }
+
+    private void validateResponse(TourApiResponse response, String apiName) {
+        if (response == null || response.response() == null) {
+            log.error("[TourApiClient] {} 응답이 비어있습니다 (null)", apiName);
+            throw new IllegalStateException(String.format("TourAPI %s 응답이 null입니다.", apiName));
+        }
+        if (response.response().header() != null) {
+            String resultCode = response.response().header().resultCode();
+            String resultMsg = response.response().header().resultMsg();
+            if (resultCode != null && !"0000".equals(resultCode)) {
+                log.error("[TourApiClient] {} 에러 응답 수신: resultCode={}, resultMsg={}", apiName, resultCode, resultMsg);
+                throw new IllegalStateException(String.format("TourAPI %s 에러 응답: [%s] %s", apiName, resultCode, resultMsg));
+            }
+        }
     }
 
     public Item getDetailCommon(String contentId) {
@@ -152,8 +190,11 @@ public class TourApiClient {
                 List<Item> items = response.response().body().items().item();
                 if (items != null && !items.isEmpty()) return items.get(0);
             }
+        } catch (WebClientResponseException e) {
+            log.warn("[TourApiClient] detailCommon HTTP 오류 (contentId={}, status={}): {}",
+                    contentId, e.getStatusCode(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("TourAPI detailCommon 호출 실패 contentId={}: {}", contentId, e.getMessage());
+            log.warn("[TourApiClient] detailCommon 호출 실패 (contentId={}): cause={}", contentId, e.getMessage());
         }
         return null;
     }
@@ -180,8 +221,12 @@ public class TourApiClient {
                 List<IntroItem> items = response.response().body().items().item();
                 if (items != null && !items.isEmpty()) return items.get(0);
             }
+        } catch (WebClientResponseException e) {
+            log.warn("[TourApiClient] detailIntro HTTP 오류 (contentId={}, contentTypeId={}, status={}): {}",
+                    contentId, contentTypeId, e.getStatusCode(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("TourAPI detailIntro 호출 실패 contentId={}, contentTypeId={}: {}", contentId, contentTypeId, e.getMessage());
+            log.warn("[TourApiClient] detailIntro 호출 실패 (contentId={}, contentTypeId={}): cause={}",
+                    contentId, contentTypeId, e.getMessage());
         }
         return null;
     }
@@ -212,8 +257,11 @@ public class TourApiClient {
                 List<ImageItem> items = response.response().body().items().item();
                 return items != null ? items : Collections.emptyList();
             }
+        } catch (WebClientResponseException e) {
+            log.warn("[TourApiClient] detailImage HTTP 오류 (contentId={}, status={}): {}",
+                    contentId, e.getStatusCode(), e.getResponseBodyAsString());
         } catch (Exception e) {
-            log.warn("TourAPI detailImage 호출 실패 contentId={}: {}", contentId, e.getMessage());
+            log.warn("[TourApiClient] detailImage 호출 실패 (contentId={}): cause={}", contentId, e.getMessage());
         }
         return Collections.emptyList();
     }

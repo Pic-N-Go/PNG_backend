@@ -22,6 +22,7 @@ public enum ContestErrorCode implements BaseErrorCode {
 
     CONTEST_PERIOD_OVERLAP(HttpStatus.CONFLICT, "직전 콘테스트의 결과 발표 전에는 다음 회차를 시작할 수 없습니다."),
     CONTEST_START_IN_PAST(HttpStatus.BAD_REQUEST, "콘테스트 시작 시각은 현재보다 이전일 수 없습니다."),
+    CANNOT_MODIFY_STARTED_CONTEST(HttpStatus.CONFLICT, "출품이 시작된 콘테스트의 시작 날짜는 변경할 수 없습니다."),
 
     NOT_MY_ENTRY(HttpStatus.FORBIDDEN, "내 출품작만 처리할 수 있습니다.");
 

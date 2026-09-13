@@ -41,7 +41,7 @@ class SpotServiceFuzzyFallbackTest {
 
     private SpotService service(boolean similar, boolean fuzzy) {
         return new SpotService(
-                spotRepository, null, null, null, null,
+                spotRepository, null, null, null,
                 meterRegistry,
                 new SearchProperties(SearchEngine.FULLTEXT, false, similar, fuzzy, false),
                 null

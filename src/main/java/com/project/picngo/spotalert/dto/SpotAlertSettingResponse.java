@@ -13,6 +13,7 @@ public record SpotAlertSettingResponse(
     String spotName,
     String address,
     Integer photogenicScore,
+    List<String> categories,
     List<String> tags,
     
     String memo,

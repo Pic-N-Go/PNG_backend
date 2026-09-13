@@ -198,6 +198,11 @@ picngo:
     model: ${EMBEDDING_MODEL:text-embedding-3-small}
     base-url: ${EMBEDDING_BASE_URL:https://api.openai.com/v1/embeddings}
 
+  llm:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+    base-url: ${OPENAI_CHAT_BASE_URL:https://api.openai.com/v1/chat/completions}
+
 management:
   metrics:
     tags:

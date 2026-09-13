@@ -1,7 +1,6 @@
 package com.project.picngo.spot.dto;
 
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotTag;
 
 import java.util.List;
 
@@ -60,7 +59,6 @@ public record SpotDetailResponse(
 
     public static SpotDetailResponse of(
             Spot spot,
-            List<SpotTag> tags,
             List<String> reviewTags,
             Double avgRating,
             Integer reviewCount,
@@ -68,6 +66,7 @@ public record SpotDetailResponse(
             Boolean isBookmarked,
             Long myReviewId
     ) {
+        List<String> categoryNames = spot.getCategoryNames();
         return new SpotDetailResponse(
                 spot.getId(),
                 spot.getName(),
@@ -77,9 +76,9 @@ public record SpotDetailResponse(
                 spot.getLatitude(),
                 spot.getLongitude(),
                 NavigationInfo.of(spot),
-                spot.getCategoryNames(),
+                categoryNames,
                 spot.getOverview(),
-                tags.stream().map(SpotTag::getTag).toList(),
+                categoryNames,
                 reviewTags,
                 ConvenienceInfo.from(spot),
                 new StatsInfo(avgRating, reviewCount, photoCount),

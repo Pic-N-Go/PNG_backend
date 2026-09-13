@@ -46,7 +46,7 @@ class SpotServiceNormalizeFallbackTest {
     /** 검색 경로만 검증하므로 쓰이지 않는 리포지토리는 null로 둔다. */
     private SpotService serviceWithFallback(boolean enabled) {
         return new SpotService(
-                spotRepository, null, null, null, null,
+                spotRepository, null, null, null,
                 meterRegistry,
                 new SearchProperties(SearchEngine.FULLTEXT, enabled, false, false, false),
                 null

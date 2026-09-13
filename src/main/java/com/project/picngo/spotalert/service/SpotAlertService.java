@@ -3,9 +3,7 @@ package com.project.picngo.spotalert.service;
 import com.project.picngo.external.service.WeatherCacheService;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
 import com.project.picngo.spot.domain.Spot;
-import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.repository.SpotRepository;
-import com.project.picngo.spot.repository.SpotTagRepository;
 import com.project.picngo.spotalert.domain.SpotAlert;
 import com.project.picngo.spotalert.domain.enums.TimeCondition;
 import com.project.picngo.spotalert.domain.enums.WeatherCondition;
@@ -42,7 +40,6 @@ public class SpotAlertService {
     private final WeatherCacheService weatherCacheService;
     private final UserRepository userRepository;
     private final SpotRepository spotRepository;
-    private final SpotTagRepository spotTagRepository;
     private final NotificationSettingRepository notificationSettingRepository;
     private final WeatherMatchService weatherMatchService;
 
@@ -124,11 +121,7 @@ public class SpotAlertService {
         String spotName = spot != null ? spot.getName() : "알 수 없는 스팟";
         String address = spot != null ? spot.getAddress() : "주소 미상";
         Integer photogenicScore = spot != null ? spot.getPhotogenicScore() : 0;
-        
-        List<String> tags = spotTagRepository.findBySpotId(spotAlert.getSpotId())
-                .stream()
-                .map(SpotTag::getTag)
-                .collect(Collectors.toList());
+        List<String> categories = spot != null ? spot.getCategoryNames() : List.of("ETC");
                 
         LocalTime dndStartTime = null;
         LocalTime dndEndTime = null;
@@ -199,7 +192,8 @@ public class SpotAlertService {
                 spotName, 
                 address,
                 photogenicScore,
-                tags,
+                categories,
+                categories,
                 spotAlert.getMemo(),
                 spotAlert.getWeatherConditions(),
                 spotAlert.getTimeConditions(),

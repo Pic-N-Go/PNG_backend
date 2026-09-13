@@ -46,7 +46,7 @@ class TourApiSyncConsumerTest {
     }
 
     @Test
-    @DisplayName("동기화 중 예외 발생 시 markFailed 호출 및 락 해제 검증")
+    @DisplayName("동기화 중 예외 발생 시 markFailed 호출, 감사로그 실패 기록 및 락 해제 검증")
     void consumeFailureHandlesError() {
         TourApiSyncMessage message = TourApiSyncMessage.ofAll(100L);
         given(tourApiSyncService.syncAll()).willThrow(new RuntimeException("API 서버 오류"));
@@ -54,6 +54,7 @@ class TourApiSyncConsumerTest {
         tourApiSyncConsumer.consume(message);
 
         verify(syncStatusManager).markFailed("API 서버 오류");
+        verify(adminAuditLogService).record(eq(100L), eq(AdminActionType.TOUR_API_SYNC), anyString(), eq("ALL_AREAS"), contains("API 서버 오류"), isNull());
         verify(syncStatusManager).releaseLock();
     }
 }

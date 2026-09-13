@@ -35,7 +35,7 @@ public class SpotUpsertService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public void upsertSpot(Item item, Item detail, IntroItem intro, List<ImageItem> images) {
+    public boolean upsertSpot(Item item, Item detail, IntroItem intro, List<ImageItem> images) {
         Integer contentTypeId = item.getContentTypeIdOrNull();
         String overview = detail != null ? detail.overview() : null;
         String categoryCode = item.getEffectiveCategoryCode();
@@ -48,7 +48,7 @@ public class SpotUpsertService {
             if (!isCafe) {
                 log.debug("음식점(39) 중 일반 식당은 건너뜁니다 (카페 아님): contentId={}, title={}",
                         item.contentid(), item.title());
-                return;
+                return false;
             }
         }
 
@@ -106,6 +106,7 @@ public class SpotUpsertService {
             return createdSpot;
         });
         syncTourPhotos(spot, images);
+        return true;
     }
 
     // TourAPI 사진(userId=null)만 갈아끼운다. 유저 업로드 사진은 건드리지 않음.

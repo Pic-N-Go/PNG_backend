@@ -131,6 +131,17 @@ class FlywayMigrationOnMySqlTest {
                     + "AND TABLE_NAME = 'contest_ranking_snapshot' AND COLUMN_NAME = 'ranking'"))
                     .as("순위 컬럼은 예약어를 피해 ranking이어야 한다")
                     .isEqualTo(1);
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
+                    + "AND COLUMN_NAME = 'category'"))
+                    .as("spot 테이블의 레거시 category 컬럼은 V18에 의해 삭제되어야 한다")
+                    .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.TABLES "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot_tag'"))
+                    .as("spot_tag 테이블은 V19에 의해 삭제되어야 한다")
+                    .isZero();
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }
@@ -239,6 +250,17 @@ class FlywayMigrationOnMySqlTest {
                     + "AND COLUMN_NAME = 'photo_url'"))
                     .as("spot_photo.photo_url은 지금도 쓰는 컬럼이라 남아 있어야 한다")
                     .isEqualTo(1);
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot' "
+                    + "AND COLUMN_NAME = 'category'"))
+                    .as("spot 테이블의 레거시 category 컬럼이 없어야 한다")
+                    .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.TABLES "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot_tag'"))
+                    .as("기존 DB에서도 spot_tag 테이블이 없어야 한다")
+                    .isZero();
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }

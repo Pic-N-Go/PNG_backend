@@ -43,6 +43,7 @@ public class Course extends BaseTimeEntity {
     private LocalDate endDate;
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("dayNumber ASC, sequenceOrder ASC")
     private List<CourseSpot> courseSpots = new ArrayList<>();
 
     @OneToMany(mappedBy = "course", cascade = CascadeType.ALL, orphanRemoval = true)

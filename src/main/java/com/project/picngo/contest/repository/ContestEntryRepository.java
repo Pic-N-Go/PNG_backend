@@ -38,6 +38,9 @@ public interface ContestEntryRepository extends JpaRepository<ContestEntry, Long
     // 콘테스트별 참여자 수 조회
     long countDistinctUserByContest(Contest contest);
 
+    @Query("select distinct e.user.id from ContestEntry e where e.contest = :contest")
+    List<Long> findDistinctUserIdsByContest(@Param("contest") Contest contest);
+
     // 특정 콘테스트에 속한 출품작 조회
     Optional<ContestEntry> findByIdAndContest(Long id, Contest contest);
 

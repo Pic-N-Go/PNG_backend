@@ -12,7 +12,6 @@ import com.project.picngo.spot.domain.EmbeddingVector;
 import com.project.picngo.spot.domain.FullTextKeyword;
 import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.domain.SpotCategoryTagger;
-import com.project.picngo.spot.domain.SpotTag;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
@@ -74,7 +73,6 @@ public class SpotService {
     private static final String PHASE_MAPPING = "mapping";
 
     private final SpotRepository spotRepository;
-    private final SpotTagRepository spotTagRepository;
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
@@ -86,7 +84,6 @@ public class SpotService {
         Spot spot = spotRepository.findById(spotId)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
 
-        List<SpotTag> tags = spotTagRepository.findBySpotId(spotId);
         // 2회 이상 쓰인 태그 중 상위 3개만 노출 (스팟 상세 카드에 한 줄로 들어가는 분량)
         List<String> reviewTags = reviewRepository.findFrequentTagsBySpotId(spotId).stream()
                 .limit(3)
@@ -104,7 +101,7 @@ public class SpotService {
                 : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
 
         return SpotDetailResponse.of(
-                spot, tags, reviewTags,
+                spot, reviewTags,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
                 reviewCount, photoCount, isBookmarked, myReviewId
         );

@@ -52,11 +52,23 @@ public class TourApiSyncConsumer {
             syncStatusManager.markSuccess(saved);
             log.info("[TourApiSyncConsumer] 동기화 작업 완료 처리: scope={}, saved={}", message.syncType(), saved);
         } catch (Exception e) {
-            log.error("[TourApiSyncConsumer] 동기화 작업 실패: scope={}, error={}", message.syncType(), e.getMessage(), e);
+            log.error("[TourApiSyncConsumer] 동기화 작업 실패: scope={}, areaCode={}, cause={}",
+                    message.syncType(), message.areaCode(), e.getMessage(), e);
             syncStatusManager.markFailed(e.getMessage());
+            recordAuditLog(message.adminId(), getTarget(message),
+                    String.format("한국관광공사 TourAPI 비동기 동기화 실패 (오류: %s)", e.getMessage()));
         } finally {
             syncStatusManager.releaseLock();
         }
+    }
+
+    private String getTarget(TourApiSyncMessage message) {
+        if (message == null || message.syncType() == null) return "UNKNOWN";
+        return switch (message.syncType()) {
+            case AREA -> "AREA_" + message.areaCode();
+            case ALL -> "ALL_AREAS";
+            case SAMPLE -> "SAMPLE";
+        };
     }
 
     private void recordAuditLog(Long adminId, String target, String details) {
@@ -70,7 +82,7 @@ public class TourApiSyncConsumer {
                     null
             );
         } catch (Exception e) {
-            log.warn("TourAPI 비동기 동기화 감사 로그 기록 실패: {}", e.getMessage());
+            log.warn("[TourApiSyncConsumer] TourAPI 비동기 동기화 감사 로그 기록 실패: {}", e.getMessage());
         }
     }
 }

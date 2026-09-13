@@ -45,7 +45,7 @@ class SpotServiceSemanticFallbackTest {
 
     private SpotService service(boolean semantic) {
         return new SpotService(
-                spotRepository, null, null, null, null,
+                spotRepository, null, null, null,
                 meterRegistry,
                 new SearchProperties(SearchEngine.FULLTEXT, false, false, false, semantic),
                 embeddingClient

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface ContestSubscriptionRepository extends JpaRepository<ContestSubscription, Long> {
@@ -18,6 +19,12 @@ public interface ContestSubscriptionRepository extends JpaRepository<ContestSubs
 
     //알림 구독 내역 확인
     Optional<ContestSubscription> findByContestAndUser(Contest contest, User user);
+
+    //특정 콘테스트의 전체 구독자 조회
+    List<ContestSubscription> findAllByContest(Contest contest);
+
+    @Query("select distinct s.user.id from ContestSubscription s where s.contest = :contest")
+    List<Long> findDistinctUserIdsByContest(@Param("contest") Contest contest);
 
     // 이미 있으면 조용히 넘어간다. save + 제약 위반 catch로는 트랜잭션이 rollback-only로 찍혀
     // 커밋에서 UnexpectedRollbackException이 나므로, 중복 판정을 DB에 맡긴다.
