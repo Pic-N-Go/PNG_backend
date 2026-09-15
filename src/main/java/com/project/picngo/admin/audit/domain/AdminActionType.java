@@ -16,7 +16,7 @@ public enum AdminActionType {
     CONTEST_RESULT_PUBLISH("콘테스트 결과 강제 발표 및 조기 마감"),
     CONTEST_RESULT_NOTIFICATION_SEND("콘테스트 결과 알림 수동 발송"),
     REPORT_PROCESS("신고 처리"),
-    REPORT_TARGET_DELETE("신고 대상 게시글 삭제");
+    REPORT_TARGET_DELETE("신고 대상 삭제");
 
     private final String description;
 
