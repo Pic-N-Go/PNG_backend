@@ -20,6 +20,8 @@ import com.project.picngo.spot.service.AdminReviewService;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -32,6 +34,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -72,6 +76,16 @@ class AdminReportServiceTest {
 
     @InjectMocks
     private AdminReportService adminReportService;
+
+    @BeforeEach
+    void setUpTransactionSynchronization() {
+        TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void clearTransactionSynchronization() {
+        TransactionSynchronizationManager.clearSynchronization();
+    }
 
     @Test
     @DisplayName("전체 신고는 최신순으로 페이지당 기본 10개를 조회한다")
@@ -189,6 +203,7 @@ class AdminReportServiceTest {
         assertThat(response.handledById()).isEqualTo(1L);
         assertThat(response.handledAt()).isNotNull();
         assertThat(response.resolutionNote()).isEqualTo("처리 메모");
+        triggerAfterCommit();
         verify(adminAuditLogService).record(
                 eq(1L),
                 eq(AdminActionType.REPORT_PROCESS),
@@ -275,6 +290,7 @@ class AdminReportServiceTest {
                 20L,
                 100L
         );
+        triggerAfterCommit();
         verify(adminAuditLogService).record(
                 eq(1L),
                 eq(AdminActionType.REPORT_TARGET_DELETE),
@@ -313,6 +329,7 @@ class AdminReportServiceTest {
                 20L,
                 100L
         );
+        triggerAfterCommit();
         verify(adminAuditLogService).record(
                 eq(1L),
                 eq(AdminActionType.REPORT_TARGET_DELETE),
@@ -421,6 +438,11 @@ class AdminReportServiceTest {
 
     private Report report(Long id) {
         return report(id, 10L);
+    }
+
+    private void triggerAfterCommit() {
+        TransactionSynchronizationManager.getSynchronizations()
+                .forEach(TransactionSynchronization::afterCommit);
     }
 
     private Report report(Long id, Long reporterId) {

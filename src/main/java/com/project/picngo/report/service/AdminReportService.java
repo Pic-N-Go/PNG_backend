@@ -26,6 +26,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -86,18 +88,13 @@ public class AdminReportService {
 
         report.process(admin, request.status(), request.resolutionNote());
 
-        try {
-            adminAuditLogService.record(
-                    adminUserId,
-                    AdminActionType.REPORT_PROCESS,
-                    "REPORT",
-                    String.valueOf(reportId),
-                    "신고 처리 상태: " + request.status(),
-                    null
-            );
-        } catch (Exception exception) {
-            log.warn("신고 처리 감사 로그 기록 실패: reportId={}, message={}", reportId, exception.getMessage());
-        }
+        recordAuditLogAfterCommit(
+                adminUserId,
+                AdminActionType.REPORT_PROCESS,
+                "REPORT",
+                String.valueOf(reportId),
+                "신고 처리 상태: " + request.status()
+        );
 
         return AdminReportProcessResponse.from(report);
     }
@@ -151,18 +148,13 @@ public class AdminReportService {
                 reportId
         );
 
-        try {
-            adminAuditLogService.record(
-                    adminUserId,
-                    AdminActionType.REPORT_TARGET_DELETE,
-                    report.getTargetType().name(),
-                    String.valueOf(report.getTargetId()),
-                    "신고 대상 삭제 및 관련 신고 처리: " + relatedReports.size() + "건",
-                    null
-            );
-        } catch (Exception exception) {
-            log.warn("신고 대상 삭제 감사 로그 기록 실패: reportId={}, message={}", reportId, exception.getMessage());
-        }
+        recordAuditLogAfterCommit(
+                adminUserId,
+                AdminActionType.REPORT_TARGET_DELETE,
+                report.getTargetType().name(),
+                String.valueOf(report.getTargetId()),
+                "신고 대상 삭제 및 관련 신고 처리: " + relatedReports.size() + "건"
+        );
 
         return AdminReportProcessResponse.from(targetReport);
     }
@@ -181,6 +173,45 @@ public class AdminReportService {
             case REVIEW -> "신고된 리뷰 삭제";
             default -> "신고 대상 콘텐츠 삭제";
         };
+    }
+
+    /**
+     * 신고 처리 트랜잭션이 성공적으로 커밋된 경우에만 완료 감사 로그를 기록한다.
+     * AdminAuditLogService.record()는 별도 트랜잭션(REQUIRES_NEW)을 사용하므로 즉시 호출하면,
+     * 신고 처리가 롤백되어도 감사 로그만 남을 수 있어 afterCommit 콜백으로 실행 시점을 늦춘다.
+     */
+    private void recordAuditLogAfterCommit(
+            Long adminUserId,
+            AdminActionType actionType,
+            String targetType,
+            String targetId,
+            String detail
+    ) {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            adminAuditLogService.record(
+                                    adminUserId,
+                                    actionType,
+                                    targetType,
+                                    targetId,
+                                    detail,
+                                    null
+                            );
+                        } catch (Exception exception) {
+                            // 비즈니스 처리는 이미 커밋됐으므로 감사 로그 실패를 별도로 기록하고 전파하지 않는다.
+                            log.warn(
+                                    "관리자 감사 로그 기록 실패: actionType={}, targetId={}, message={}",
+                                    actionType,
+                                    targetId,
+                                    exception.getMessage()
+                            );
+                        }
+                    }
+                }
+        );
     }
 
     private Page<AdminReportListResponse> getReportsByStatus(ReportStatus status, int page, int size) {
