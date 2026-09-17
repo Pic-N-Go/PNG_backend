@@ -14,7 +14,9 @@ public enum AdminActionType {
     CONTEST_ENTRY_DELETE("콘테스트 출품작 강제 삭제"),
     CONTEST_NOTIFICATION_SEND("콘테스트 시작 알림 수동 발송"),
     CONTEST_RESULT_PUBLISH("콘테스트 결과 강제 발표 및 조기 마감"),
-    CONTEST_RESULT_NOTIFICATION_SEND("콘테스트 결과 알림 수동 발송");
+    CONTEST_RESULT_NOTIFICATION_SEND("콘테스트 결과 알림 수동 발송"),
+    REPORT_PROCESS("신고 처리"),
+    REPORT_TARGET_DELETE("신고 대상 삭제");
 
     private final String description;
 

@@ -7,4 +7,8 @@ public record Coordinate(
         Double latitude,
         Double longitude,
         String name
-) {}
+) {
+    public Coordinate(Double latitude, Double longitude) {
+        this(latitude, longitude, "");
+    }
+}

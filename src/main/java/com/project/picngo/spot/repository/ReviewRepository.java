@@ -4,13 +4,21 @@ import com.project.picngo.spot.domain.Review;
 import com.project.picngo.spot.dto.ReviewedSpotResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import jakarta.persistence.LockModeType;
+
 import java.util.List;
+import java.util.Optional;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Review r JOIN FETCH r.spot WHERE r.id = :reviewId")
+    Optional<Review> findByIdForUpdate(@Param("reviewId") Long reviewId);
 
     @Query("SELECT AVG(r.rating), COUNT(r) FROM Review r WHERE r.spot.id = :spotId")
     List<Object[]> findAvgAndCountBySpotId(@Param("spotId") Long spotId);

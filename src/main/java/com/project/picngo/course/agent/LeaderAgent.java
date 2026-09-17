@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -37,26 +38,42 @@ public class LeaderAgent {
     private final WeatherAgent weatherAgent;
     private final CourseCuratorAgent courseCuratorAgent;
 
+    public static final Map<String, Object> PLAN_GOAL_SCHEMA = Map.of(
+            "type", "object",
+            "properties", Map.of(
+                    "region", Map.of("type", "string", "description", "대한민국 광역/기초 행정구역명"),
+                    "theme", Map.of("type", "string", "description", "출사 테마"),
+                    "durationDays", Map.of("type", "integer", "description", "여행 일수 (1~7)"),
+                    "categories", Map.of(
+                            "type", "array",
+                            "items", Map.of("type", "string"),
+                            "description", "출사 카테고리 목록"
+                    )
+            ),
+            "required", List.of("region", "theme", "durationDays", "categories"),
+            "additionalProperties", false
+    );
+
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public CuratedCourseDraft planCourse(String userPrompt, String requestedRegion, LocalDate targetDate) {
-        log.info("══════════════════════════════════════════════════════");
-        log.info("🎯 [LeaderAgent] 멀티 에이전트 오케스트레이션 파이프라인 시작");
+        log.info("==================================================");
+        log.info("[LeaderAgent] 멀티 에이전트 오케스트레이션 파이프라인 시작");
         log.info(" - 사용자 프롬프트: {}", userPrompt);
         log.info(" - 요청 지역: {}, 타겟 날짜: {}", requestedRegion, targetDate);
-        log.info("══════════════════════════════════════════════════════");
+        log.info("==================================================");
 
         // Step 1: 자연어 의도 분석 및 목표(PlanGoal) 구조화
         PlanGoal goal = analyzeIntent(userPrompt, requestedRegion, targetDate);
         int durationDays = Math.max(1, goal.durationDays());
-        log.info("📌 [Step 1 완료] 구조화된 목표: region={}, theme={}, durationDays={}, categories={}",
+        log.info("[Step 1 완료] 구조화된 목표: region={}, theme={}, durationDays={}, categories={}",
                 goal.region(), goal.theme(), durationDays, goal.categories());
 
         // Step 2: 실존 스팟 후보지 탐색 (환각 방지)
         List<SpotCandidate> candidates = spotSearchAgent.searchCandidates(goal);
-        log.info("📌 [Step 2 완료] 후보 스팟 발굴: {}건", candidates.size());
+        log.info("[Step 2 완료] 후보 스팟 발굴: {}건", candidates.size());
 
         if (candidates.isEmpty()) {
             log.warn("해당 지역에 등록된 스팟이 없어 기획을 중단합니다: region={}", goal.region());
@@ -68,7 +85,7 @@ public class LeaderAgent {
         int spotsPerDay = 3;
         int targetCount = (durationDays == 1) ? 4 : (durationDays * spotsPerDay);
         OptimizedRoute route = routeOptimizerAgent.optimizeRoute(candidates, targetCount);
-        log.info("📌 [Step 3 완료] 동선 최적화 완료: 선정 스팟 {}곳 (요청 일수: {}일)", route.orderedSpots().size(), durationDays);
+        log.info("[Step 3 완료] 동선 최적화 완료: 선정 스팟 {}곳 (요청 일수: {}일)", route.orderedSpots().size(), durationDays);
 
         // Step 4: 기상 상태 및 골든아워 분석
         SpotCandidate firstSpot = route.orderedSpots().get(0);
@@ -77,7 +94,7 @@ public class LeaderAgent {
                 firstSpot.longitude(),
                 goal.targetDate()
         );
-        log.info("📌 [Step 4 완료] 날씨 분석: 상태={}, 일몰={}, 골든아워={}",
+        log.info("[Step 4 완료] 날씨 분석: 상태={}, 일몰={}, 골든아워={}",
                 weather.weatherSummary(), weather.sunsetTime(), weather.goldenHourTime());
 
         // Step 5: 감성 큐레이션 및 시간대별 촬영 가이드 조립
@@ -87,7 +104,7 @@ public class LeaderAgent {
                 route.travelMinutesList(),
                 weather
         );
-        log.info("🎯 [LeaderAgent] 오케스트레이션 성공! 완성된 코스: '{}'", draft.title());
+        log.info("[LeaderAgent] 오케스트레이션 성공! 완성된 코스: '{}'", draft.title());
 
         return draft;
     }
@@ -103,7 +120,8 @@ public class LeaderAgent {
                     사용자의 요청에서 '지역(region)', '출사 테마(theme)', '관련 카테고리(categories)', '여행 일수(durationDays)'를 추출하여 JSON으로 응답하세요.
                     
                     region 추출 규칙:
-                    - 대한민국 광역/기초 행정구역명(도/시/군/구) 위주로 추출하세요. (예: 충남, 충청남도, 태안, 보령, 부산, 제주, 강릉, 경주 등)
+                    - 사용자의 요청 문장(프롬프트)에 명시된 지역이 있다면, 기본 지역 필터보다 요청 문장의 지역명을 최우선으로 추출하세요.
+                    - 대한민국 광역/기초 행정구역명(도/시/군/구) 위주로 추출하세요. (예: 충남, 충청남도, 태안, 보령, 부산, 제주, 강릉, 경주, 전남광주, 광주 등)
                     - '서해', '동해', '남해', '바다' 같은 방위/자연지물은 region에 포함하지 말고, 순수 행정구역명만 추출하세요. (예: '충남 서해' -> '충남')
                     - 지역 언급이 없으면 '서울'로 설정하세요.
                     
@@ -128,17 +146,26 @@ public class LeaderAgent {
                     }
                     """;
 
-            String userMessage = String.format("요청: \"%s\" (기본 지역: %s)", prompt, region != null ? region : "미지정");
-            Optional<String> jsonOpt = openAiChatClient.chatJson(systemPrompt, userMessage, 500);
+            String userMessage = String.format("사용자 프롬프트: \"%s\" (선택된 기본 지역: %s - 단, 사용자 프롬프트에 지역명이 있다면 프롬프트의 지역명을 최우선 추출할 것)",
+                    prompt, (region != null && !PlanGoal.isGenericRegion(region)) ? region : "미지정");
+            Optional<String> jsonOpt = openAiChatClient.chatStructuredJson(systemPrompt, userMessage, "plan_goal", PLAN_GOAL_SCHEMA, 500);
+            if (jsonOpt.isEmpty()) {
+                jsonOpt = openAiChatClient.chatJson(systemPrompt, userMessage, 500);
+            }
 
             if (jsonOpt.isPresent()) {
                 JsonNode root = objectMapper.readTree(jsonOpt.get());
                 String rawRegion = root.path("region").asText("");
+
+                // 사용자 프롬프트 텍스트에 지역명이 명시되어 있으면 최우선 적용
+                Optional<String> promptExplicitRegion = PlanGoal.findRegionInText(prompt);
                 String extractedRegion;
-                if (rawRegion.isBlank() || rawRegion.equals("미정") || rawRegion.equals("전국") || rawRegion.equals("국내")) {
-                    extractedRegion = PlanGoal.extractRegionFromPrompt(prompt, region);
-                } else {
+                if (promptExplicitRegion.isPresent()) {
+                    extractedRegion = promptExplicitRegion.get();
+                } else if (!rawRegion.isBlank() && !PlanGoal.isGenericRegion(rawRegion)) {
                     extractedRegion = rawRegion;
+                } else {
+                    extractedRegion = PlanGoal.extractRegionFromPrompt(prompt, region);
                 }
                 extractedRegion = SpotSearchAgent.normalizeRegion(extractedRegion);
                 String theme = root.path("theme").asText("감성 출사 코스");
@@ -159,7 +186,7 @@ public class LeaderAgent {
                     }
                 }
                 if (categories.isEmpty()) {
-                    categories.add(SpotCategory.SUNRISE_SUNSET);
+                    categories.addAll(PlanGoal.extractCategoriesFromPrompt(prompt));
                 }
 
                 LocalDate date = (targetDate != null) ? targetDate : LocalDate.now().plusDays(1);

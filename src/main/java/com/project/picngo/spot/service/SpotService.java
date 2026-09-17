@@ -15,8 +15,13 @@ import com.project.picngo.spot.domain.SpotCategoryTagger;
 import com.project.picngo.spot.domain.enums.ReviewTag;
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.spot.domain.enums.SpotStatus;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.picngo.external.TarRlteTarApiClient;
+import com.project.picngo.external.dto.TarRlteTarResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
+import com.project.picngo.spot.dto.RelatedSpotResponse;
 import com.project.picngo.spot.dto.SpotDetailResponse;
 import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.dto.SpotMapResponse;
@@ -27,19 +32,23 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,7 +58,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SpotService {
 
@@ -79,6 +87,59 @@ public class SpotService {
     private final MeterRegistry meterRegistry;
     private final SearchProperties searchProperties;
     private final EmbeddingClient embeddingClient;
+    private final TarRlteTarApiClient tarRlteTarApiClient;
+    private final AdministrativeCodeResolver administrativeCodeResolver;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    public SpotService(
+            SpotRepository spotRepository,
+            ReviewRepository reviewRepository,
+            SpotPhotoRepository spotPhotoRepository,
+            BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository,
+            MeterRegistry meterRegistry,
+            SearchProperties searchProperties,
+            @Nullable EmbeddingClient embeddingClient,
+            @Nullable TarRlteTarApiClient tarRlteTarApiClient,
+            @Nullable AdministrativeCodeResolver administrativeCodeResolver,
+            @Nullable StringRedisTemplate redisTemplate
+    ) {
+        this.spotRepository = spotRepository;
+        this.reviewRepository = reviewRepository;
+        this.spotPhotoRepository = spotPhotoRepository;
+        this.bookmarkCollectionSpotRepository = bookmarkCollectionSpotRepository;
+        this.meterRegistry = meterRegistry;
+        this.searchProperties = searchProperties;
+        this.embeddingClient = embeddingClient;
+        this.tarRlteTarApiClient = tarRlteTarApiClient;
+        this.administrativeCodeResolver = administrativeCodeResolver;
+        this.redisTemplate = redisTemplate;
+    }
+
+    // 기존 테스트 코드 호환용 보조 생성자
+    public SpotService(
+            SpotRepository spotRepository,
+            ReviewRepository reviewRepository,
+            SpotPhotoRepository spotPhotoRepository,
+            BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository,
+            MeterRegistry meterRegistry,
+            SearchProperties searchProperties,
+            EmbeddingClient embeddingClient
+    ) {
+        this(
+                spotRepository,
+                reviewRepository,
+                spotPhotoRepository,
+                bookmarkCollectionSpotRepository,
+                meterRegistry,
+                searchProperties,
+                embeddingClient,
+                null,
+                null,
+                null
+        );
+    }
 
     public SpotDetailResponse getSpotDetail(Long spotId, Long userId) {
         Spot spot = spotRepository.findById(spotId)
@@ -717,5 +778,163 @@ public class SpotService {
         return spotRepository.findByIdAndStatusAndIsActiveTrue(id, SpotStatus.APPROVED)
                 .map(SpotSummaryResponse::from)
                 .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
+    }
+
+    /**
+     * 한국관광공사 연관 관광지 정보(TarRlteTarService1)를 활용하여
+     * 현재 스팟과 함께 방문하기 좋은 연관 명소 목록을 조회합니다.
+     */
+    public List<RelatedSpotResponse> getRelatedSpots(Long spotId, int limit) {
+        int targetLimit = Math.max(1, Math.min(limit, 20));
+        String cacheKey = "spot:related:" + spotId + ":" + targetLimit;
+
+        // 1. Redis 캐시 확인 (24시간 유효)
+        try {
+            if (redisTemplate != null) {
+                String cached = redisTemplate.opsForValue().get(cacheKey);
+                if (cached != null && !cached.isBlank()) {
+                    List<RelatedSpotResponse> cachedList = objectMapper.readValue(
+                            cached, new TypeReference<List<RelatedSpotResponse>>() {});
+                    log.info("[SpotService] 연관 관광지 캐시 적중: spotId={}, count={}", spotId, cachedList.size());
+                    return cachedList;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[SpotService] 연관 관광지 캐시 조회 실패 (무시하고 계속): {}", e.getMessage());
+        }
+
+        // 2. 기준 스팟 조회
+        Spot spot = spotRepository.findById(spotId)
+                .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
+
+        // 3. 주소로부터 시도(areaCd) 및 시군구(signguCd) 코드 해석
+        String areaCd = null;
+        String signguCd = null;
+        if (administrativeCodeResolver != null) {
+            Optional<AdministrativeCodeResolver.AdministrativeCode> codeOpt =
+                    administrativeCodeResolver.resolve(spot.getAddress());
+            if (codeOpt.isPresent()) {
+                areaCd = codeOpt.get().areaCd();
+                signguCd = codeOpt.get().signguCd();
+            }
+        }
+
+        // 4. 한국관광공사 연관 관광지 API 호출
+        List<TarRlteTarResponse.Item> externalItems = Collections.emptyList();
+        if (tarRlteTarApiClient != null) {
+            externalItems = tarRlteTarApiClient.searchKeyword(spot.getName(), areaCd, signguCd, null, targetLimit);
+        }
+
+        List<RelatedSpotResponse> result = new ArrayList<>();
+
+        if (!externalItems.isEmpty()) {
+            for (TarRlteTarResponse.Item item : externalItems) {
+                String name = item.rlteTatsNm() != null ? item.rlteTatsNm() : "";
+                int rank = item.getRankOrZero() > 0 ? item.getRankOrZero() : (result.size() + 1);
+                String category = item.rlteCtgryMclsNm() != null && !item.rlteCtgryMclsNm().isBlank()
+                        ? item.rlteCtgryMclsNm()
+                        : (item.rlteCtgryLclsNm() != null ? item.rlteCtgryLclsNm() : "관광지");
+                String region = ((item.rlteRegnNm() != null ? item.rlteRegnNm() : "") + " "
+                        + (item.rlteSignguNm() != null ? item.rlteSignguNm() : "")).trim();
+
+                // DB 스팟 매칭 시도
+                Optional<Spot> matchedOpt = findMatchingSpot(name);
+                Long matchedSpotId = null;
+                String imageUrl = null;
+                Double rating = 0.0;
+                Integer reviewCount = 0;
+                Double distanceKm = null;
+
+                if (matchedOpt.isPresent()) {
+                    Spot ms = matchedOpt.get();
+                    matchedSpotId = ms.getId();
+                    imageUrl = ms.getImageUrl() != null ? ms.getImageUrl() : ms.getThumbnailUrl();
+                    rating = ms.getReviewAverage();
+                    reviewCount = ms.getReviewCount();
+                    distanceKm = calculateDistanceKm(spot.getLatitude(), spot.getLongitude(), ms.getLatitude(), ms.getLongitude());
+                }
+
+                result.add(RelatedSpotResponse.fromExternal(
+                        rank, name, category, region, matchedSpotId, imageUrl, rating, reviewCount, distanceKm
+                ));
+
+                if (result.size() >= targetLimit) {
+                    break;
+                }
+            }
+        }
+
+        // 5. 외부 API 결과가 없거나 부족한 경우 인근 인기 스팟으로 안전 폴백
+        if (result.isEmpty()) {
+            log.info("[SpotService] 연관 관광지 외부 API 결과 부재 -> 인근 인기 스팟으로 폴백: spotId={}, name={}",
+                    spotId, spot.getName());
+            List<Spot> nearbySpots = spotRepository.findNearbyApprovedSpots(
+                    spot.getLatitude(),
+                    spot.getLongitude(),
+                    SpotStatus.APPROVED.name(),
+                    20.0,
+                    targetLimit + 1
+            );
+
+            int rank = 1;
+            for (Spot ns : nearbySpots) {
+                if (ns.getId().equals(spot.getId())) {
+                    continue;
+                }
+                Double dist = calculateDistanceKm(spot.getLatitude(), spot.getLongitude(), ns.getLatitude(), ns.getLongitude());
+                String catName = ns.getCategories().stream().findFirst().map(Enum::name).orElse("관광지");
+
+                result.add(RelatedSpotResponse.fromExternal(
+                        rank++,
+                        ns.getName(),
+                        catName,
+                        ns.getAddress(),
+                        ns.getId(),
+                        ns.getImageUrl() != null ? ns.getImageUrl() : ns.getThumbnailUrl(),
+                        ns.getReviewAverage(),
+                        ns.getReviewCount(),
+                        dist
+                ));
+
+                if (result.size() >= targetLimit) {
+                    break;
+                }
+            }
+        }
+
+        // 6. Redis에 24시간 캐싱
+        try {
+            if (redisTemplate != null && !result.isEmpty()) {
+                String json = objectMapper.writeValueAsString(result);
+                redisTemplate.opsForValue().set(cacheKey, json, Duration.ofHours(24));
+            }
+        } catch (Exception e) {
+            log.warn("[SpotService] 연관 관광지 캐시 저장 실패 (무시): {}", e.getMessage());
+        }
+
+        return result;
+    }
+
+    private Optional<Spot> findMatchingSpot(String rlteTatsNm) {
+        if (rlteTatsNm == null || rlteTatsNm.isBlank()) {
+            return Optional.empty();
+        }
+        String clean = rlteTatsNm.split("/")[0].trim();
+        List<Spot> spots = spotRepository.findApprovedByNameContaining(clean, PageRequest.of(0, 1));
+        return spots.isEmpty() ? Optional.empty() : Optional.of(spots.get(0));
+    }
+
+    private Double calculateDistanceKm(Double lat1, Double lon1, Double lat2, Double lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
+            return null;
+        }
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double dist = 6371.0 * c;
+        return Math.round(dist * 10.0) / 10.0;
     }
 }
