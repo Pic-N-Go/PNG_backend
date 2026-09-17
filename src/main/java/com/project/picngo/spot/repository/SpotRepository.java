@@ -67,6 +67,9 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
                                         @Param("status") String status,
                                         @Param("limit") int limit);
 
+    @Query("SELECT s FROM Spot s WHERE s.isActive = true AND s.status = 'APPROVED' AND s.name LIKE %:name%")
+    List<Spot> findApprovedByNameContaining(@Param("name") String name, Pageable pageable);
+
     // 유저 관심테마와 겹치는 스팟만 반환한다. 겹치는 테마가 많은 순 → 인기순.
     // INNER JOIN이라 관심테마가 없는 유저(소셜 가입 등)는 빈 목록이 되고, 클라이언트가
     // 그걸 근거로 "관심 테마 설정" 안내를 띄운다 — 인기순으로 채우면 "관심 스팟" 제목 아래

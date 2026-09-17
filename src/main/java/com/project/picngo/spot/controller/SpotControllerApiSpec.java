@@ -6,6 +6,7 @@ import com.project.picngo.spot.dto.MapBoundsRequest;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.PhotogenicResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
+import com.project.picngo.spot.dto.RelatedSpotResponse;
 import com.project.picngo.spot.dto.ReviewCreateRequest;
 import com.project.picngo.spot.dto.ReviewListResponse;
 import com.project.picngo.spot.dto.ReviewResponse;
@@ -139,6 +140,15 @@ public interface SpotControllerApiSpec {
     ResponseEntity<SpotDetailResponse> getSpotDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
             @Parameter(description = "스팟 ID") @PathVariable Long id
+    );
+
+    @Operation(
+            summary = "연관 관광지 목록 조회",
+            description = "한국관광공사 연관 관광지 정보(TarRlteTarService1)를 기반으로, 현재 스팟 방문객들이 함께 많이 찾는 연관 명소 목록을 순위별로 조회합니다. limit 기본값 10."
+    )
+    ResponseEntity<List<RelatedSpotResponse>> getRelatedSpots(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "조회 개수 (기본 10, 최대 20)") @RequestParam(defaultValue = "10") int limit
     );
 
     @Operation(summary = "리뷰 목록 조회", description = "스팟의 리뷰 목록과 요약 정보를 반환합니다. sort: LATEST(기본) | RATING_HIGH | RATING_LOW")
