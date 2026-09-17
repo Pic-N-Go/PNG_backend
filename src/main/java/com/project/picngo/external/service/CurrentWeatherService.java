@@ -47,7 +47,13 @@ public class CurrentWeatherService {
         AirQualityResponse.Item air = sido == null ? null :
                 safe(() -> weatherCacheService.getCachedAirQuality(sido));
 
-        return assemble(sido, forecasts, air, goldenHour, today, now);
+        // 오늘 일몰이 지난 뒤에만 내일 값을 받는다 — 안 그러면 하루 종일 외부 API를 두 번씩 부른다.
+        SunTimes todayTimes = sunTimes(goldenHour);
+        GoldenHourResponse tomorrowGolden = (todayTimes != null && !now.isBefore(todayTimes.sunset()))
+                ? safe(() -> weatherCacheService.getCachedGoldenHour(lat, lng, today.plusDays(1).toString()))
+                : null;
+
+        return assemble(sido, forecasts, air, goldenHour, tomorrowGolden, today, now);
     }
 
     // 순수 함수 — 테스트 대상
@@ -55,6 +61,7 @@ public class CurrentWeatherService {
                                     List<WeatherForecastResponse> forecasts,
                                     AirQualityResponse.Item air,
                                     GoldenHourResponse goldenHour,
+                                    GoldenHourResponse tomorrowGolden,
                                     LocalDate today, LocalTime now) {
         String status = null;
         Double temperature = null;
@@ -69,7 +76,7 @@ public class CurrentWeatherService {
         AirGrade ozone = air == null ? null
                 : new AirGrade(gradeLabel(air.o3Grade()), parseDouble(air.o3Value()));
 
-        String goldenHourStr = nextGoldenHour(goldenHour, now);
+        String goldenHourStr = nextGoldenHour(goldenHour, tomorrowGolden, now);
 
         return new CurrentWeatherResponse(region, status, temperature, fineDust, ozone, goldenHourStr);
     }
@@ -97,23 +104,37 @@ public class CurrentWeatherService {
         }
     }
 
-    // 현재 시각 기준 다음 골든아워(일출-30분 / 일몰-30분). 오늘 둘 다 지났으면 null.
-    private String nextGoldenHour(GoldenHourResponse gh, LocalTime now) {
+    /** 골든아워 판정에 필요한 오늘의 시각들. 하나라도 파싱이 안 되면 null. */
+    private record SunTimes(LocalTime morningGolden, LocalTime sunrise,
+                            LocalTime eveningGolden, LocalTime sunset) {}
+
+    private SunTimes sunTimes(GoldenHourResponse gh) {
         if (gh == null || gh.sunriseTime() == null || gh.sunsetTime() == null) return null;
         try {
             LocalTime sunrise = OffsetDateTime.parse(gh.sunriseTime()).atZoneSameInstant(KST).toLocalTime();
             LocalTime sunset = OffsetDateTime.parse(gh.sunsetTime()).atZoneSameInstant(KST).toLocalTime();
-            LocalTime morning = sunrise.minusMinutes(30);
-            LocalTime evening = sunset.minusMinutes(30);
-            if (now.isBefore(morning)) return morning.format(HH_MM);
-            if (now.isBefore(evening)) return evening.format(HH_MM);
-            // ponytail: 오늘 골든아워가 다 지나면 null. 내일 일출 값을 주려면 getCachedGoldenHour를
-            // 내일 날짜로 한 번 더 호출해야 하므로, 프론트에 "오늘 종료" 표시가 필요해지면 그때 추가.
-            return null;
+            return new SunTimes(sunrise.minusMinutes(30), sunrise, sunset.minusMinutes(30), sunset);
         } catch (Exception e) {
             log.warn("골든아워 파싱 실패: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 현재 시각 기준 다음 골든아워(일출-30분 / 일몰-30분).
+     *
+     * 시작 시각이 아니라 끝나는 시각(일출·일몰)을 기준으로 넘긴다 — 시작 시각으로 자르면
+     * 정작 골든아워가 진행 중인 30분 동안 화면에서 사라진다.
+     * 오늘 것이 다 끝났으면 내일 아침을 "내일 HH:mm"으로 준다.
+     */
+    private String nextGoldenHour(GoldenHourResponse todayGh, GoldenHourResponse tomorrowGh, LocalTime now) {
+        SunTimes t = sunTimes(todayGh);
+        if (t == null) return null;
+        if (now.isBefore(t.sunrise())) return t.morningGolden().format(HH_MM);
+        if (now.isBefore(t.sunset())) return t.eveningGolden().format(HH_MM);
+
+        SunTimes tomorrow = sunTimes(tomorrowGh);
+        return tomorrow == null ? null : "내일 " + tomorrow.morningGolden().format(HH_MM);
     }
 
     private String weatherLabel(String status) {

@@ -31,7 +31,7 @@ class CurrentWeatherServiceTest {
                 "2026-07-20T05:15:00+09:00", "2026-07-20T19:42:00+09:00", null, null);
 
         CurrentWeatherResponse r = service.assemble(
-                "서울", forecasts, air, gh,
+                "서울", forecasts, air, gh, null,
                 LocalDate.of(2026, 7, 20), LocalTime.of(14, 30));
 
         assertThat(r.region()).isEqualTo("서울");
@@ -44,31 +44,43 @@ class CurrentWeatherServiceTest {
     }
 
     @Test
-    @DisplayName("오전 골든아워 전이면 오전(일출-30분), 지났으면 저녁(일몰-30분), 저녁도 지났으면 null")
+    @DisplayName("골든아워는 진행 중에도 유지되고, 오늘 것이 끝나면 내일 아침을 준다")
     void nextGoldenHour() {
+        // 일출 05:15 → 오전 골든아워 04:45~05:15 / 일몰 19:42 → 저녁 골든아워 19:12~19:42
         GoldenHourResponse gh = new GoldenHourResponse(
                 "2026-07-20T05:15:00+09:00", "2026-07-20T19:42:00+09:00", null, null);
+        GoldenHourResponse tomorrow = new GoldenHourResponse(
+                "2026-07-21T05:16:00+09:00", "2026-07-21T19:41:00+09:00", null, null);
 
-        // 04:00 → 오전 골든아워(04:45) 전 → 04:45
-        CurrentWeatherResponse morning = service.assemble("서울", List.of(), null, gh,
-                LocalDate.of(2026, 7, 20), LocalTime.of(4, 0));
-        assertThat(morning.goldenHour()).isEqualTo("04:45");
+        // 04:00 → 오전 골든아워 전 → 04:45
+        assertThat(service.assemble("서울", List.of(), null, gh, null,
+                LocalDate.of(2026, 7, 20), LocalTime.of(4, 0)).goldenHour()).isEqualTo("04:45");
 
-        // 14:00 → 오전 지남 → 저녁(19:12)
-        CurrentWeatherResponse evening = service.assemble("서울", List.of(), null, gh,
-                LocalDate.of(2026, 7, 20), LocalTime.of(14, 0));
-        assertThat(evening.goldenHour()).isEqualTo("19:12");
+        // 05:00 → 오전 골든아워 진행 중 → 사라지지 않고 04:45 유지
+        assertThat(service.assemble("서울", List.of(), null, gh, null,
+                LocalDate.of(2026, 7, 20), LocalTime.of(5, 0)).goldenHour()).isEqualTo("04:45");
 
-        // 20:00 → 저녁 골든아워(19:12)도 지남 → 지난 시각을 "다음"으로 주지 않고 null
-        CurrentWeatherResponse afterSunset = service.assemble("서울", List.of(), null, gh,
-                LocalDate.of(2026, 7, 20), LocalTime.of(20, 0));
-        assertThat(afterSunset.goldenHour()).isNull();
+        // 14:00 → 오전 끝남 → 저녁 19:12
+        assertThat(service.assemble("서울", List.of(), null, gh, null,
+                LocalDate.of(2026, 7, 20), LocalTime.of(14, 0)).goldenHour()).isEqualTo("19:12");
+
+        // 19:30 → 저녁 골든아워 진행 중 → 사라지지 않고 19:12 유지
+        assertThat(service.assemble("서울", List.of(), null, gh, null,
+                LocalDate.of(2026, 7, 20), LocalTime.of(19, 30)).goldenHour()).isEqualTo("19:12");
+
+        // 20:00 → 일몰도 지남 → 내일 아침 골든아워(05:16-30분)
+        assertThat(service.assemble("서울", List.of(), null, gh, tomorrow,
+                LocalDate.of(2026, 7, 20), LocalTime.of(20, 0)).goldenHour()).isEqualTo("내일 04:46");
+
+        // 내일 값을 못 받았으면(외부 API 실패) 지난 시각을 "다음"으로 주지 않고 null
+        assertThat(service.assemble("서울", List.of(), null, gh, null,
+                LocalDate.of(2026, 7, 20), LocalTime.of(20, 0)).goldenHour()).isNull();
     }
 
     @Test
     @DisplayName("예보 없음/미세먼지 없음이면 해당 필드는 null (부분 응답)")
     void partialNulls() {
-        CurrentWeatherResponse r = service.assemble("서울", List.of(), null, null,
+        CurrentWeatherResponse r = service.assemble("서울", List.of(), null, null, null,
                 LocalDate.of(2026, 7, 20), LocalTime.of(12, 0));
 
         assertThat(r.region()).isEqualTo("서울");
@@ -89,7 +101,7 @@ class CurrentWeatherServiceTest {
         );
 
         CurrentWeatherResponse r = service.assemble(
-                "서울", forecasts, null, null,
+                "서울", forecasts, null, null, null,
                 LocalDate.of(2026, 7, 20), LocalTime.of(14, 30));
 
         assertThat(r.weatherStatus()).isEqualTo("맑음");
@@ -105,7 +117,7 @@ class CurrentWeatherServiceTest {
         );
 
         CurrentWeatherResponse r = service.assemble(
-                "서울", forecasts, null, null,
+                "서울", forecasts, null, null, null,
                 LocalDate.of(2026, 7, 20), LocalTime.of(14, 30));
 
         assertThat(r.weatherStatus()).isNull();
@@ -122,7 +134,7 @@ class CurrentWeatherServiceTest {
 
         // 23:50 → 2300 슬롯(50분)이 0010 슬롯(1420분)보다 가까움. 원형거리였다면 0010(20분)을 잘못 골랐을 것.
         CurrentWeatherResponse r = service.assemble(
-                "서울", forecasts, null, null,
+                "서울", forecasts, null, null, null,
                 LocalDate.of(2026, 7, 20), LocalTime.of(23, 50));
 
         assertThat(r.weatherStatus()).isEqualTo("맑음");
