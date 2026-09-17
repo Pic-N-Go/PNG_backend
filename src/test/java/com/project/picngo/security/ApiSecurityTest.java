@@ -129,6 +129,13 @@ public class ApiSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("인증 없이 관리자 신고 목록에 접근할 수 없다")
+    void unauthenticatedUserCannotAccessAdminReports() throws Exception {
+        mockMvc.perform(get("/admin/reports"))
+                .andExpect(status().isUnauthorized());
+    }
+
     // ========== 2. 유효한 인증 정보로 API 호출 시 정상 통과되는지 검증 ==========
     // 주소 오타(404)를 원천 차단하기 위한 짝꿍 테스트!
 
@@ -164,6 +171,14 @@ public class ApiSecurityTest {
         mockMvc.perform(get("/courses")
                         .with(authentication(createMockAuthToken())))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("일반 사용자는 관리자 신고 목록에 접근할 수 없다")
+    void normalUserCannotAccessAdminReports() throws Exception {
+        mockMvc.perform(get("/admin/reports")
+                        .with(authentication(createMockAuthToken())))
+                .andExpect(status().isForbidden());
     }
 
     @Test

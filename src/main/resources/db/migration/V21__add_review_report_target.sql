@@ -1,0 +1,2 @@
+ALTER TABLE `reports`
+    MODIFY COLUMN `target_type` enum('CHAT_MESSAGE','COMMENT','POST','REVIEW') NOT NULL;
