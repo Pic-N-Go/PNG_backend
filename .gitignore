@@ -57,6 +57,7 @@ docs/spot-category-set-progress.md
 # OS / 로컬 덤프 / 스킬 산출물
 .DS_Store
 picngo_spots.sql
+picngo_backup.sql
 docs/superpowers/
 .superpowers/
 

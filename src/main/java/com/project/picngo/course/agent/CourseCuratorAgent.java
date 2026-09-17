@@ -31,6 +31,29 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 @RequiredArgsConstructor
 public class CourseCuratorAgent {
 
+    public static final Map<String, Object> CURATION_SCHEMA = Map.of(
+            "type", "object",
+            "properties", Map.of(
+                    "title", Map.of("type", "string", "description", "코스 제목 (30자 이내)"),
+                    "overview", Map.of("type", "string", "description", "코스 소개 및 총평 (100자 내외)"),
+                    "tips", Map.of(
+                            "type", "array",
+                            "items", Map.of(
+                                    "type", "object",
+                                    "properties", Map.of(
+                                            "spotId", Map.of("type", "integer", "description", "스팟 ID"),
+                                            "tip", Map.of("type", "string", "description", "해당 스팟에서의 구체적인 촬영 팁")
+                                    ),
+                                    "required", List.of("spotId", "tip"),
+                                    "additionalProperties", false
+                            ),
+                            "description", "스팟별 촬영 팁 목록"
+                    )
+            ),
+            "required", List.of("title", "overview", "tips"),
+            "additionalProperties", false
+    );
+
     private final OpenAiChatClient openAiChatClient;
     private final ObjectMapper objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
@@ -95,6 +118,12 @@ public class CourseCuratorAgent {
         userContext.append("날씨: ").append(weather.weatherSummary())
                 .append(", 일몰: ").append(weather.sunsetTime())
                 .append(", 골든아워: ").append(weather.goldenHourTime()).append("\n\n");
+        boolean nearby = isNearbyCourse(goal, spots);
+        if (nearby) {
+            userContext.append(String.format("참고사항: 요청 지역(%s) 내 등록 스팟이 없어, %s 인근 주변 명소들로 구성된 코스입니다. 코스 제목과 소개(overview)에 '%s 인근' 명소임을 자연스럽게 표현해주세요.\n\n",
+                    goal.region(), goal.region(), goal.region()));
+        }
+
         userContext.append("일정별 스팟 목록:\n");
 
         int curDay = 1;
@@ -114,14 +143,23 @@ public class CourseCuratorAgent {
                     day, orderInCurDay++, s.id(), s.name(), s.address(), travelMin));
         }
 
-        Optional<String> jsonOpt = openAiChatClient.chatJson(systemPrompt, userContext.toString(), 1000);
+        Optional<String> jsonOpt = openAiChatClient.chatStructuredJson(systemPrompt, userContext.toString(), "course_curation", CURATION_SCHEMA, 1000);
+        if (jsonOpt.isEmpty()) {
+            jsonOpt = openAiChatClient.chatJson(systemPrompt, userContext.toString(), 1000);
+        }
         if (jsonOpt.isEmpty()) {
             return Optional.empty();
         }
 
         JsonNode root = objectMapper.readTree(jsonOpt.get());
-        String title = root.path("title").asText("감성 출사 코스");
-        String overview = root.path("overview").asText("멋진 사진을 남길 수 있는 추천 출사 코스입니다.");
+        String defaultTitle = nearby
+                ? String.format("%s 인근 %s (%d일 코스)", goal.region(), goal.theme(), duration)
+                : "감성 출사 코스";
+        String defaultOverview = nearby
+                ? String.format("요청하신 %s 인근 명소로 구성된 %s 날씨 맞춤 추천 코스입니다.", goal.region(), weather.weatherSummary())
+                : "멋진 사진을 남길 수 있는 추천 출사 코스입니다.";
+        String title = root.path("title").asText(defaultTitle);
+        String overview = root.path("overview").asText(defaultOverview);
 
         Map<Long, String> tipsMap = new HashMap<>();
         JsonNode tipsNode = root.path("tips");
@@ -172,8 +210,15 @@ public class CourseCuratorAgent {
     ) {
         int duration = Math.max(1, goal.durationDays());
         int totalSpots = spots.size();
-        String title = String.format("%s %s (%d일 코스)", goal.region(), goal.theme(), duration);
-        String overview = String.format("%s 날씨에 어울리는 %s %d일 추천 코스입니다. (골든아워: %s)",
+
+        boolean nearby = isNearbyCourse(goal, spots);
+        String title = nearby
+                ? String.format("%s 인근 %s (%d일 코스)", goal.region(), goal.theme(), duration)
+                : String.format("%s %s (%d일 코스)", goal.region(), goal.theme(), duration);
+        String overview = nearby
+                ? String.format("요청하신 %s 인근 명소로 구성된 %s 날씨 맞춤 %d일 추천 코스입니다. (골든아워: %s)",
+                goal.region(), weather.weatherSummary(), duration, weather.goldenHourTime())
+                : String.format("%s 날씨에 어울리는 %s %d일 추천 코스입니다. (골든아워: %s)",
                 weather.weatherSummary(), goal.region(), duration, weather.goldenHourTime());
 
         List<CuratedSpotItem> curatedSpots = new ArrayList<>();
@@ -207,5 +252,19 @@ public class CourseCuratorAgent {
         }
 
         return new CuratedCourseDraft(title, goal.theme(), overview, duration, curatedSpots);
+    }
+
+    private boolean isNearbyCourse(PlanGoal goal, List<SpotCandidate> spots) {
+        if (spots == null || spots.isEmpty() || goal.region() == null || goal.region().isBlank()) {
+            return false;
+        }
+        SpotSearchAgent.RegionPair pair = SpotSearchAgent.resolveRegionPair(goal.region());
+        String r = goal.region().trim();
+        return spots.stream().noneMatch(s -> {
+            if (s.address() == null) return false;
+            return s.address().contains(r)
+                    || (pair.primary() != null && s.address().contains(pair.primary()))
+                    || (pair.secondary() != null && s.address().contains(pair.secondary()));
+        });
     }
 }

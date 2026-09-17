@@ -49,7 +49,7 @@ public class AiCoursePlanService {
      */
     public String initiatePlan(Long userId, AiCoursePlanRequest request) {
         String taskId = UUID.randomUUID().toString();
-        log.info("🚀 AI 코스 기획 요청 접수: taskId={}, userId={}, prompt='{}'", taskId, userId, request.prompt());
+        log.info("[AI Plan] 코스 기획 요청 접수: taskId={}, userId={}, prompt='{}'", taskId, userId, request.prompt());
 
         // Redis에 초기 진행 상태 저장
         saveTaskStatus(taskId, AiCoursePlanResponse.accepted(taskId));
@@ -74,7 +74,7 @@ public class AiCoursePlanService {
     public void executePlan(AiCoursePlanMessage message) {
         String taskId = message.taskId();
         Long userId = message.userId();
-        log.info("⚙️ [AI Worker] 멀티 에이전트 오케스트레이션 실행 시작: taskId={}, userId={}", taskId, userId);
+        log.info("[AI Worker] 멀티 에이전트 오케스트레이션 실행 시작: taskId={}, userId={}", taskId, userId);
 
         try {
             // 1. LeaderAgent 오케스트레이션 실행 (의도 분석 -> 스팟 탐색 -> 동선 최적화 -> 날씨/골든아워 -> 큐레이션)
@@ -111,7 +111,7 @@ public class AiCoursePlanService {
                 savedCourse.getCourseSpots().add(savedSpot);
             }
 
-            log.info("💾 [AI Worker] 코스 DB 저장 완료: courseId={}, title='{}', 스팟 {}개",
+            log.info("[AI Worker] 코스 DB 저장 완료: courseId={}, title='{}', 스팟 {}개",
                     savedCourse.getId(), savedCourse.getTitle(), draft.spots().size());
 
             // 4. Redis 상태 갱신 (COMPLETED)
@@ -132,7 +132,7 @@ public class AiCoursePlanService {
             );
 
         } catch (Exception e) {
-            log.error("❌ [AI Worker] 코스 기획 중 장애 발생: taskId={}, error={}", taskId, e.getMessage(), e);
+            log.error("[AI Worker] 코스 기획 중 장애 발생: taskId={}, error={}", taskId, e.getMessage(), e);
             saveTaskStatus(taskId, AiCoursePlanResponse.failed(taskId, "코스 기획 도중 오류가 발생했습니다: " + e.getMessage()));
         }
     }

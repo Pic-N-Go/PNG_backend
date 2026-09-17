@@ -35,6 +35,38 @@ public interface SpotRepository extends JpaRepository<Spot, Long> {
     List<Spot> findNearbySpots(@Param("lat") Double lat, @Param("lng") Double lng,
                                @Param("radiusKm") Double radiusKm, @Param("limit") int limit);
 
+    @Query(value = """
+            SELECT s.*, (6371 * acos(cos(radians(:lat)) * cos(radians(s.latitude))
+                * cos(radians(s.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(s.latitude)))) AS distance
+            FROM spot s
+            WHERE s.is_active = true AND s.status = :status
+              AND s.latitude BETWEEN 33.0 AND 38.9
+              AND s.longitude BETWEEN 124.0 AND 132.0
+            HAVING distance < :radiusKm
+            ORDER BY distance ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Spot> findNearbyApprovedSpots(@Param("lat") Double lat,
+                                       @Param("lng") Double lng,
+                                       @Param("status") String status,
+                                       @Param("radiusKm") Double radiusKm,
+                                       @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT s.*, (6371 * acos(cos(radians(:lat)) * cos(radians(s.latitude))
+                * cos(radians(s.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(s.latitude)))) AS distance
+            FROM spot s
+            WHERE s.is_active = true AND s.status = :status
+              AND s.latitude BETWEEN 33.0 AND 38.9
+              AND s.longitude BETWEEN 124.0 AND 132.0
+            ORDER BY distance ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Spot> findNearestApprovedSpots(@Param("lat") Double lat,
+                                        @Param("lng") Double lng,
+                                        @Param("status") String status,
+                                        @Param("limit") int limit);
+
     // 유저 관심테마와 겹치는 스팟만 반환한다. 겹치는 테마가 많은 순 → 인기순.
     // INNER JOIN이라 관심테마가 없는 유저(소셜 가입 등)는 빈 목록이 되고, 클라이언트가
     // 그걸 근거로 "관심 테마 설정" 안내를 띄운다 — 인기순으로 채우면 "관심 스팟" 제목 아래
