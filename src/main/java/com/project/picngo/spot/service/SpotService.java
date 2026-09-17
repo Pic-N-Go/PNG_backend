@@ -32,7 +32,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -47,6 +48,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,7 +58,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class SpotService {
 
@@ -90,6 +91,31 @@ public class SpotService {
     private final AdministrativeCodeResolver administrativeCodeResolver;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    public SpotService(
+            SpotRepository spotRepository,
+            ReviewRepository reviewRepository,
+            SpotPhotoRepository spotPhotoRepository,
+            BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository,
+            MeterRegistry meterRegistry,
+            SearchProperties searchProperties,
+            @Nullable EmbeddingClient embeddingClient,
+            @Nullable TarRlteTarApiClient tarRlteTarApiClient,
+            @Nullable AdministrativeCodeResolver administrativeCodeResolver,
+            @Nullable StringRedisTemplate redisTemplate
+    ) {
+        this.spotRepository = spotRepository;
+        this.reviewRepository = reviewRepository;
+        this.spotPhotoRepository = spotPhotoRepository;
+        this.bookmarkCollectionSpotRepository = bookmarkCollectionSpotRepository;
+        this.meterRegistry = meterRegistry;
+        this.searchProperties = searchProperties;
+        this.embeddingClient = embeddingClient;
+        this.tarRlteTarApiClient = tarRlteTarApiClient;
+        this.administrativeCodeResolver = administrativeCodeResolver;
+        this.redisTemplate = redisTemplate;
+    }
 
     // 기존 테스트 코드 호환용 보조 생성자
     public SpotService(
