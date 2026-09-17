@@ -120,7 +120,8 @@ public class LeaderAgent {
                     사용자의 요청에서 '지역(region)', '출사 테마(theme)', '관련 카테고리(categories)', '여행 일수(durationDays)'를 추출하여 JSON으로 응답하세요.
                     
                     region 추출 규칙:
-                    - 대한민국 광역/기초 행정구역명(도/시/군/구) 위주로 추출하세요. (예: 충남, 충청남도, 태안, 보령, 부산, 제주, 강릉, 경주 등)
+                    - 사용자의 요청 문장(프롬프트)에 명시된 지역이 있다면, 기본 지역 필터보다 요청 문장의 지역명을 최우선으로 추출하세요.
+                    - 대한민국 광역/기초 행정구역명(도/시/군/구) 위주로 추출하세요. (예: 충남, 충청남도, 태안, 보령, 부산, 제주, 강릉, 경주, 전남광주, 광주 등)
                     - '서해', '동해', '남해', '바다' 같은 방위/자연지물은 region에 포함하지 말고, 순수 행정구역명만 추출하세요. (예: '충남 서해' -> '충남')
                     - 지역 언급이 없으면 '서울'로 설정하세요.
                     
@@ -145,7 +146,8 @@ public class LeaderAgent {
                     }
                     """;
 
-            String userMessage = String.format("요청: \"%s\" (기본 지역: %s)", prompt, region != null ? region : "미지정");
+            String userMessage = String.format("사용자 프롬프트: \"%s\" (선택된 기본 지역: %s - 단, 사용자 프롬프트에 지역명이 있다면 프롬프트의 지역명을 최우선 추출할 것)",
+                    prompt, (region != null && !PlanGoal.isGenericRegion(region)) ? region : "미지정");
             Optional<String> jsonOpt = openAiChatClient.chatStructuredJson(systemPrompt, userMessage, "plan_goal", PLAN_GOAL_SCHEMA, 500);
             if (jsonOpt.isEmpty()) {
                 jsonOpt = openAiChatClient.chatJson(systemPrompt, userMessage, 500);
@@ -154,11 +156,16 @@ public class LeaderAgent {
             if (jsonOpt.isPresent()) {
                 JsonNode root = objectMapper.readTree(jsonOpt.get());
                 String rawRegion = root.path("region").asText("");
+
+                // 사용자 프롬프트 텍스트에 지역명이 명시되어 있으면 최우선 적용
+                Optional<String> promptExplicitRegion = PlanGoal.findRegionInText(prompt);
                 String extractedRegion;
-                if (rawRegion.isBlank() || rawRegion.equals("미정") || rawRegion.equals("전국") || rawRegion.equals("국내")) {
-                    extractedRegion = PlanGoal.extractRegionFromPrompt(prompt, region);
-                } else {
+                if (promptExplicitRegion.isPresent()) {
+                    extractedRegion = promptExplicitRegion.get();
+                } else if (!rawRegion.isBlank() && !PlanGoal.isGenericRegion(rawRegion)) {
                     extractedRegion = rawRegion;
+                } else {
+                    extractedRegion = PlanGoal.extractRegionFromPrompt(prompt, region);
                 }
                 extractedRegion = SpotSearchAgent.normalizeRegion(extractedRegion);
                 String theme = root.path("theme").asText("감성 출사 코스");

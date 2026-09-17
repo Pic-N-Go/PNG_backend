@@ -4,6 +4,7 @@ import com.project.picngo.common.domain.SpotCategory;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -97,34 +98,66 @@ public record PlanGoal(
         return false;
     }
 
-    public static String extractRegionFromPrompt(String prompt, String defaultRegion) {
-        if (defaultRegion != null && !defaultRegion.isBlank() && !defaultRegion.equals("미지정") && !defaultRegion.equals("전국")) {
-            return defaultRegion;
+    public static final List<String> REGION_CANDIDATES = List.of(
+            // 1. 혼동되기 쉬운 복합/특수 지명 최우선 매칭
+            "전남광주", "전남 광주", "광주광역시", "경기광주", "경기 광주",
+            // 2. 기초지자체(시/군)를 광역지자체(도/특별시)보다 우선 매칭하여 정확도 향상
+            "태안", "보령", "서산", "당진",
+            "강릉", "속초", "양양", "춘천", "원주", "동해", "태백", "삼척", "홍천", "횡성", "영월", "평창", "정선", "철원", "화천", "양구", "인제",
+            "경주", "안동", "포항", "김천", "구미", "영주", "영천", "상주", "문경", "경산", "의성", "청송", "영양", "영덕", "청도", "고령", "성주", "칠곡", "예천", "봉화", "울진", "울릉",
+            "여수", "순천", "담양", "목포", "광양", "곡성", "구례", "고흥", "보성", "화순", "장흥", "강진", "해남", "영암", "무안", "함평", "영광", "장성", "완도", "진도", "신안",
+            "전주", "군산", "단양", "남원", "정읍", "익산", "김제", "완주", "진안", "무주", "장수", "임실", "순창", "고창", "부안",
+            "통영", "거제", "남해", "창원", "진주", "사천", "김해", "밀양", "양산", "의령", "함안", "창녕", "하동", "산청", "함양", "거창", "합천",
+            "천안", "공주", "아산", "논산", "계룡", "금산", "부여", "서천", "청양", "홍성", "예산",
+            "청주", "충주", "제천", "보은", "옥천", "영동", "증평", "진천", "괴산", "음성",
+            "수원", "성남", "의정부", "안양", "부천", "광명", "평택", "동두천", "안산", "고양", "과천", "구리", "남양주", "오산", "시흥", "군포", "의왕", "하남", "용인", "파주", "이천", "안성", "김포", "화성", "양주", "포천", "여주", "연천", "가평", "양평",
+            // 3. 광역 지자체 정식 명칭
+            "서울특별시", "부산광역시", "대구광역시", "인천광역시", "대전광역시", "울산광역시", "세종특별자치시",
+            "제주특별자치도", "강원특별자치도", "전북특별자치도", "충청남도", "충청북도", "전라남도", "전라북도", "경상남도", "경상북도", "경기도",
+            // 4. 광역 단축 명칭
+            "부산", "대구", "인천", "광주", "대전", "울산", "세종", "서울", "제주",
+            "충남", "충북", "전남", "전북", "경남", "경북", "강원", "경기"
+    );
+
+    public static Optional<String> findRegionInText(String text) {
+        if (text == null || text.isBlank()) {
+            return Optional.empty();
         }
-        if (prompt == null || prompt.isBlank()) {
-            return "서울";
-        }
-        // 기초지자체(시/군)를 광역지자체(도/특별시)보다 우선 매칭하여 정확도 향상
-        List<String> regionCandidates = List.of(
-                "태안", "보령", "서산", "당진",
-                "강릉", "속초", "양양", "춘천", "원주", "동해", "태백", "삼척", "홍천", "횡성", "영월", "평창", "정선", "철원", "화천", "양구", "인제",
-                "경주", "안동", "포항", "김천", "구미", "영주", "영천", "상주", "문경", "경산", "의성", "청송", "영양", "영덕", "청도", "고령", "성주", "칠곡", "예천", "봉화", "울진", "울릉",
-                "여수", "순천", "담양", "목포", "광양", "곡성", "구례", "고흥", "보성", "화순", "장흥", "강진", "해남", "영암", "무안", "함평", "영광", "장성", "완도", "진도", "신안",
-                "전주", "군산", "단양", "남원", "정읍", "익산", "김제", "완주", "진안", "무주", "장수", "임실", "순창", "고창", "부안",
-                "통영", "거제", "남해", "창원", "진주", "사천", "김해", "밀양", "양산", "의령", "함안", "창녕", "하동", "산청", "함양", "거창", "합천",
-                "천안", "공주", "아산", "논산", "계룡", "금산", "부여", "서천", "청양", "홍성", "예산",
-                "청주", "충주", "제천", "보은", "옥천", "영동", "증평", "진천", "괴산", "음성",
-                "수원", "성남", "의정부", "안양", "부천", "광명", "평택", "동두천", "안산", "고양", "과천", "구리", "남양주", "오산", "시흥", "군포", "의왕", "하남", "용인", "파주", "이천", "안성", "김포", "화성", "양주", "포천", "여주", "연천", "가평", "양평",
-                "부산", "대구", "인천", "광주", "대전", "울산", "세종", "서울",
-                "제주특별자치도", "제주",
-                "충청남도", "충청북도", "전라남도", "전라북도", "경상남도", "경상북도", "강원특별자치도",
-                "충남", "충북", "전남", "전북", "경남", "경북", "강원", "경기"
-        );
-        for (String r : regionCandidates) {
-            if (prompt.contains(r)) {
-                return r;
+        for (String r : REGION_CANDIDATES) {
+            if (text.contains(r)) {
+                return Optional.of(r);
             }
         }
+        return Optional.empty();
+    }
+
+    public static boolean isGenericRegion(String region) {
+        if (region == null || region.isBlank()) {
+            return true;
+        }
+        String r = region.trim();
+        return r.equals("미지정") || r.equals("미정")
+                || r.equals("전국") || r.equals("전체")
+                || r.equals("전체(자동)") || r.equals("국내")
+                || r.equals("대한민국") || r.equals("한국");
+    }
+
+    public static String extractRegionFromPrompt(String prompt, String defaultRegion) {
+        // 1순위: 사용자 프롬프트 텍스트에서 지역 키워드를 최우선 탐색
+        Optional<String> promptRegion = findRegionInText(prompt);
+        if (promptRegion.isPresent()) {
+            return promptRegion.get();
+        }
+
+        // 2순위: 프롬프트에 지역명이 없을 때만 기본 필터 지역 반영
+        if (defaultRegion != null && !defaultRegion.isBlank()) {
+            String trimmed = defaultRegion.trim();
+            if (!isGenericRegion(trimmed)) {
+                return trimmed;
+            }
+        }
+
+        // 3순위: 기본 안전망
         return "서울";
     }
 

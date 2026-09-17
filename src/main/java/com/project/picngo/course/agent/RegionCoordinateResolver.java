@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,24 +29,48 @@ public class RegionCoordinateResolver {
     private static final Map<String, Coordinate> REGION_COORDINATES = new HashMap<>();
 
     static {
-        // 광역자치단체 (17개)
+        // 복합 및 특수 지명 (오인식 방지)
+        put("전남광주", 35.1595, 126.8526);
+        put("전남 광주", 35.1595, 126.8526);
+        put("광주광역시", 35.1595, 126.8526);
+        put("경기광주", 37.4294, 127.2551);
+        put("경기 광주", 37.4294, 127.2551);
+
+        // 광역자치단체 (17개) 및 정식 명칭
         put("서울", 37.5665, 126.9780);
+        put("서울특별시", 37.5665, 126.9780);
         put("부산", 35.1796, 129.0756);
+        put("부산광역시", 35.1796, 129.0756);
         put("대구", 35.8714, 128.6014);
+        put("대구광역시", 35.8714, 128.6014);
         put("인천", 37.4563, 126.7052);
+        put("인천광역시", 37.4563, 126.7052);
         put("광주", 35.1595, 126.8526);
         put("대전", 36.3504, 127.3845);
+        put("대전광역시", 36.3504, 127.3845);
         put("울산", 35.5384, 129.3114);
+        put("울산광역시", 35.5384, 129.3114);
         put("세종", 36.4800, 127.2890);
+        put("세종특별자치시", 36.4800, 127.2890);
         put("경기", 37.2750, 127.0094);
+        put("경기도", 37.2750, 127.0094);
         put("강원", 37.8854, 127.7298);
+        put("강원특별자치도", 37.8854, 127.7298);
         put("충북", 36.6357, 127.4914);
+        put("충청북도", 36.6357, 127.4914);
         put("충남", 36.5184, 126.8000);
+        put("충청남도", 36.5184, 126.8000);
         put("전북", 35.8205, 127.1088);
+        put("전북특별자치도", 35.8205, 127.1088);
+        put("전라북도", 35.8205, 127.1088);
         put("전남", 34.8161, 126.4629);
+        put("전라남도", 34.8161, 126.4629);
         put("경북", 36.5760, 128.5056);
+        put("경상북도", 36.5760, 128.5056);
         put("경남", 35.2383, 128.6924);
+        put("경상남도", 35.2383, 128.6924);
         put("제주", 33.4996, 126.5312);
+        put("제주특별자치도", 33.4996, 126.5312);
 
         // 전북특별자치도
         put("전주", 35.8242, 127.1480);
@@ -213,7 +238,12 @@ public class RegionCoordinateResolver {
         put("의정부", 37.7381, 127.0337);
         put("남양주", 37.6360, 127.2165);
         put("고양", 37.6584, 126.8320);
+        SORTED_REGION_KEYS = REGION_COORDINATES.keySet().stream()
+                .sorted((a, b) -> Integer.compare(b.length(), a.length()))
+                .toList();
     }
+
+    private static final List<String> SORTED_REGION_KEYS;
 
     private static void put(String name, double lat, double lng) {
         REGION_COORDINATES.put(name, new Coordinate(lat, lng, name));
@@ -238,11 +268,10 @@ public class RegionCoordinateResolver {
             return Optional.of(c);
         }
 
-        // 1단계 보완: 포함 매칭 (예: "남원시" -> "남원", "해남군" -> "해남")
-        for (Map.Entry<String, Coordinate> entry : REGION_COORDINATES.entrySet()) {
-            String key = entry.getKey();
+        // 1단계 보완: 가장 구체적인(긴) 지명부터 부분 일치 검사 (예: "전남광주" > "전남", "남원시" -> "남원")
+        for (String key : SORTED_REGION_KEYS) {
             if (cleaned.startsWith(key) || cleaned.contains(key)) {
-                Coordinate c = entry.getValue();
+                Coordinate c = REGION_COORDINATES.get(key);
                 log.info("[RegionCoordinateResolver] 인메모리 부분 매칭 성공: '{}' (key={}) -> ({}, {})",
                         cleaned, key, c.latitude(), c.longitude());
                 return Optional.of(c);
