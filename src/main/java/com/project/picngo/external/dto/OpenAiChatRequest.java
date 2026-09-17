@@ -11,7 +11,7 @@ public record OpenAiChatRequest(
         String model,
         List<Message> messages,
         @JsonProperty("response_format")
-        Map<String, String> responseFormat,
+        Object responseFormat,
         Double temperature,
         @JsonProperty("max_tokens")
         Integer maxTokens
@@ -26,6 +26,35 @@ public record OpenAiChatRequest(
                         new Message("user", userPrompt)
                 ),
                 Map.of("type", "json_object"),
+                temperature,
+                maxTokens
+        );
+    }
+
+    public static OpenAiChatRequest ofStructuredJson(
+            String model,
+            String systemPrompt,
+            String userPrompt,
+            String schemaName,
+            Map<String, Object> schema,
+            double temperature,
+            int maxTokens
+    ) {
+        Map<String, Object> jsonSchema = Map.of(
+                "name", schemaName,
+                "strict", true,
+                "schema", schema
+        );
+        return new OpenAiChatRequest(
+                model,
+                List.of(
+                        new Message("system", systemPrompt),
+                        new Message("user", userPrompt)
+                ),
+                Map.of(
+                        "type", "json_schema",
+                        "json_schema", jsonSchema
+                ),
                 temperature,
                 maxTokens
         );

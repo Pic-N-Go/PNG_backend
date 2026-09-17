@@ -128,6 +128,57 @@ public class KakaoLocalSearchClient {
         return PlaceSearchResult.found(place);
     }
 
+    /**
+     * 지명 또는 키워드로 카카오 로컬 검색을 수행하여 대표 좌표(위도, 경도)를 조회합니다.
+     * x, y, radius 없이 query만으로 키워드 검색을 호출합니다.
+     */
+    public java.util.Optional<Coordinate> searchRegionCoordinate(String query) {
+        if (query == null || query.isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        log.info("[카카오 지역 대표 좌표 검색 요청] 쿼리: '{}'", query);
+
+        try {
+            Supplier<KakaoLocalSearchResponse> call = CircuitBreaker.decorateSupplier(circuitBreaker, () ->
+                    webClient.get()
+                            .uri(uriBuilder -> uriBuilder
+                                    .queryParam("query", query)
+                                    .queryParam("size", 1)
+                                    .build())
+                            .header("Authorization", "KakaoAK " + apiKey)
+                            .retrieve()
+                            .bodyToMono(KakaoLocalSearchResponse.class)
+                            .timeout(CALL_TIMEOUT)
+                            .block());
+
+            KakaoLocalSearchResponse response = call.get();
+            if (response == null || response.documents() == null || response.documents().isEmpty()) {
+                log.info("[카카오 지역 좌표 검색 결과 없음] 쿼리: '{}'", query);
+                return java.util.Optional.empty();
+            }
+
+            KakaoLocalSearchResponse.PlaceDocument doc = response.documents().get(0);
+            if (doc == null || doc.x() == null || doc.y() == null) {
+                return java.util.Optional.empty();
+            }
+
+            double latitude = Double.parseDouble(doc.y());
+            double longitude = Double.parseDouble(doc.x());
+            if (!isValidCoordinate(latitude, longitude)) {
+                return java.util.Optional.empty();
+            }
+
+            log.info("[카카오 지역 대표 좌표 검색 성공] 쿼리: '{}' -> 장소: '{}' ({}, {})",
+                    query, doc.placeName(), latitude, longitude);
+            return java.util.Optional.of(new Coordinate(latitude, longitude, doc.placeName()));
+
+        } catch (Exception e) {
+            log.warn("[카카오 지역 대표 좌표 검색 실패] 쿼리: '{}', 원인: {}", query, e.getMessage());
+            return java.util.Optional.empty();
+        }
+    }
+
     private boolean isValidCoordinate(double latitude, double longitude) {
         return Double.isFinite(latitude) && Double.isFinite(longitude)
                 && latitude >= -90.0 && latitude <= 90.0
