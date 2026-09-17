@@ -106,6 +106,14 @@ public class SpotController implements SpotControllerApiSpec {
         return ResponseEntity.ok(spotService.getSpotDetail(id, userDetails != null ? userDetails.getId() : null));
     }
 
+    @GetMapping("/{id}/related")
+    public ResponseEntity<List<RelatedSpotResponse>> getRelatedSpots(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(spotService.getRelatedSpots(id, limit));
+    }
+
     @GetMapping("/{id}/reviews")
     public ResponseEntity<ReviewListResponse> getReviews(
             @PathVariable Long id,
