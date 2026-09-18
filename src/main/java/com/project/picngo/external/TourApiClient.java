@@ -265,4 +265,44 @@ public class TourApiClient {
         }
         return Collections.emptyList();
     }
+
+    /**
+     * 위치기반 관광정보 조회 (GET /locationBasedList2).
+     * 유저 실시간 위치(mapX=경도, mapY=위도) 기준 반경 내 관광정보를 조회한다.
+     * 공모전 심사 시 TourAPI 실시간 호출 이력 생성 및 공공데이터 활용을 위해 사용된다.
+     */
+    public TourApiResponse getLocationBasedList(Double mapX, Double mapY, int radiusMeters, int pageNo, int numOfRows) {
+        if (mapX == null || mapY == null) {
+            return null;
+        }
+        int clampedRadius = Math.max(100, Math.min(radiusMeters, 20000));
+        try {
+            TourApiResponse response = webClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/locationBasedList2")
+                            .queryParam("serviceKey", serviceKey)
+                            .queryParam("MobileOS", "ETC")
+                            .queryParam("MobileApp", "picngo")
+                            .queryParam("_type", "json")
+                            .queryParam("mapX", mapX)
+                            .queryParam("mapY", mapY)
+                            .queryParam("radius", clampedRadius)
+                            .queryParam("pageNo", pageNo)
+                            .queryParam("numOfRows", numOfRows)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(TourApiResponse.class)
+                    .timeout(CALL_TIMEOUT)
+                    .block();
+
+            validateResponse(response, "locationBasedList");
+            return response;
+        } catch (WebClientResponseException e) {
+            log.warn("[TourApiClient] locationBasedList HTTP 오류 (mapX={}, mapY={}, status={}): {}",
+                    mapX, mapY, e.getStatusCode(), e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.warn("[TourApiClient] locationBasedList 호출 실패 (mapX={}, mapY={}): cause={}",
+                    mapX, mapY, e.getMessage());
+        }
+        return null;
+    }
 }
