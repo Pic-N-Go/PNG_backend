@@ -1,5 +1,5 @@
 package com.project.picngo.spot.domain.enums;
 
 public enum SpotSource {
-    TOUR_API, USER
+    TOUR_API, USER, PHOTO_CONTEST
 }

@@ -20,8 +20,34 @@ public record SpotDetailResponse(
         ConvenienceInfo convenience,
         StatsInfo stats,
         Boolean isBookmarked,
-        Long myReviewId
+        Long myReviewId,
+        PhotoAwardRef photoAward
 ) {
+    public record PhotoAwardRef(
+            Long id,
+            String title,
+            String awardName,
+            String photographer,
+            String awardYearMonth,
+            String imageUrl,
+            String thumbnailUrl,
+            String copyrightNotice
+    ) {
+        public static PhotoAwardRef from(com.project.picngo.spot.domain.PhotoAward award) {
+            if (award == null) return null;
+            return new PhotoAwardRef(
+                    award.getId(),
+                    award.getTitle(),
+                    award.getAwardName(),
+                    award.getPhotographer(),
+                    award.getAwardYearMonth(),
+                    award.getImageUrl(),
+                    award.getThumbnailUrl(),
+                    "출처: ⓒ한국관광공사"
+            );
+        }
+    }
+
     public record ConvenienceInfo(
             String parking,
             String wheelchairAccess,
@@ -66,6 +92,19 @@ public record SpotDetailResponse(
             Boolean isBookmarked,
             Long myReviewId
     ) {
+        return of(spot, reviewTags, avgRating, reviewCount, photoCount, isBookmarked, myReviewId, null);
+    }
+
+    public static SpotDetailResponse of(
+            Spot spot,
+            List<String> reviewTags,
+            Double avgRating,
+            Integer reviewCount,
+            Long photoCount,
+            Boolean isBookmarked,
+            Long myReviewId,
+            PhotoAwardRef photoAward
+    ) {
         List<String> categoryNames = spot.getCategoryNames();
         return new SpotDetailResponse(
                 spot.getId(),
@@ -83,7 +122,8 @@ public record SpotDetailResponse(
                 ConvenienceInfo.from(spot),
                 new StatsInfo(avgRating, reviewCount, photoCount),
                 isBookmarked,
-                myReviewId
+                myReviewId,
+                photoAward
         );
     }
 }

@@ -290,6 +290,16 @@ public class Spot extends BaseTimeEntity {
         this.reviewCount = count;
     }
 
+    public void enrichFromPhotoAward(String imageUrl, String thumbnailUrl) {
+        this.badge = true;
+        if ((this.imageUrl == null || this.imageUrl.isBlank()) && imageUrl != null && !imageUrl.isBlank()) {
+            this.imageUrl = imageUrl;
+        }
+        if ((this.thumbnailUrl == null || this.thumbnailUrl.isBlank()) && thumbnailUrl != null && !thumbnailUrl.isBlank()) {
+            this.thumbnailUrl = thumbnailUrl;
+        }
+    }
+
     @Builder
     public Spot(
             String name,

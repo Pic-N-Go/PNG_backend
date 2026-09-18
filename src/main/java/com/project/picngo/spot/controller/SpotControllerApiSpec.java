@@ -15,6 +15,7 @@ import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
+import com.project.picngo.spot.dto.SpotCongestionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -164,6 +165,12 @@ public interface SpotControllerApiSpec {
             @Parameter(description = "스팟 ID") @PathVariable Long id,
             @Parameter(description = "조회 날짜 (yyyy-MM-dd, 생략 시 오늘)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @Parameter(description = "조회 시각 (HH:mm, 생략 시 현재)") @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime time
+    );
+
+    @Operation(summary = "스팟 관광지 집중률(혼잡도) 조회", description = "한국관광공사 TatsCnctrRateService 기반 향후 30일간의 인파 집중률 예측 및 최적 출사일을 반환합니다. date 파라미터 전달 시 해당 일자의 혼잡도 정보도 함께 반환합니다.")
+    ResponseEntity<SpotCongestionResponse> getSpotCongestion(
+            @Parameter(description = "스팟 ID") @PathVariable Long id,
+            @Parameter(description = "조회 희망 날짜 (yyyy-MM-dd, 생략 가능)") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     );
 
     @Operation(summary = "스팟 사진 목록 조회", description = "한국관광공사 TourAPI에서 스팟 공식 사진 목록을 실시간 조회합니다. 사용자 등록 스팟은 빈 배열 반환.")

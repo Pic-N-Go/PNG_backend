@@ -20,6 +20,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.picngo.external.TarRlteTarApiClient;
 import com.project.picngo.external.TourApiClient;
 import com.project.picngo.external.dto.TarRlteTarResponse;
+import com.project.picngo.external.dto.CongestionApiResponse;
+import com.project.picngo.external.service.CongestionCacheService;
+import com.project.picngo.spot.dto.SpotCongestionResponse;
 import com.project.picngo.spot.dto.NearbySpotResponse;
 import com.project.picngo.spot.dto.RecommendedSpotResponse;
 import com.project.picngo.spot.dto.RelatedSpotResponse;
@@ -46,6 +49,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -92,6 +99,8 @@ public class SpotService {
     private final AdministrativeCodeResolver administrativeCodeResolver;
     private final StringRedisTemplate redisTemplate;
     private final TourApiClient tourApiClient;
+    private final PhotoAwardRepository photoAwardRepository;
+    private final CongestionCacheService congestionCacheService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
@@ -106,7 +115,9 @@ public class SpotService {
             @Nullable TarRlteTarApiClient tarRlteTarApiClient,
             @Nullable AdministrativeCodeResolver administrativeCodeResolver,
             @Nullable StringRedisTemplate redisTemplate,
-            @Nullable TourApiClient tourApiClient
+            @Nullable TourApiClient tourApiClient,
+            @Nullable PhotoAwardRepository photoAwardRepository,
+            @Nullable CongestionCacheService congestionCacheService
     ) {
         this.spotRepository = spotRepository;
         this.reviewRepository = reviewRepository;
@@ -119,6 +130,8 @@ public class SpotService {
         this.administrativeCodeResolver = administrativeCodeResolver;
         this.redisTemplate = redisTemplate;
         this.tourApiClient = tourApiClient;
+        this.photoAwardRepository = photoAwardRepository;
+        this.congestionCacheService = congestionCacheService;
     }
 
     // 기존 테스트 코드 호환용 보조 생성자
@@ -139,6 +152,8 @@ public class SpotService {
                 meterRegistry,
                 searchProperties,
                 embeddingClient,
+                null,
+                null,
                 null,
                 null,
                 null,
@@ -166,10 +181,19 @@ public class SpotService {
         Long myReviewId = userId == null ? null
                 : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
 
+        SpotDetailResponse.PhotoAwardRef photoAwardRef = null;
+        if (photoAwardRepository != null) {
+            photoAwardRef = photoAwardRepository.findBySpotIdOrderByCreatedAtDesc(spotId).stream()
+                    .findFirst()
+                    .map(SpotDetailResponse.PhotoAwardRef::from)
+                    .orElse(null);
+        }
+
         return SpotDetailResponse.of(
                 spot, reviewTags,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
-                reviewCount, photoCount, isBookmarked, myReviewId
+                reviewCount, photoCount, isBookmarked, myReviewId,
+                photoAwardRef
         );
     }
 
@@ -952,5 +976,82 @@ public class SpotService {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         double dist = 6371.0 * c;
         return Math.round(dist * 10.0) / 10.0;
+    }
+
+    /**
+     * 한국관광공사 TatsCnctrRateService 기반 스팟의 향후 30일간 관광객 집중률(혼잡도)을 조회합니다.
+     */
+    public SpotCongestionResponse getSpotCongestion(Long spotId, @Nullable LocalDate targetDate) {
+        Spot spot = spotRepository.findById(spotId)
+                .orElseThrow(() -> new CustomException(SpotErrorCode.SPOT_NOT_FOUND));
+
+        if (congestionCacheService == null) {
+            return SpotCongestionResponse.empty(spot.getId(), spot.getName());
+        }
+
+        List<CongestionApiResponse.CongestionItem> items = congestionCacheService.getCachedCongestion(spot);
+        if (items == null || items.isEmpty()) {
+            return SpotCongestionResponse.empty(spot.getId(), spot.getName());
+        }
+
+        DateTimeFormatter inFmt = DateTimeFormatter.ofPattern("yyyyMMdd");
+        DateTimeFormatter outFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        List<SpotCongestionResponse.CongestionDayInfo> days = new ArrayList<>();
+        SpotCongestionResponse.CongestionDayInfo bestCleanDay = null;
+        SpotCongestionResponse.CongestionDayInfo selectedDay = null;
+
+        String targetDateStr = targetDate != null ? targetDate.format(outFmt) : null;
+
+        for (CongestionApiResponse.CongestionItem item : items) {
+            if (item.baseYmd() == null || item.cnctrRate() == null) continue;
+            try {
+                LocalDate d = LocalDate.parse(item.baseYmd(), inFmt);
+                String formattedDate = d.format(outFmt);
+                String dayOfWeek = d.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.KOREAN);
+                double rate = Math.round(item.cnctrRate() * 10.0) / 10.0;
+                String level = SpotCongestionResponse.levelFrom(rate);
+                String levelLabel = SpotCongestionResponse.levelLabelFrom(level);
+
+                SpotCongestionResponse.CongestionDayInfo dayInfo = new SpotCongestionResponse.CongestionDayInfo(
+                        formattedDate, dayOfWeek, rate, level, levelLabel
+                );
+                days.add(dayInfo);
+
+                if (bestCleanDay == null || dayInfo.rate() < bestCleanDay.rate()) {
+                    bestCleanDay = dayInfo;
+                }
+
+                if (targetDateStr != null && targetDateStr.equals(formattedDate)) {
+                    selectedDay = dayInfo;
+                }
+            } catch (Exception e) {
+                log.warn("[SpotService] 집중률 일자 파싱 오류 (baseYmd={}): {}", item.baseYmd(), e.getMessage());
+            }
+        }
+
+        if (days.isEmpty()) {
+            return SpotCongestionResponse.empty(spot.getId(), spot.getName());
+        }
+
+        if (selectedDay == null) {
+            String todayStr = LocalDate.now().format(outFmt);
+            selectedDay = days.stream()
+                    .filter(d -> d.date().equals(todayStr))
+                    .findFirst()
+                    .orElse(days.get(0));
+        }
+
+        String matchedAttractionName = items.get(0).tAtsNm();
+
+        return new SpotCongestionResponse(
+                spot.getId(),
+                spot.getName(),
+                matchedAttractionName,
+                true,
+                bestCleanDay,
+                selectedDay,
+                days
+        );
     }
 }

@@ -105,6 +105,16 @@ air:
     key: ${PUBLIC_DATA_SERVICE_KEY}
     base-url: ${AIR_QUALITY_BASE_URL:http://apis.data.go.kr/B552584/ArpltnInforInqireSvc}
 
+photo-award:
+  api:
+    key: ${PHOTO_AWARD_SERVICE_KEY:${PUBLIC_DATA_SERVICE_KEY}}
+    base-url: ${PHOTO_AWARD_BASE_URL:https://apis.data.go.kr/B551011/PhokoAwrdService}
+
+congestion:
+  api:
+    key: ${CONGESTION_SERVICE_KEY:${PUBLIC_DATA_SERVICE_KEY}}
+    base-url: ${CONGESTION_BASE_URL:http://apis.data.go.kr/B551011/TatsCnctrRateService}
+
 kakao:
   rest:
     api:
