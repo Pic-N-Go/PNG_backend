@@ -15,6 +15,8 @@ import com.project.picngo.spot.dto.SpotPhotoResponse;
 import com.project.picngo.spot.dto.SpotMapResponse;
 import com.project.picngo.spot.dto.SpotResponse;
 import com.project.picngo.spot.dto.SpotSummaryResponse;
+import com.project.picngo.spot.dto.SpotPetInfoResponse;
+import com.project.picngo.spot.dto.SpotAccessibilityInfoResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -139,6 +141,21 @@ public interface SpotControllerApiSpec {
     )
     ResponseEntity<SpotDetailResponse> getSpotDetail(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Parameter(description = "스팟 ID") @PathVariable Long id
+    );
+
+    @Operation(
+            summary = "스팟 반려동물 동반 상세정보 조회",
+            description = "스팟에 저장된 반려동물 동반 범위, 가능 대상, 준비사항과 시설 정보를 조회합니다. "
+                    + "스팟이 없으면 404, 스팟은 있지만 반려동물 정보가 없으면 204 No Content를 반환합니다."
+    )
+    ResponseEntity<SpotPetInfoResponse> getSpotPetInfo(
+            @Parameter(description = "스팟 ID") @PathVariable Long id
+    );
+
+    @Operation(summary = "스팟 무장애 여행 상세정보 조회",
+            description = "스팟이 없으면 404, 스팟은 있지만 무장애 정보가 없으면 204 No Content를 반환합니다.")
+    ResponseEntity<SpotAccessibilityInfoResponse> getSpotAccessibilityInfo(
             @Parameter(description = "스팟 ID") @PathVariable Long id
     );
 

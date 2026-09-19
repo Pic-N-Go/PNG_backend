@@ -5,6 +5,8 @@ import com.project.picngo.spot.dto.*;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
+import com.project.picngo.spot.service.SpotPetInfoService;
+import com.project.picngo.spot.service.SpotAccessibilityInfoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -29,6 +31,8 @@ public class SpotController implements SpotControllerApiSpec {
     private final SpotService spotService;
     private final ReviewService reviewService;
     private final PhotogenicService photogenicService;
+    private final SpotPetInfoService spotPetInfoService;
+    private final SpotAccessibilityInfoService spotAccessibilityInfoService;
 
     @GetMapping
     public ResponseEntity<Page<SpotResponse>> getSpots(
@@ -104,6 +108,20 @@ public class SpotController implements SpotControllerApiSpec {
             @PathVariable Long id
     ) {
         return ResponseEntity.ok(spotService.getSpotDetail(id, userDetails != null ? userDetails.getId() : null));
+    }
+
+    @GetMapping("/{id}/pet-info")
+    public ResponseEntity<SpotPetInfoResponse> getSpotPetInfo(@PathVariable Long id) {
+        return spotPetInfoService.getPetInfo(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/{id}/accessibility-info")
+    public ResponseEntity<SpotAccessibilityInfoResponse> getSpotAccessibilityInfo(@PathVariable Long id) {
+        return spotAccessibilityInfoService.getAccessibilityInfo(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/{id}/related")
