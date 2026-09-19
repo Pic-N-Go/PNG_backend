@@ -25,4 +25,29 @@ class AccessibilityTourDetailResponseTest {
 
         assertThat(response.response().body().items().safeItems()).isEmpty();
     }
+
+    @Test
+    void acceptsSingleItemObject() throws Exception {
+        String json = """
+                {
+                  "response": {
+                    "header": {"resultCode": "0000", "resultMsg": "OK"},
+                    "body": {
+                      "items": {
+                        "item": {"contentid": "100", "parking": "주차 가능"}
+                      },
+                      "totalCount": 1
+                    }
+                  }
+                }
+                """;
+
+        AccessibilityTourDetailResponse response =
+                objectMapper.readValue(json, AccessibilityTourDetailResponse.class);
+
+        assertThat(response.response().body().items().safeItems())
+                .singleElement()
+                .extracting(AccessibilityTourDetailResponse.Item::contentid)
+                .isEqualTo("100");
+    }
 }
