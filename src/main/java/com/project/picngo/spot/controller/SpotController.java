@@ -150,6 +150,13 @@ public class SpotController implements SpotControllerApiSpec {
         return ResponseEntity.ok(photogenicService.calculate(id, date, time));
     }
 
+    @GetMapping("/{id}/congestion")
+    public ResponseEntity<SpotCongestionResponse> getSpotCongestion(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(spotService.getSpotCongestion(id, date));
+    }
+
     @GetMapping("/{id}/photos")
     public ResponseEntity<SpotPhotoResponse> getSpotPhotos(@PathVariable Long id) {
         return ResponseEntity.ok(spotService.getSpotPhotos(id));

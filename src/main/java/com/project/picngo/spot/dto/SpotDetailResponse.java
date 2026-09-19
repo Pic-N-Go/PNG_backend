@@ -22,8 +22,34 @@ public record SpotDetailResponse(
         Boolean hasAccessibilityInfo,
         StatsInfo stats,
         Boolean isBookmarked,
-        Long myReviewId
+        Long myReviewId,
+        PhotoAwardRef photoAward
 ) {
+    public record PhotoAwardRef(
+            Long id,
+            String title,
+            String awardName,
+            String photographer,
+            String awardYearMonth,
+            String imageUrl,
+            String thumbnailUrl,
+            String copyrightNotice
+    ) {
+        public static PhotoAwardRef from(com.project.picngo.spot.domain.PhotoAward award) {
+            if (award == null) return null;
+            return new PhotoAwardRef(
+                    award.getId(),
+                    award.getTitle(),
+                    award.getAwardName(),
+                    award.getPhotographer(),
+                    award.getAwardYearMonth(),
+                    award.getImageUrl(),
+                    award.getThumbnailUrl(),
+                    "출처: ⓒ한국관광공사"
+            );
+        }
+    }
+
     public record ConvenienceInfo(
             String parking,
             String wheelchairAccess,
@@ -68,7 +94,8 @@ public record SpotDetailResponse(
             Boolean isBookmarked,
             Long myReviewId,
             boolean hasPetInfo,
-            boolean hasAccessibilityInfo
+            boolean hasAccessibilityInfo,
+            PhotoAwardRef photoAward
     ) {
         List<String> categoryNames = spot.getCategoryNames();
         return new SpotDetailResponse(
@@ -89,7 +116,8 @@ public record SpotDetailResponse(
                 hasAccessibilityInfo,
                 new StatsInfo(avgRating, reviewCount, photoCount),
                 isBookmarked,
-                myReviewId
+                myReviewId,
+                photoAward
         );
     }
 }
