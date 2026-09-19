@@ -141,7 +141,7 @@ public class AccessibilityTourApiClient {
     }
 
     private void validateHeader(String resultCode, String resultMsg, String apiName) {
-        if (resultCode != null && !"0000".equals(resultCode)) {
+        if (!"0000".equals(resultCode)) {
             throw new IllegalStateException(String.format(
                     "%s 에러: [%s] %s",
                     apiName,

@@ -115,10 +115,11 @@ public class PetTourApiClient {
             throw new IllegalStateException("반려동물 목록 API 응답이 비어 있습니다.");
         }
         var header = response.response().header();
-        if (header != null && header.resultCode() != null && !"0000".equals(header.resultCode())) {
+        if (header == null || !"0000".equals(header.resultCode())) {
             throw new IllegalStateException(String.format(
                     "반려동물 목록 API 에러: [%s] %s",
-                    header.resultCode(), header.resultMsg()));
+                    header == null ? null : header.resultCode(),
+                    header == null ? null : header.resultMsg()));
         }
     }
 
@@ -127,10 +128,12 @@ public class PetTourApiClient {
             throw new IllegalStateException("반려동물 상세 API 응답이 비어 있습니다. contentId=" + contentId);
         }
         var header = response.response().header();
-        if (header != null && header.resultCode() != null && !"0000".equals(header.resultCode())) {
+        if (header == null || !"0000".equals(header.resultCode())) {
             throw new IllegalStateException(String.format(
                     "반려동물 상세 API 에러 (contentId=%s): [%s] %s",
-                    contentId, header.resultCode(), header.resultMsg()));
+                    contentId,
+                    header == null ? null : header.resultCode(),
+                    header == null ? null : header.resultMsg()));
         }
     }
 }
