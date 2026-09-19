@@ -3,6 +3,8 @@ package com.project.picngo.spot.consumer;
 import com.project.picngo.admin.audit.domain.AdminActionType;
 import com.project.picngo.admin.audit.service.AdminAuditLogService;
 import com.project.picngo.spot.dto.TourApiSyncMessage;
+import com.project.picngo.spot.producer.PetTourSyncProducer;
+import com.project.picngo.spot.producer.AccessibilityTourSyncProducer;
 import com.project.picngo.spot.service.TourApiSyncService;
 import com.project.picngo.spot.service.TourApiSyncStatusManager;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +30,12 @@ class TourApiSyncConsumerTest {
     @Mock
     private AdminAuditLogService adminAuditLogService;
 
+    @Mock
+    private PetTourSyncProducer petTourSyncProducer;
+
+    @Mock
+    private AccessibilityTourSyncProducer accessibilityTourSyncProducer;
+
     @InjectMocks
     private TourApiSyncConsumer tourApiSyncConsumer;
 
@@ -42,6 +50,8 @@ class TourApiSyncConsumerTest {
         verify(tourApiSyncService).sync(34, 1, 5);
         verify(adminAuditLogService).record(eq(100L), eq(AdminActionType.TOUR_API_SYNC), anyString(), eq("AREA_34"), anyString(), isNull());
         verify(syncStatusManager).markSuccess(45);
+        verify(petTourSyncProducer).sendAfterSpotSync(message);
+        verify(accessibilityTourSyncProducer).sendAfterSpotSync(message);
         verify(syncStatusManager).releaseLock();
     }
 
