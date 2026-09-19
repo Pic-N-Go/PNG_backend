@@ -22,6 +22,7 @@ public class PetTourSyncConsumer {
                 message.sourceSyncType(), message.contentTypeIds());
 
         try {
+            int totalFailedCount = 0;
             for (int contentTypeId : message.contentTypeIds()) {
                 PetTourSyncResultResponse result = petTourSyncService.syncMatchedSpots(
                         contentTypeId,
@@ -31,6 +32,13 @@ public class PetTourSyncConsumer {
                 log.info("[PetTourSyncConsumer] 타입 동기화 완료: contentTypeId={}, matched={}, requested={}, saved={}, noDetail={}, failed={}",
                         result.contentTypeId(), result.matchedSpotCount(), result.requestedDetailCount(),
                         result.savedCount(), result.noDetailCount(), result.failedCount());
+                totalFailedCount += result.failedCount();
+            }
+
+            if (totalFailedCount > 0) {
+                throw new IllegalStateException(
+                        "반려동물 상세 동기화 실패: " + totalFailedCount + "건"
+                );
             }
         } catch (RuntimeException e) {
             // 예외를 다시 던져 Spring AMQP 재시도와 DLQ 처리가 동작하게 한다.

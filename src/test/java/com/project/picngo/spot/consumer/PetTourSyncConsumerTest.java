@@ -51,12 +51,31 @@ class PetTourSyncConsumerTest {
                 .hasMessage("외부 API 오류");
     }
 
+    @Test
+    void processesLaterContentTypesBeforeRequestingRetryForFailedItems() {
+        PetTourSyncMessage message = message(List.of(12, 14));
+        given(petTourSyncService.syncMatchedSpots(12, 1_000, null))
+                .willReturn(result(12, 1));
+        given(petTourSyncService.syncMatchedSpots(14, 1_000, null))
+                .willReturn(result(14));
+
+        assertThatThrownBy(() -> consumer.consume(message))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("반려동물 상세 동기화 실패: 1건");
+
+        verify(petTourSyncService).syncMatchedSpots(14, 1_000, null);
+    }
+
     private PetTourSyncMessage message(List<Integer> types) {
         return new PetTourSyncMessage(types, 1_000, null, 1L,
                 TourApiSyncMessage.SyncType.SAMPLE, LocalDateTime.now());
     }
 
     private PetTourSyncResultResponse result(int contentTypeId) {
-        return new PetTourSyncResultResponse(contentTypeId, 0, 0, 0, 0, 0);
+        return result(contentTypeId, 0);
+    }
+
+    private PetTourSyncResultResponse result(int contentTypeId, int failedCount) {
+        return new PetTourSyncResultResponse(contentTypeId, 0, 0, 0, 0, failedCount);
     }
 }

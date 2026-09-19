@@ -10,6 +10,7 @@ import com.project.picngo.spot.dto.PetTourSyncResultResponse;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.spot.repository.SpotPetInfoRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PetTourSyncService {
@@ -137,12 +139,18 @@ public class PetTourSyncService {
                 if (alreadySyncedSpotIds.contains(spot.getId())) continue;
 
                 requestedDetailCount++;
-                PetTourDetailResponse.Item detail = petTourApiClient.getDetail(contentId);
-                if (detail == null) {
-                    noDetailCount++;
-                } else {
-                    spotPetInfoUpsertService.upsert(spot, detail);
-                    savedCount++;
+                try {
+                    PetTourDetailResponse.Item detail = petTourApiClient.getDetail(contentId);
+                    if (detail == null) {
+                        noDetailCount++;
+                    } else {
+                        spotPetInfoUpsertService.upsert(spot, detail);
+                        savedCount++;
+                    }
+                } catch (RuntimeException e) {
+                    failedCount++;
+                    log.warn("[PetTourSyncService] 상세 동기화 실패: contentId={}, cause={}",
+                            contentId, e.getMessage(), e);
                 }
                 sleep(150);
             }

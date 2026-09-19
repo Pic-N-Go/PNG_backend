@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -141,22 +140,36 @@ class PetTourSyncServiceTest {
     }
 
     @Test
-    void propagatesDetailApiFailureForRabbitRetry() {
+    void continuesAfterDetailFailureAndCountsFailedItem() {
         given(petTourApiClient.getSyncList(12, 1, 500, null))
-                .willReturn(response(1, 1, List.of(item("100", "1"))));
+                .willReturn(response(1, 2, List.of(item("100", "1"), item("200", "1"))));
 
-        Spot matched = org.mockito.Mockito.mock(Spot.class);
-        given(matched.getId()).willReturn(1L);
-        given(matched.getTourContentId()).willReturn("100");
-        given(spotRepository.findTourApiAddonTargets(List.of("100"), 12, SpotCategory.CAFE))
-                .willReturn(List.of(matched));
-        given(spotPetInfoRepository.findExistingSpotIds(List.of(1L))).willReturn(Set.of());
+        Spot failedSpot = org.mockito.Mockito.mock(Spot.class);
+        given(failedSpot.getId()).willReturn(1L);
+        given(failedSpot.getTourContentId()).willReturn("100");
+        Spot successfulSpot = org.mockito.Mockito.mock(Spot.class);
+        given(successfulSpot.getId()).willReturn(2L);
+        given(successfulSpot.getTourContentId()).willReturn("200");
+        given(spotRepository.findTourApiAddonTargets(
+                List.of("100", "200"),
+                12,
+                SpotCategory.CAFE
+        )).willReturn(List.of(failedSpot, successfulSpot));
+        given(spotPetInfoRepository.findExistingSpotIds(List.of(1L, 2L))).willReturn(Set.of());
         given(petTourApiClient.getDetail("100"))
                 .willThrow(new IllegalStateException("API 호출 한도 초과"));
+        PetTourDetailResponse.Item detail = new PetTourDetailResponse.Item(
+                "200", "", "동반가능", "", "", "",
+                "", "전 견종", "", "목줄 착용"
+        );
+        given(petTourApiClient.getDetail("200")).willReturn(detail);
 
-        assertThatThrownBy(() -> petTourSyncService.syncMatchedSpots(12, 10))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("API 호출 한도 초과");
+        PetTourSyncResultResponse result = petTourSyncService.syncMatchedSpots(12, 10);
+
+        assertThat(result.requestedDetailCount()).isEqualTo(2);
+        assertThat(result.savedCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(1);
+        verify(spotPetInfoUpsertService).upsert(successfulSpot, detail);
     }
 
     private PetTourSyncListResponse response(
