@@ -614,4 +614,17 @@ order by coalesce(s.eventStartDate, '9999-12-31') asc, s.id desc
             AND s.eventEndDate < :today
             """)
     List<Spot> findExpiredFestivals(@Param("festivalCategory") SpotCategory festivalCategory, @Param("today") LocalDate today);
+
+    /** 외부 부가정보 동기화 대상. 음식점(39)은 CAFE 카테고리만 허용한다. */
+    @Query("""
+            select distinct s from Spot s
+            where s.tourContentId in :contentIds
+            and s.contentTypeId = :contentTypeId
+            and (:contentTypeId <> 39 or :cafeCategory member of s.categories)
+            """)
+    List<Spot> findTourApiAddonTargets(
+            @Param("contentIds") Collection<String> contentIds,
+            @Param("contentTypeId") int contentTypeId,
+            @Param("cafeCategory") SpotCategory cafeCategory
+    );
 }
