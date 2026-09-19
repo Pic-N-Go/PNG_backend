@@ -4,6 +4,8 @@ import com.project.picngo.admin.audit.domain.AdminActionType;
 import com.project.picngo.admin.audit.service.AdminAuditLogService;
 import com.project.picngo.spot.config.TourApiRabbitMQConfig;
 import com.project.picngo.spot.dto.TourApiSyncMessage;
+import com.project.picngo.spot.producer.PetTourSyncProducer;
+import com.project.picngo.spot.producer.AccessibilityTourSyncProducer;
 import com.project.picngo.spot.service.TourApiSyncService;
 import com.project.picngo.spot.service.TourApiSyncStatusManager;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,8 @@ public class TourApiSyncConsumer {
     private final TourApiSyncService tourApiSyncService;
     private final TourApiSyncStatusManager syncStatusManager;
     private final AdminAuditLogService adminAuditLogService;
+    private final PetTourSyncProducer petTourSyncProducer;
+    private final AccessibilityTourSyncProducer accessibilityTourSyncProducer;
 
     @RabbitListener(queues = TourApiRabbitMQConfig.QUEUE_NAME)
     public void consume(TourApiSyncMessage message) {
@@ -49,6 +53,8 @@ public class TourApiSyncConsumer {
                             String.format("한국관광공사 TourAPI 타입별 샘플(%d건) 비동기 동기화 완료 (%d건 저장)", count, saved));
                 }
             }
+            petTourSyncProducer.sendAfterSpotSync(message);
+            accessibilityTourSyncProducer.sendAfterSpotSync(message);
             syncStatusManager.markSuccess(saved);
             log.info("[TourApiSyncConsumer] 동기화 작업 완료 처리: scope={}, saved={}", message.syncType(), saved);
         } catch (Exception e) {
