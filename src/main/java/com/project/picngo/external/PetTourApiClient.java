@@ -24,7 +24,7 @@ public class PetTourApiClient {
 
     public PetTourApiClient(
             WebClient.Builder builder,
-            @Value("${tour.api.pet-key}") String serviceKey,
+            @Value("${tour.api.key}") String serviceKey,
             @Value("${tour.api.pet-base-url}") String baseUrl
     ) {
         DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory(baseUrl);

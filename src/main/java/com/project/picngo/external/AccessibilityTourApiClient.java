@@ -23,7 +23,7 @@ public class AccessibilityTourApiClient {
 
     public AccessibilityTourApiClient(
             WebClient.Builder builder,
-            @Value("${tour.api.accessibility-key}") String serviceKey,
+            @Value("${tour.api.key}") String serviceKey,
             @Value("${tour.api.accessibility-base-url}") String baseUrl
     ) {
         DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory(baseUrl);
