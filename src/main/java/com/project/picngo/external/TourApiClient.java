@@ -6,6 +6,8 @@ import com.project.picngo.external.dto.TourApiIntroResponse;
 import com.project.picngo.external.dto.TourApiIntroResponse.IntroItem;
 import com.project.picngo.external.dto.TourApiResponse;
 import com.project.picngo.external.dto.TourApiResponse.Item;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,15 +18,15 @@ import org.springframework.web.util.DefaultUriBuilderFactory;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * 한국관광공사 관광정보 Open API 클라이언트.
  *
- * 다른 외부 API 클라이언트와 달리 서킷브레이커를 달지 않았다.
- * 이 클라이언트는 유저 요청이 아니라 관리자가 수동으로 트리거하는 배치(TourApiSyncService)에서만
- * 쓰여 스레드 풀 고갈 위험이 없고, 오히려 서킷이 열리면 상세 조회가 전부 null을 돌려주는데
- * 동기화 루프는 그걸 건너뛰고 계속 돌기 때문에 "빈 스팟 수천 건 저장 후 성공 보고"가 된다.
- * 느리지만 정확한 배치가 빠르지만 데이터가 망가지는 배치로 바뀌는 셈이다.
+ * 관리자 수동 배치(TourApiSyncService)에서 쓰는 메서드들(areaBasedList, detailCommon 등)은
+ * 서킷이 열리면 상세 조회가 null이 되어 빈 스팟이 저장될 위험이 있어 서킷브레이커를 걸지 않았다.
+ * 반면, 유저 실시간 요청에서 호출되는 getLocationBasedList(위치기반 관광정보)는
+ * TourAPI 장애나 지연 시 유저 스레드 풀 고갈을 방지하기 위해 CircuitBreaker를 적용한다.
  *
  * 대신 타임아웃은 반드시 필요하다. /tour-api/sync는 동기 요청이라
  * 타임아웃이 없으면 관광공사 API가 응답하지 않을 때 요청이 무한정 매달린다.
@@ -38,8 +40,10 @@ public class TourApiClient {
 
     private final WebClient webClient;
     private final String serviceKey;
+    private final CircuitBreaker circuitBreaker;
 
     public TourApiClient(WebClient.Builder builder,
+                         CircuitBreakerRegistry circuitBreakerRegistry,
                          @Value("${tour.api.key}") String serviceKey, // ponytail: tour.api.key → PUBLIC_DATA_SERVICE_KEY 경유
                          @Value("${tour.api.base-url}") String baseUrl) {
         // 공공데이터포털 서비스키는 이미 URL 인코딩된 상태로 발급됨 → 이중 인코딩 방지
@@ -47,6 +51,7 @@ public class TourApiClient {
         factory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.NONE);
         this.webClient = builder.uriBuilderFactory(factory).build();
         this.serviceKey = serviceKey;
+        this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("tourApiLocation");
     }
 
     public TourApiResponse getAreaBasedListRaw(Integer contentTypeId, Integer areaCode, Integer lDongRegnCd, String lclsSystm3, int pageNo, int numOfRows) {
@@ -264,5 +269,47 @@ public class TourApiClient {
             log.warn("[TourApiClient] detailImage 호출 실패 (contentId={}): cause={}", contentId, e.getMessage());
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * 위치기반 관광정보 조회 (GET /locationBasedList2).
+     * 유저 실시간 위치(mapX=경도, mapY=위도) 기준 반경 내 관광정보를 조회한다.
+     * 공모전 심사 시 TourAPI 실시간 호출 이력 생성 및 공공데이터 활용을 위해 사용된다.
+     */
+    public TourApiResponse getLocationBasedList(Double mapX, Double mapY, int radiusMeters, int pageNo, int numOfRows) {
+        if (mapX == null || mapY == null) {
+            return null;
+        }
+        int clampedRadius = Math.max(100, Math.min(radiusMeters, 20000));
+        try {
+            Supplier<TourApiResponse> call = CircuitBreaker.decorateSupplier(circuitBreaker, () ->
+                    webClient.get()
+                            .uri(uriBuilder -> uriBuilder.path("/locationBasedList2")
+                                    .queryParam("serviceKey", serviceKey)
+                                    .queryParam("MobileOS", "ETC")
+                                    .queryParam("MobileApp", "picngo")
+                                    .queryParam("_type", "json")
+                                    .queryParam("mapX", mapX)
+                                    .queryParam("mapY", mapY)
+                                    .queryParam("radius", clampedRadius)
+                                    .queryParam("pageNo", pageNo)
+                                    .queryParam("numOfRows", numOfRows)
+                                    .build())
+                            .retrieve()
+                            .bodyToMono(TourApiResponse.class)
+                            .timeout(CALL_TIMEOUT)
+                            .block());
+
+            TourApiResponse response = call.get();
+            validateResponse(response, "locationBasedList");
+            return response;
+        } catch (WebClientResponseException e) {
+            log.warn("[TourApiClient] locationBasedList HTTP 오류 (mapX={}, mapY={}, status={}): {}",
+                    mapX, mapY, e.getStatusCode(), e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.warn("[TourApiClient] locationBasedList 호출 실패 (mapX={}, mapY={}): cause={}",
+                    mapX, mapY, e.getMessage());
+        }
+        return null;
     }
 }
