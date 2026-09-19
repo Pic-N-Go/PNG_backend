@@ -15,6 +15,7 @@ public class PetTourRabbitMQConfig {
     public static final String EXCHANGE_NAME = "pettour.sync.exchange";
     public static final String ROUTING_KEY = "pettour.sync.key";
     public static final String DEAD_LETTER_QUEUE_NAME = "pettour.sync.dlq";
+    public static final String DEAD_LETTER_STATUS_QUEUE_NAME = "pettour.sync.dlq.status";
     public static final String DEAD_LETTER_EXCHANGE_NAME = "pettour.sync.dlx";
     public static final String DEAD_LETTER_ROUTING_KEY = "pettour.sync.dead";
 
@@ -52,6 +53,21 @@ public class PetTourRabbitMQConfig {
             DirectExchange petTourSyncDeadLetterExchange
     ) {
         return BindingBuilder.bind(petTourSyncDeadLetterQueue)
+                .to(petTourSyncDeadLetterExchange)
+                .with(DEAD_LETTER_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue petTourSyncDeadLetterStatusQueue() {
+        return QueueBuilder.durable(DEAD_LETTER_STATUS_QUEUE_NAME).build();
+    }
+
+    @Bean
+    public Binding petTourSyncDeadLetterStatusBinding(
+            Queue petTourSyncDeadLetterStatusQueue,
+            DirectExchange petTourSyncDeadLetterExchange
+    ) {
+        return BindingBuilder.bind(petTourSyncDeadLetterStatusQueue)
                 .to(petTourSyncDeadLetterExchange)
                 .with(DEAD_LETTER_ROUTING_KEY);
     }
