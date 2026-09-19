@@ -1034,7 +1034,7 @@ public class SpotService {
             return SpotCongestionResponse.empty(spot.getId(), spot.getName());
         }
 
-        if (selectedDay == null) {
+        if (selectedDay == null && targetDate == null) {
             String todayStr = LocalDate.now().format(outFmt);
             selectedDay = days.stream()
                     .filter(d -> d.date().equals(todayStr))

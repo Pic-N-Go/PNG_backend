@@ -35,7 +35,7 @@ public class CongestionApiClient {
     public CongestionApiClient(
             WebClient.Builder builder,
             @Value("${congestion.api.key:${PUBLIC_DATA_SERVICE_KEY:}}") String serviceKey,
-            @Value("${congestion.api.base-url:http://apis.data.go.kr/B551011/TatsCnctrRateService}") String baseUrl
+            @Value("${congestion.api.base-url:https://apis.data.go.kr/B551011/TatsCnctrRateService}") String baseUrl
     ) {
         DefaultUriBuilderFactory factory = new DefaultUriBuilderFactory(baseUrl);
         factory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.NONE);

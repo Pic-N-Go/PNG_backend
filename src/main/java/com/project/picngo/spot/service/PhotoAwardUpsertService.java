@@ -74,6 +74,7 @@ public class PhotoAwardUpsertService {
         if (address == null || address.isBlank()) {
             address = item.koFilmst() != null ? item.koFilmst() : "주소 정보 없음";
         }
+        address = truncate(address, 255);
 
         String spotName = resolveSpotName(coord.name(), item.koFilmst(), item.koTitle());
         Set<SpotCategory> categories = SpotCategoryTagger.tag(null, item.koTitle(), item.koKeyWord());
@@ -127,18 +128,27 @@ public class PhotoAwardUpsertService {
     }
 
     private String resolveSpotName(String kakaoPlaceName, String koFilmst, String koTitle) {
+        String name;
         if (kakaoPlaceName != null && !kakaoPlaceName.isBlank()) {
-            return kakaoPlaceName.trim();
-        }
-        if (koFilmst != null && !koFilmst.isBlank()) {
+            name = kakaoPlaceName.trim();
+        } else if (koFilmst != null && !koFilmst.isBlank()) {
             String[] parts = koFilmst.split(",");
             if (parts.length > 1) {
                 String specific = parts[parts.length - 1].trim();
-                if (specific.length() >= 2) return specific;
+                name = specific.length() >= 2 ? specific : koFilmst.trim();
+            } else {
+                name = koFilmst.trim();
             }
-            return koFilmst.trim();
+        } else {
+            name = koTitle != null ? koTitle.trim() : "사진공모전 명소";
         }
-        return koTitle != null ? koTitle.trim() : "사진공모전 명소";
+        return truncate(name, 100);
+    }
+
+    private String truncate(String str, int maxLen) {
+        if (str == null) return null;
+        String trimmed = str.trim();
+        return trimmed.length() > maxLen ? trimmed.substring(0, maxLen) : trimmed;
     }
 
     private String buildOverview(PhotoAwardItem item) {
