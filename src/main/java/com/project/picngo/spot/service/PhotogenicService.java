@@ -85,7 +85,7 @@ public class PhotogenicService {
         );
     }
 
-    // 날씨 만점 30점 — 선택한 시각에 가장 가까운 예보 슬롯 기준
+    // 날씨 만점 35점 — 선택한 시각에 가장 가까운 예보 슬롯 기준
     private FactorInfo calculateWeather(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
             String dateStr = date.format(DATE_FMT);
@@ -102,9 +102,9 @@ public class PhotogenicService {
             if (closest == null) return new FactorInfo("데이터 없음", 0);
 
             return switch (closest.weatherStatus()) {
-                case "CLEAR"  -> new FactorInfo("맑음", 30);
-                case "CLOUDY" -> new FactorInfo("흐림", 15);
-                case "SNOWY"  -> new FactorInfo("눈", 10);
+                case "CLEAR"  -> new FactorInfo("맑음", 35);
+                case "CLOUDY" -> new FactorInfo("흐림", 20);
+                case "SNOWY"  -> new FactorInfo("눈", 12);
                 case "RAINY"  -> new FactorInfo("비", 5);
                 default       -> new FactorInfo("데이터 없음", 0);
             };
@@ -114,7 +114,7 @@ public class PhotogenicService {
         }
     }
 
-    // 골든아워 만점 5점 — 일출/일몰 전후 30분 이내
+    // 골든아워 만점 10점 — 일출/일몰 전후 30분 이내
     private GoldenHourInfo calculateGoldenHour(Double lat, Double lng, LocalDate date, LocalTime time) {
         try {
             GoldenHourResponse goldenHour = weatherCacheService.getCachedGoldenHour(lat, lng, date.toString());
@@ -132,10 +132,10 @@ public class PhotogenicService {
             LocalTime eveningEnd = sunset.plusMinutes(30);
 
             if (!time.isBefore(morningStart) && !time.isAfter(morningEnd)) {
-                return new GoldenHourInfo("골든아워", 5, null, morningStart.format(HH_MM));
+                return new GoldenHourInfo("골든아워", 10, null, morningStart.format(HH_MM));
             }
             if (!time.isBefore(eveningStart) && !time.isAfter(eveningEnd)) {
-                return new GoldenHourInfo("골든아워", 5, null, eveningStart.format(HH_MM));
+                return new GoldenHourInfo("골든아워", 10, null, eveningStart.format(HH_MM));
             }
             if (time.isBefore(morningStart)) {
                 long minutes = Duration.between(time, morningStart).toMinutes();
@@ -152,7 +152,7 @@ public class PhotogenicService {
         }
     }
 
-    // 미세먼지 만점 20점 — grade 없으면 pm10Value(㎍/㎥)로 직접 판단
+    // 미세먼지 만점 25점 — grade 없으면 pm10Value(㎍/㎥)로 직접 판단
     private FactorInfo calculateFineDust(Item air) {
         if (air == null || air.pm10Value() == null || air.pm10Value().equals("-")) {
             return new FactorInfo("데이터 없음", 0);
@@ -167,9 +167,9 @@ public class PhotogenicService {
             }
         }
         return switch (grade) {
-            case "1" -> new FactorInfo("좋음", 20);
-            case "2" -> new FactorInfo("보통", 12);
-            case "3" -> new FactorInfo("나쁨", 4);
+            case "1" -> new FactorInfo("좋음", 25);
+            case "2" -> new FactorInfo("보통", 15);
+            case "3" -> new FactorInfo("나쁨", 5);
             default  -> new FactorInfo("매우나쁨", 0);
         };
     }

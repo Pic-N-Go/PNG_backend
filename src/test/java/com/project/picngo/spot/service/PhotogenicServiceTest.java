@@ -86,9 +86,9 @@ class PhotogenicServiceTest {
         // then
         verify(weatherCacheService).getCachedAirQuality("충남");
         assertThat(response).isNotNull();
-        assertThat(response.weather().score()).isEqualTo(30); // 맑음 30점
-        assertThat(response.fineDust().score()).isEqualTo(20); // 미세먼지 좋음 20점
+        assertThat(response.weather().score()).isEqualTo(35); // 맑음 35점
+        assertThat(response.fineDust().score()).isEqualTo(25); // 미세먼지 좋음 25점
         assertThat(response.ozone().score()).isEqualTo(10); // 오존 좋음 10점
-        assertThat(response.score()).isGreaterThanOrEqualTo(60);
+        assertThat(response.score()).isEqualTo(70); // 35 + 25 + 10 = 70점
     }
 }
