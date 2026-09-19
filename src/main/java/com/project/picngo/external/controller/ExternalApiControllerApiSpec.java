@@ -3,6 +3,8 @@ package com.project.picngo.external.controller;
 import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import com.project.picngo.spot.dto.PetTourMatchStatusResponse;
+import com.project.picngo.spot.dto.PetTourSyncResultResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -45,6 +47,21 @@ public interface ExternalApiControllerApiSpec {
             description = "현재 백그라운드 큐에서 실행 중인 TourAPI 동기화 작업의 진행 여부, 대상 지역, 처리 건수, 진행률(%), 상태 메시지를 조회합니다. (GET /admin/tour-api/sync/status)",
             security = @SecurityRequirement(name = "bearerAuth"))
     ResponseEntity<com.project.picngo.spot.dto.TourApiSyncStatusResponse> getSyncStatus();
+
+    @Operation(summary = "반려동물 스팟 매칭 현황 조회 (ADMIN 권한 필요)",
+            description = "반려동물 목록을 contentTypeId별로 페이지 순회하고 현재 Spot DB의 tourContentId와 일치하는 건수를 반환합니다. 상세 API 호출과 DB 변경은 수행하지 않습니다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    ResponseEntity<PetTourMatchStatusResponse> getPetTourMatchStatus(
+            @Parameter(description = "관광타입 ID", example = "12") @RequestParam(defaultValue = "12") int contentTypeId
+    );
+
+    @Operation(summary = "반려동물 상세정보 순차 동기화 (ADMIN 권한 필요)",
+            description = "반려동물 목록과 현재 Spot DB가 매칭되는 항목만 detailPetTour2로 순차 조회하여 저장합니다. HTTP 요청에서 직접 처리하므로 maxDetails는 1~100건으로 제한됩니다.",
+            security = @SecurityRequirement(name = "bearerAuth"))
+    ResponseEntity<PetTourSyncResultResponse> syncPetTourDetails(
+            @Parameter(description = "관광타입 ID", example = "12") @RequestParam(defaultValue = "12") int contentTypeId,
+            @Parameter(description = "이번 요청에서 상세조회할 최대 스팟 수(1~100)", example = "10") @RequestParam(defaultValue = "100") int maxDetails
+    );
 
     @Operation(summary = "길찾기 (이동시간/거리)", description = "카카오모빌리티 API를 이용하여 출발지에서 목적지까지의 자동차 예상 소요 시간과 거리를 조회합니다.")
     ResponseEntity<DirectionsResponse> getDirections(

@@ -12,6 +12,7 @@ public interface SpotAlertRepository extends JpaRepository<SpotAlert, Long> {
     
     List<SpotAlert> findAllByUserIdAndIsActiveTrue(Long userId);
     
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"timeConditions", "weatherConditions"})
     List<SpotAlert> findAllByUserIdInAndIsActiveTrue(List<Long> userIds);
     
     List<SpotAlert> findAllByIsActiveTrue();

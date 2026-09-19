@@ -5,6 +5,8 @@ import com.project.picngo.spot.dto.*;
 import com.project.picngo.spot.service.PhotogenicService;
 import com.project.picngo.spot.service.ReviewService;
 import com.project.picngo.spot.service.SpotService;
+import com.project.picngo.spot.service.SpotPetInfoService;
+import com.project.picngo.spot.service.SpotAccessibilityInfoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -29,6 +31,8 @@ public class SpotController implements SpotControllerApiSpec {
     private final SpotService spotService;
     private final ReviewService reviewService;
     private final PhotogenicService photogenicService;
+    private final SpotPetInfoService spotPetInfoService;
+    private final SpotAccessibilityInfoService spotAccessibilityInfoService;
 
     @GetMapping
     public ResponseEntity<Page<SpotResponse>> getSpots(
@@ -106,6 +110,20 @@ public class SpotController implements SpotControllerApiSpec {
         return ResponseEntity.ok(spotService.getSpotDetail(id, userDetails != null ? userDetails.getId() : null));
     }
 
+    @GetMapping("/{id}/pet-info")
+    public ResponseEntity<SpotPetInfoResponse> getSpotPetInfo(@PathVariable Long id) {
+        return spotPetInfoService.getPetInfo(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/{id}/accessibility-info")
+    public ResponseEntity<SpotAccessibilityInfoResponse> getSpotAccessibilityInfo(@PathVariable Long id) {
+        return spotAccessibilityInfoService.getAccessibilityInfo(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
     @GetMapping("/{id}/related")
     public ResponseEntity<List<RelatedSpotResponse>> getRelatedSpots(
             @PathVariable Long id,
@@ -130,6 +148,13 @@ public class SpotController implements SpotControllerApiSpec {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime time) {
         return ResponseEntity.ok(photogenicService.calculate(id, date, time));
+    }
+
+    @GetMapping("/{id}/congestion")
+    public ResponseEntity<SpotCongestionResponse> getSpotCongestion(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ResponseEntity.ok(spotService.getSpotCongestion(id, date));
     }
 
     @GetMapping("/{id}/photos")

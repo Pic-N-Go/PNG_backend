@@ -94,4 +94,35 @@ class SpotAlertServiceTest {
         assertThatThrownBy(() -> spotAlertService.updateSpotAlertActive(userId, spotId, request))
                 .isInstanceOf(CustomException.class);
     }
+
+    @Test
+    @DisplayName("DB에 출사알림이 아직 저장되지 않은 스팟도 기본 설정값으로 상세 조회가 가능하다")
+    void getSpotAlertDetail_unregisteredSpot_returnsDefaultResponse() {
+        // given
+        Long userId = 1L;
+        Long spotId = 10L;
+        Spot spot = Spot.builder()
+                .name("남산 팔각정")
+                .address("서울특별시 중구 회현동")
+                .latitude(37.551)
+                .longitude(126.988)
+                .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(spot, "id", spotId);
+
+        given(userRepository.existsById(userId)).willReturn(true);
+        given(spotAlertRepository.findByUserIdAndSpotId(userId, spotId)).willReturn(Optional.empty());
+        given(spotRepository.findById(spotId)).willReturn(Optional.of(spot));
+        given(weatherCacheService.getCached7DayForecast(anyDouble(), anyDouble(), anyString()))
+                .willReturn(Collections.emptyList());
+
+        // when
+        SpotAlertSettingResponse response = spotAlertService.getSpotAlertDetail(userId, spotId);
+
+        // then
+        assertThat(response).isNotNull();
+        assertThat(response.spotId()).isEqualTo(spotId);
+        assertThat(response.spotName()).isEqualTo("남산 팔각정");
+        assertThat(response.isAlertEnabled()).isTrue();
+        assertThat(response.alertTimingDays()).isEqualTo(1);
+    }
 }

@@ -53,7 +53,20 @@ public class SpotAlertService {
     public SpotAlertSettingResponse getSpotAlertDetail(Long userId, Long spotId) {
         validateUserExists(userId);
         SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
-                .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+                .orElseGet(() -> {
+                    Spot spot = spotRepository.findById(spotId)
+                            .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+                    return SpotAlert.builder()
+                            .userId(userId)
+                            .spotId(spot.getId())
+                            .memo("")
+                            .weatherConditions(Set.of(WeatherCondition.CLEAR))
+                            .timeConditions(Set.of(TimeCondition.SUNSET, TimeCondition.NIGHT))
+                            .airQualityCondition(com.project.picngo.spotalert.domain.enums.AirQualityCondition.GOOD)
+                            .isActive(true)
+                            .alertTimingDays(1)
+                            .build();
+                });
         return convertToResponse(spotAlert);
     }
 
@@ -84,9 +97,23 @@ public class SpotAlertService {
     @Transactional
     public SpotAlertActiveResponse updateSpotAlertActive(Long userId, Long spotId, SpotAlertActiveUpdateRequest request) {
         SpotAlert spotAlert = spotAlertRepository.findByUserIdAndSpotId(userId, spotId)
-                .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+                .orElseGet(() -> {
+                    Spot spot = spotRepository.findById(spotId)
+                            .orElseThrow(() -> new CustomException(SpotAlertErrorCode.SPOT_ALERT_NOT_FOUND_OR_UNAUTHORIZED));
+                    return SpotAlert.builder()
+                            .userId(userId)
+                            .spotId(spot.getId())
+                            .memo("")
+                            .weatherConditions(Set.of(WeatherCondition.CLEAR))
+                            .timeConditions(Set.of(TimeCondition.SUNSET, TimeCondition.NIGHT))
+                            .airQualityCondition(com.project.picngo.spotalert.domain.enums.AirQualityCondition.GOOD)
+                            .isActive(request.isAlertEnabled())
+                            .alertTimingDays(1)
+                            .build();
+                });
 
         spotAlert.updateActive(request.isAlertEnabled());
+        spotAlertRepository.save(spotAlert);
         return new SpotAlertActiveResponse(spotAlert.getSpotId(), spotAlert.getIsActive());
     }
 
@@ -107,8 +134,8 @@ public class SpotAlertService {
         }
     }
 
-    // 알림 시점은 당일(0)/1일 전(1)/3일 전(3)만 허용
-    private static final Set<Integer> ALLOWED_ALERT_TIMING_DAYS = Set.of(0, 1, 3);
+    // 알림 시점은 당일(0)/1일 전(1)/2일 전(2)/3일 전(3) 허용
+    private static final Set<Integer> ALLOWED_ALERT_TIMING_DAYS = Set.of(0, 1, 2, 3);
 
     private void validateAlertTimingDays(Integer alertTimingDays) {
         if (alertTimingDays != null && !ALLOWED_ALERT_TIMING_DAYS.contains(alertTimingDays)) {

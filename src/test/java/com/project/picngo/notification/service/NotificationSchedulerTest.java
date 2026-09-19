@@ -1,6 +1,7 @@
 package com.project.picngo.notification.service;
 
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.service.WeatherCacheService;
 import com.project.picngo.notification.domain.NotificationSetting;
 import com.project.picngo.notification.repository.NotificationSettingRepository;
@@ -165,5 +166,36 @@ class NotificationSchedulerTest {
         // Then: 날씨가 맞지 않으므로 sendPushNotification이 한 번도 호출되지 않아야 함 (7-arg 시그니처 기준)
         verify(notificationService, never()).sendPushNotification(
                 any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("[골든아워] 일몰(SUNSET) 스케줄러 실행 시 LazyInitializationException 없이 정상 동작")
+    void testGoldenHourSunsetScheduler() {
+        // Given
+        when(notificationCacheService.getActiveUserIds("goldenhour")).thenReturn(Set.of(userId));
+
+        SpotAlert spotAlert = SpotAlert.builder()
+                .userId(userId)
+                .spotId(savedSpot.getId())
+                .build();
+        spotAlert.updateSettings(
+                "일몰 알림",
+                Set.of(WeatherCondition.CLEAR),
+                Set.of(TimeCondition.SUNSET),
+                com.project.picngo.spotalert.domain.enums.AirQualityCondition.NONE,
+                0,
+                true
+        );
+        spotAlertRepository.save(spotAlert);
+
+        java.time.ZonedDateTime nowUtc = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+        String utcStr = nowUtc.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        when(weatherCacheService.getCachedGoldenHour(any(), any(), any()))
+                .thenReturn(new GoldenHourResponse(null, utcStr, null, null));
+
+        // When & Then
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> {
+            notificationScheduler.scheduleSunsetNotification();
+        });
     }
 }
