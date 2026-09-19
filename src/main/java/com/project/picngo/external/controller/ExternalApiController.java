@@ -9,7 +9,10 @@ import com.project.picngo.external.dto.DirectionsResponse;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.spot.dto.TourApiSyncStatusResponse;
+import com.project.picngo.spot.dto.PetTourMatchStatusResponse;
+import com.project.picngo.spot.dto.PetTourSyncResultResponse;
 import com.project.picngo.spot.producer.TourApiSyncProducer;
+import com.project.picngo.spot.service.PetTourSyncService;
 import com.project.picngo.spot.service.TourApiSyncStatusManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +34,7 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
     private final DirectionsClient directionsClient;
     private final TourApiSyncProducer tourApiSyncProducer;
     private final TourApiSyncStatusManager tourApiSyncStatusManager;
+    private final PetTourSyncService petTourSyncService;
 
     // 1. 길찾기 API (바로 출발 시 호출)
     @GetMapping("/directions")
@@ -96,6 +100,21 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
     @GetMapping("/admin/tour-api/sync/status")
     public ResponseEntity<TourApiSyncStatusResponse> getSyncStatus() {
         return ResponseEntity.ok(tourApiSyncStatusManager.getStatus());
+    }
+
+    @GetMapping("/admin/pet-tour/matches/status")
+    public ResponseEntity<PetTourMatchStatusResponse> getPetTourMatchStatus(
+            @RequestParam(defaultValue = "12") int contentTypeId
+    ) {
+        return ResponseEntity.ok(petTourSyncService.getMatchStatus(contentTypeId));
+    }
+
+    @PostMapping("/admin/pet-tour/sync")
+    public ResponseEntity<PetTourSyncResultResponse> syncPetTourDetails(
+            @RequestParam(defaultValue = "12") int contentTypeId,
+            @RequestParam(defaultValue = "100") int maxDetails
+    ) {
+        return ResponseEntity.ok(petTourSyncService.syncMatchedSpots(contentTypeId, maxDetails));
     }
 
     // 5. 골든아워 조회 (스팟별/홈 화면)
