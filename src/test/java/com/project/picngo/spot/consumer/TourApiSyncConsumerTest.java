@@ -14,8 +14,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,10 +63,29 @@ class TourApiSyncConsumerTest {
         TourApiSyncMessage message = TourApiSyncMessage.ofAll(100L);
         given(tourApiSyncService.syncAll()).willThrow(new RuntimeException("API 서버 오류"));
 
-        tourApiSyncConsumer.consume(message);
+        assertThatThrownBy(() -> tourApiSyncConsumer.consume(message))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("API 서버 오류");
 
         verify(syncStatusManager).markFailed("API 서버 오류");
         verify(adminAuditLogService).record(eq(100L), eq(AdminActionType.TOUR_API_SYNC), anyString(), eq("ALL_AREAS"), contains("API 서버 오류"), isNull());
+        verify(syncStatusManager).releaseLock();
+    }
+
+    @Test
+    @DisplayName("후속 메시지 발행 실패 시 예외를 전파하여 RabbitMQ 재시도를 요청한다")
+    void propagateAddonMessagePublicationFailure() {
+        TourApiSyncMessage message = TourApiSyncMessage.ofSample(3, 100L);
+        given(tourApiSyncService.syncSample(3)).willReturn(0);
+        willThrow(new RuntimeException("RabbitMQ 발행 오류"))
+                .given(petTourSyncProducer)
+                .sendAfterSpotSync(message);
+
+        assertThatThrownBy(() -> tourApiSyncConsumer.consume(message))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("RabbitMQ 발행 오류");
+
+        verify(syncStatusManager).markFailed("RabbitMQ 발행 오류");
         verify(syncStatusManager).releaseLock();
     }
 }
