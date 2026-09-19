@@ -87,6 +87,7 @@ spring:
     password: ${RABBITMQ_PASSWORD:guest}
     listener:
       simple:
+        default-requeue-rejected: false
         retry:
           enabled: true
           max-attempts: 2
@@ -99,6 +100,10 @@ tour:
   api:
     key: ${PUBLIC_DATA_SERVICE_KEY}
     base-url: ${TOUR_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
+    pet-key: ${PET_TOUR_API_KEY}
+    pet-base-url: ${PET_TOUR_API_BASE_URL:https://apis.data.go.kr/B551011/KorPetTourService2}
+    accessibility-key: ${WITH_TOUR_API_KEY}
+    accessibility-base-url: ${WITH_TOUR_API_BASE_URL:https://apis.data.go.kr/B551011/KorWithService2}
 
 air:
   quality:

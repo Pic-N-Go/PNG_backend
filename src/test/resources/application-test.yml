@@ -39,6 +39,8 @@ air:
 
 tour:
   api:
+    pet-key: test-pet-tour-key
+    accessibility-key: test-accessibility-tour-key
     key: "test-key"
 
 kakao:
