@@ -42,7 +42,7 @@ class TourApiSyncConsumerTest {
     private TourApiSyncConsumer tourApiSyncConsumer;
 
     @Test
-    @DisplayName("지역 동기화 큐 메시지 수신 시 syncService 호출, 감사로그 기록 및 성공 처리 검증")
+    @DisplayName("지역 Spot 동기화 완료 후 후속 메시지를 발행하고 파이프라인 상태를 갱신한다")
     void consumeAreaSyncSuccess() {
         TourApiSyncMessage message = TourApiSyncMessage.ofArea(34, 1, 5, 100L);
         given(tourApiSyncService.sync(34, 1, 5)).willReturn(45);
@@ -51,10 +51,9 @@ class TourApiSyncConsumerTest {
 
         verify(tourApiSyncService).sync(34, 1, 5);
         verify(adminAuditLogService).record(eq(100L), eq(AdminActionType.TOUR_API_SYNC), anyString(), eq("AREA_34"), anyString(), isNull());
-        verify(syncStatusManager).markSuccess(45);
+        verify(syncStatusManager).markSpotCompleted(message.jobId(), 45);
         verify(petTourSyncProducer).sendAfterSpotSync(message);
         verify(accessibilityTourSyncProducer).sendAfterSpotSync(message);
-        verify(syncStatusManager).releaseLock();
     }
 
     @Test
@@ -69,7 +68,6 @@ class TourApiSyncConsumerTest {
 
         verify(syncStatusManager).markFailed("API 서버 오류");
         verify(adminAuditLogService).record(eq(100L), eq(AdminActionType.TOUR_API_SYNC), anyString(), eq("ALL_AREAS"), contains("API 서버 오류"), isNull());
-        verify(syncStatusManager).releaseLock();
     }
 
     @Test
@@ -86,6 +84,5 @@ class TourApiSyncConsumerTest {
                 .hasMessage("RabbitMQ 발행 오류");
 
         verify(syncStatusManager).markFailed("RabbitMQ 발행 오류");
-        verify(syncStatusManager).releaseLock();
     }
 }

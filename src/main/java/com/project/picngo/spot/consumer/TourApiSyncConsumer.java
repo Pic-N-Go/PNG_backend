@@ -31,6 +31,11 @@ public class TourApiSyncConsumer {
 
         int saved = 0;
         try {
+            syncStatusManager.markStageRunning(
+                    message.jobId(),
+                    TourApiSyncStatusManager.Stage.SPOT,
+                    "일반 Spot 동기화 진행 중"
+            );
             switch (message.syncType()) {
                 case AREA -> {
                     int areaCode = message.areaCode();
@@ -55,7 +60,7 @@ public class TourApiSyncConsumer {
             }
             petTourSyncProducer.sendAfterSpotSync(message);
             accessibilityTourSyncProducer.sendAfterSpotSync(message);
-            syncStatusManager.markSuccess(saved);
+            syncStatusManager.markSpotCompleted(message.jobId(), saved);
             log.info("[TourApiSyncConsumer] 동기화 작업 완료 처리: scope={}, saved={}", message.syncType(), saved);
         } catch (RuntimeException e) {
             log.error("[TourApiSyncConsumer] 동기화 작업 실패: scope={}, areaCode={}, cause={}",
@@ -64,8 +69,6 @@ public class TourApiSyncConsumer {
             recordAuditLog(message.adminId(), getTarget(message),
                     String.format("한국관광공사 TourAPI 비동기 동기화 실패 (오류: %s)", e.getMessage()));
             throw e;
-        } finally {
-            syncStatusManager.releaseLock();
         }
     }
 
