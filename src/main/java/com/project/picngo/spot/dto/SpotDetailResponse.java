@@ -18,6 +18,8 @@ public record SpotDetailResponse(
         List<String> tags,
         List<String> reviewTags,
         ConvenienceInfo convenience,
+        Boolean hasPetInfo,
+        Boolean hasAccessibilityInfo,
         StatsInfo stats,
         Boolean isBookmarked,
         Long myReviewId
@@ -64,7 +66,9 @@ public record SpotDetailResponse(
             Integer reviewCount,
             Long photoCount,
             Boolean isBookmarked,
-            Long myReviewId
+            Long myReviewId,
+            boolean hasPetInfo,
+            boolean hasAccessibilityInfo
     ) {
         List<String> categoryNames = spot.getCategoryNames();
         return new SpotDetailResponse(
@@ -81,6 +85,8 @@ public record SpotDetailResponse(
                 categoryNames,
                 reviewTags,
                 ConvenienceInfo.from(spot),
+                hasPetInfo,
+                hasAccessibilityInfo,
                 new StatsInfo(avgRating, reviewCount, photoCount),
                 isBookmarked,
                 myReviewId
