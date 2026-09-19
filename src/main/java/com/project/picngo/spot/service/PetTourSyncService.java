@@ -29,6 +29,7 @@ public class PetTourSyncService {
      * 관광공사 목록 응답이 1,000건에서도 256KB를 넘으므로 500건씩 조회한다.
      */
     private static final int PAGE_SIZE = 500;
+    private static final int MAX_MANUAL_DETAILS = 100;
 
     private final PetTourApiClient petTourApiClient;
     private final SpotRepository spotRepository;
@@ -80,6 +81,18 @@ public class PetTourSyncService {
     }
 
     public PetTourSyncResultResponse syncMatchedSpots(int contentTypeId, int maxDetails) {
+        return syncMatchedSpots(contentTypeId, maxDetails, null);
+    }
+
+    public PetTourSyncResultResponse syncMatchedSpotsManually(
+            int contentTypeId,
+            int maxDetails
+    ) {
+        if (maxDetails < 1 || maxDetails > MAX_MANUAL_DETAILS) {
+            throw new IllegalArgumentException(
+                    "수동 동기화 maxDetails는 1 이상 100 이하여야 합니다."
+            );
+        }
         return syncMatchedSpots(contentTypeId, maxDetails, null);
     }
 

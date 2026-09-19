@@ -114,7 +114,9 @@ public class ExternalApiController implements ExternalApiControllerApiSpec {
             @RequestParam(defaultValue = "12") int contentTypeId,
             @RequestParam(defaultValue = "100") int maxDetails
     ) {
-        return ResponseEntity.ok(petTourSyncService.syncMatchedSpots(contentTypeId, maxDetails));
+        return ResponseEntity.ok(
+                petTourSyncService.syncMatchedSpotsManually(contentTypeId, maxDetails)
+        );
     }
 
     // 5. 골든아워 조회 (스팟별/홈 화면)

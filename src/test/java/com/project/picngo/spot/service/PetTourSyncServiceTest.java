@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -137,6 +138,24 @@ class PetTourSyncServiceTest {
         petTourSyncService.syncMatchedSpots(12, 10, 11);
 
         verify(petTourApiClient).getSyncList(12, 1, 500, 11);
+    }
+
+    @Test
+    void allowsUpToOneHundredDetailsForManualSync() {
+        given(petTourApiClient.getSyncList(12, 1, 500, null))
+                .willReturn(response(1, 0, List.of()));
+
+        PetTourSyncResultResponse result =
+                petTourSyncService.syncMatchedSpotsManually(12, 100);
+
+        assertThat(result.requestedDetailCount()).isZero();
+    }
+
+    @Test
+    void rejectsMoreThanOneHundredDetailsForManualSync() {
+        assertThatThrownBy(() -> petTourSyncService.syncMatchedSpotsManually(12, 101))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("수동 동기화 maxDetails는 1 이상 100 이하여야 합니다.");
     }
 
     @Test

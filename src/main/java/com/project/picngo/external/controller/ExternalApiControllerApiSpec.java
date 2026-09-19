@@ -56,11 +56,11 @@ public interface ExternalApiControllerApiSpec {
     );
 
     @Operation(summary = "반려동물 상세정보 순차 동기화 (ADMIN 권한 필요)",
-            description = "반려동물 목록과 현재 Spot DB가 매칭되는 항목만 detailPetTour2로 순차 조회하여 저장합니다. 초기 검증을 위해 maxDetails만큼만 처리합니다.",
+            description = "반려동물 목록과 현재 Spot DB가 매칭되는 항목만 detailPetTour2로 순차 조회하여 저장합니다. HTTP 요청에서 직접 처리하므로 maxDetails는 1~100건으로 제한됩니다.",
             security = @SecurityRequirement(name = "bearerAuth"))
     ResponseEntity<PetTourSyncResultResponse> syncPetTourDetails(
             @Parameter(description = "관광타입 ID", example = "12") @RequestParam(defaultValue = "12") int contentTypeId,
-            @Parameter(description = "이번 요청에서 상세조회할 최대 스팟 수", example = "10") @RequestParam(defaultValue = "100") int maxDetails
+            @Parameter(description = "이번 요청에서 상세조회할 최대 스팟 수(1~100)", example = "10") @RequestParam(defaultValue = "100") int maxDetails
     );
 
     @Operation(summary = "길찾기 (이동시간/거리)", description = "카카오모빌리티 API를 이용하여 출발지에서 목적지까지의 자동차 예상 소요 시간과 거리를 조회합니다.")
