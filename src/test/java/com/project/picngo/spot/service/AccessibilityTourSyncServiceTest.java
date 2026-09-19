@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -112,40 +111,61 @@ class AccessibilityTourSyncServiceTest {
     }
 
     @Test
-    void propagatesDetailApiFailureForRabbitRetry() {
+    void continuesAfterDetailFailureAndCountsFailedItem() {
         given(apiClient.getSyncList(12, 1, 500, null))
-                .willReturn(response(12, "100"));
+                .willReturn(response(12, List.of("100", "200")));
 
-        Spot spot = org.mockito.Mockito.mock(Spot.class);
-        given(spot.getId()).willReturn(1L);
-        given(spot.getTourContentId()).willReturn("100");
-        given(spotRepository.findTourApiAddonTargets(List.of("100"), 12, SpotCategory.CAFE))
-                .willReturn(List.of(spot));
-        given(accessibilityInfoRepository.findExistingSpotIds(List.of(1L)))
+        Spot failedSpot = org.mockito.Mockito.mock(Spot.class);
+        given(failedSpot.getId()).willReturn(1L);
+        given(failedSpot.getTourContentId()).willReturn("100");
+        Spot successfulSpot = org.mockito.Mockito.mock(Spot.class);
+        given(successfulSpot.getId()).willReturn(2L);
+        given(successfulSpot.getTourContentId()).willReturn("200");
+        given(spotRepository.findTourApiAddonTargets(
+                List.of("100", "200"),
+                12,
+                SpotCategory.CAFE
+        )).willReturn(List.of(failedSpot, successfulSpot));
+        given(accessibilityInfoRepository.findExistingSpotIds(List.of(1L, 2L)))
                 .willReturn(Set.of());
         given(apiClient.getDetail("100"))
                 .willThrow(new IllegalStateException("API 호출 한도 초과"));
+        AccessibilityTourDetailResponse.Item detail =
+                org.mockito.Mockito.mock(AccessibilityTourDetailResponse.Item.class);
+        given(apiClient.getDetail("200")).willReturn(detail);
 
-        assertThatThrownBy(() -> service.syncMatchedSpots(12, 10))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("API 호출 한도 초과");
+        AccessibilityTourSyncResultResponse result = service.syncMatchedSpots(12, 10);
+
+        assertThat(result.requestedDetailCount()).isEqualTo(2);
+        assertThat(result.savedCount()).isEqualTo(1);
+        assertThat(result.failedCount()).isEqualTo(1);
+        verify(upsertService).upsert(successfulSpot, detail);
     }
 
     private AccessibilityTourSyncListResponse response(int contentTypeId, String contentId) {
-        var item = new AccessibilityTourSyncListResponse.Item(
-                contentId,
-                String.valueOf(contentTypeId),
-                "관광지",
-                "1"
-        );
+        return response(contentTypeId, List.of(contentId));
+    }
+
+    private AccessibilityTourSyncListResponse response(
+            int contentTypeId,
+            List<String> contentIds
+    ) {
+        List<AccessibilityTourSyncListResponse.Item> items = contentIds.stream()
+                .map(contentId -> new AccessibilityTourSyncListResponse.Item(
+                        contentId,
+                        String.valueOf(contentTypeId),
+                        "관광지",
+                        "1"
+                ))
+                .toList();
         return new AccessibilityTourSyncListResponse(
                 new AccessibilityTourSyncListResponse.Response(
                         new AccessibilityTourSyncListResponse.Header("0000", "OK"),
                         new AccessibilityTourSyncListResponse.Body(
-                                new AccessibilityTourSyncListResponse.Items(List.of(item)),
+                                new AccessibilityTourSyncListResponse.Items(items),
                                 500,
                                 1,
-                                1
+                                items.size()
                         )
                 )
         );

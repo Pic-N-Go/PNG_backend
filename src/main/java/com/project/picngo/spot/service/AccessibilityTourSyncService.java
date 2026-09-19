@@ -9,6 +9,7 @@ import com.project.picngo.spot.dto.AccessibilityTourSyncResultResponse;
 import com.project.picngo.spot.repository.SpotAccessibilityInfoRepository;
 import com.project.picngo.spot.repository.SpotRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AccessibilityTourSyncService {
@@ -91,12 +93,18 @@ public class AccessibilityTourSyncService {
                 }
 
                 requested++;
-                AccessibilityTourDetailResponse.Item detail = apiClient.getDetail(contentId);
-                if (detail == null) {
-                    noDetail++;
-                } else {
-                    upsertService.upsert(spot, detail);
-                    saved++;
+                try {
+                    AccessibilityTourDetailResponse.Item detail = apiClient.getDetail(contentId);
+                    if (detail == null) {
+                        noDetail++;
+                    } else {
+                        upsertService.upsert(spot, detail);
+                        saved++;
+                    }
+                } catch (RuntimeException e) {
+                    failed++;
+                    log.warn("[AccessibilityTourSyncService] 상세 동기화 실패: contentId={}, cause={}",
+                            contentId, e.getMessage(), e);
                 }
                 sleep(150);
             }

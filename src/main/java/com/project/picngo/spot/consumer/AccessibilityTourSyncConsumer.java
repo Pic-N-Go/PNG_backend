@@ -19,6 +19,7 @@ public class AccessibilityTourSyncConsumer {
     @RabbitListener(queues = AccessibilityTourRabbitMQConfig.QUEUE)
     public void consume(AccessibilityTourSyncMessage message) {
         try {
+            int totalFailedCount = 0;
             for (int type : message.contentTypeIds()) {
                 AccessibilityTourSyncResultResponse result = service.syncMatchedSpots(
                         type,
@@ -31,6 +32,13 @@ public class AccessibilityTourSyncConsumer {
                         result.requestedDetailCount(),
                         result.savedCount(),
                         result.failedCount());
+                totalFailedCount += result.failedCount();
+            }
+
+            if (totalFailedCount > 0) {
+                throw new IllegalStateException(
+                        "무장애 상세 동기화 실패: " + totalFailedCount + "건"
+                );
             }
         } catch (RuntimeException e) {
             log.error("[AccessibilityTourSyncConsumer] 실패, RabbitMQ 재시도 대상: {}", e.getMessage(), e);
