@@ -52,6 +52,7 @@ public class PhotoAwardSyncService {
         int enriched = 0;
         int skipped = 0;
         int failedGeocoding = 0;
+        int failedUpsert = 0;
         int totalCount = Integer.MAX_VALUE;
 
         // 1단계: 어떤 전략으로 조회할지 1페이지 탐색 (4단계 폴백)
@@ -162,18 +163,24 @@ public class PhotoAwardSyncService {
                 }
 
                 Coordinate coord = coordOpt.get();
-                PhotoAwardUpsertService.UpsertResult result = photoAwardUpsertService.upsertAward(item, coord);
+                try {
+                    PhotoAwardUpsertService.UpsertResult result = photoAwardUpsertService.upsertAward(item, coord);
 
-                switch (result) {
-                    case CREATED -> {
-                        created++;
-                        saved++;
+                    switch (result) {
+                        case CREATED -> {
+                            created++;
+                            saved++;
+                        }
+                        case ENRICHED -> {
+                            enriched++;
+                            saved++;
+                        }
+                        case SKIPPED -> skipped++;
                     }
-                    case ENRICHED -> {
-                        enriched++;
-                        saved++;
-                    }
-                    case SKIPPED -> skipped++;
+                } catch (Exception e) {
+                    failedUpsert++;
+                    log.error("[PhotoAwardSyncService] 수상작 저장 실패로 건너뜀: contentId={}, title={}, cause={}",
+                            item.contentId(), item.koTitle(), e.getMessage());
                 }
 
                 if (syncStatusManager != null) {
@@ -188,14 +195,14 @@ public class PhotoAwardSyncService {
                 }
             }
 
-            log.info("[PhotoAwardSyncService] 지역({}) page={}/{} 완료 (누적 신규 {}건, 보강 {}건, 건너뜀 {}건, 지오코딩 실패 {}건)",
+            log.info("[PhotoAwardSyncService] 지역({}) page={}/{} 완료 (누적 신규 {}건, 보강 {}건, 건너뜀 {}건, 지오코딩 실패 {}건, 저장 실패 {}건)",
                     regionName, pageNo, (int) Math.ceil((double) totalCount / PAGE_SIZE),
-                    created, enriched, skipped, failedGeocoding);
+                    created, enriched, skipped, failedGeocoding, failedUpsert);
             pageNo++;
         }
 
-        log.info("[PhotoAwardSyncService] 지역({}) 공모전 동기화 최종 완료: 총 {}건 처리 (신규 {}건, 기존 보강 {}건, 건너뜀 {}건, 지오코딩 실패 {}건)",
-                regionName, saved, created, enriched, skipped, failedGeocoding);
+        log.info("[PhotoAwardSyncService] 지역({}) 공모전 동기화 최종 완료: 총 {}건 처리 (신규 {}건, 기존 보강 {}건, 건너뜀 {}건, 지오코딩 실패 {}건, 저장 실패 {}건)",
+                regionName, saved, created, enriched, skipped, failedGeocoding, failedUpsert);
         return saved;
     }
 
@@ -210,19 +217,28 @@ public class PhotoAwardSyncService {
         int enriched = 0;
         int skipped = 0;
         int failedGeocoding = 0;
+        int failedUpsert = 0;
         int totalCount = Integer.MAX_VALUE;
+        boolean useSyncList = false;
 
         while ((pageNo - 1) * PAGE_SIZE < totalCount) {
-            PhotoAwardApiResponse response = photoAwardApiClient.getPhotoAwardList(null, null, pageNo, PAGE_SIZE);
-            if (isEmptyResponse(response)) {
-                if (pageNo == 1) {
+            PhotoAwardApiResponse response;
+            if (useSyncList) {
+                response = photoAwardApiClient.getPhotoAwardSyncList(null, pageNo, PAGE_SIZE);
+            } else {
+                response = photoAwardApiClient.getPhotoAwardList(null, null, pageNo, PAGE_SIZE);
+                if (isEmptyResponse(response) && pageNo == 1) {
                     log.info("[PhotoAwardSyncService] 전국 phokoAwrdList 결과 없음 -> phokoAwrdSyncList 시도");
                     response = photoAwardApiClient.getPhotoAwardSyncList(null, 1, PAGE_SIZE);
+                    if (!isEmptyResponse(response)) {
+                        useSyncList = true;
+                    }
                 }
-                if (isEmptyResponse(response)) {
-                    log.info("[PhotoAwardSyncService] 전국 동기화 완료 또는 데이터 없음: page={}", pageNo);
-                    break;
-                }
+            }
+
+            if (isEmptyResponse(response)) {
+                log.info("[PhotoAwardSyncService] 전국 동기화 완료 또는 데이터 없음: page={}", pageNo);
+                break;
             }
 
             totalCount = response.response().body().totalCount();
@@ -259,18 +275,24 @@ public class PhotoAwardSyncService {
                 }
 
                 Coordinate coord = coordOpt.get();
-                PhotoAwardUpsertService.UpsertResult result = photoAwardUpsertService.upsertAward(item, coord);
+                try {
+                    PhotoAwardUpsertService.UpsertResult result = photoAwardUpsertService.upsertAward(item, coord);
 
-                switch (result) {
-                    case CREATED -> {
-                        created++;
-                        saved++;
+                    switch (result) {
+                        case CREATED -> {
+                            created++;
+                            saved++;
+                        }
+                        case ENRICHED -> {
+                            enriched++;
+                            saved++;
+                        }
+                        case SKIPPED -> skipped++;
                     }
-                    case ENRICHED -> {
-                        enriched++;
-                        saved++;
-                    }
-                    case SKIPPED -> skipped++;
+                } catch (Exception e) {
+                    failedUpsert++;
+                    log.error("[PhotoAwardSyncService] 수상작 저장 실패로 건너뜀: contentId={}, title={}, cause={}",
+                            item.contentId(), item.koTitle(), e.getMessage());
                 }
 
                 if (syncStatusManager != null) {
@@ -289,8 +311,8 @@ public class PhotoAwardSyncService {
             pageNo++;
         }
 
-        log.info("[PhotoAwardSyncService] 전국 공모전 수상작 동기화 최종 완료: 총 {}건 저장 (신규 {}건, 보강 {}건, 건너뜀 {}건, 지오코딩 실패 {}건)",
-                saved, created, enriched, skipped, failedGeocoding);
+        log.info("[PhotoAwardSyncService] 전국 공모전 수상작 동기화 최종 완료: 총 {}건 저장 (신규 {}건, 보강 {}건, 건너뜀 {}건, 지오코딩 실패 {}건, 저장 실패 {}건)",
+                saved, created, enriched, skipped, failedGeocoding, failedUpsert);
         return saved;
     }
 

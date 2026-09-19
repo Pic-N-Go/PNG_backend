@@ -125,12 +125,14 @@ public class CongestionCacheService {
         }
 
         List<CongestionItem> items = fetchFromApi(areaCd, signguCd, null, 1000);
-        if (!items.isEmpty()) {
-            try {
+        try {
+            if (!items.isEmpty()) {
                 redisTemplate.opsForValue().set(regionCacheKey, objectMapper.writeValueAsString(items), TTL_HOURS, TimeUnit.HOURS);
-            } catch (Exception e) {
-                log.warn("[CongestionCacheService] 지역 캐시 저장 실패: {}", e.getMessage());
+            } else {
+                redisTemplate.opsForValue().set(regionCacheKey, "[]", EMPTY_TTL_HOURS, TimeUnit.HOURS);
             }
+        } catch (Exception e) {
+            log.warn("[CongestionCacheService] 지역 캐시 저장 실패: {}", e.getMessage());
         }
         return items;
     }
