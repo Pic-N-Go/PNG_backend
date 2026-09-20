@@ -4,6 +4,7 @@ import com.project.picngo.spot.dto.PetTourSyncMessage;
 import com.project.picngo.spot.dto.PetTourSyncResultResponse;
 import com.project.picngo.spot.dto.TourApiSyncMessage;
 import com.project.picngo.spot.service.PetTourSyncService;
+import com.project.picngo.spot.service.TourApiSyncStatusManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +23,9 @@ class PetTourSyncConsumerTest {
 
     @Mock
     private PetTourSyncService petTourSyncService;
+
+    @Mock
+    private TourApiSyncStatusManager syncStatusManager;
 
     @InjectMocks
     private PetTourSyncConsumer consumer;
@@ -67,7 +71,7 @@ class PetTourSyncConsumerTest {
     }
 
     private PetTourSyncMessage message(List<Integer> types) {
-        return new PetTourSyncMessage(types, 1_000, null, 1L,
+        return new PetTourSyncMessage("job-1", types, 1_000, null, 1L,
                 TourApiSyncMessage.SyncType.SAMPLE, LocalDateTime.now());
     }
 

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record AccessibilityTourSyncMessage(
+        String jobId,
         List<Integer> contentTypeIds,
         int maxDetailsPerType,
         Integer areaCode,
@@ -18,6 +19,7 @@ public record AccessibilityTourSyncMessage(
 
     public static AccessibilityTourSyncMessage afterSpotSync(TourApiSyncMessage source) {
         return new AccessibilityTourSyncMessage(
+                source.jobId(),
                 DEFAULT_CONTENT_TYPE_IDS,
                 maxDetailsPerType(source),
                 source.areaCode(),

@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record PetTourSyncMessage(
+        String jobId,
         List<Integer> contentTypeIds,
         int maxDetailsPerType,
         Integer legalRegionCode,
@@ -18,6 +19,7 @@ public record PetTourSyncMessage(
 
     public static PetTourSyncMessage afterSpotSync(TourApiSyncMessage sourceMessage) {
         return new PetTourSyncMessage(
+                sourceMessage.jobId(),
                 DEFAULT_CONTENT_TYPE_IDS,
                 maxDetailsPerType(sourceMessage),
                 com.project.picngo.spot.service.TourAreaCodeMapper.toLegalRegionCode(sourceMessage.areaCode()),

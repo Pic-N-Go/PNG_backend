@@ -4,6 +4,7 @@ import com.project.picngo.spot.dto.AccessibilityTourSyncMessage;
 import com.project.picngo.spot.dto.AccessibilityTourSyncResultResponse;
 import com.project.picngo.spot.dto.TourApiSyncMessage;
 import com.project.picngo.spot.service.AccessibilityTourSyncService;
+import com.project.picngo.spot.service.TourApiSyncStatusManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +23,9 @@ class AccessibilityTourSyncConsumerTest {
 
     @Mock
     private AccessibilityTourSyncService service;
+
+    @Mock
+    private TourApiSyncStatusManager syncStatusManager;
 
     @InjectMocks
     private AccessibilityTourSyncConsumer consumer;
@@ -64,6 +68,7 @@ class AccessibilityTourSyncConsumerTest {
 
     private AccessibilityTourSyncMessage message(List<Integer> contentTypeIds) {
         return new AccessibilityTourSyncMessage(
+                "job-1",
                 contentTypeIds,
                 1_000,
                 null,
