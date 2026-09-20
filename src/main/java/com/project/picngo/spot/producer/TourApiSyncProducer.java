@@ -24,12 +24,13 @@ public class TourApiSyncProducer {
             throw new CustomException(SpotErrorCode.SYNC_ALREADY_IN_PROGRESS);
         }
 
-        TourApiSyncMessage message = TourApiSyncMessage.ofArea(areaCode, startPage, endPage, adminId);
+        TourApiSyncMessage message = TourApiSyncMessage.ofArea(
+                syncStatusManager.currentJobId(), areaCode, startPage, endPage, adminId);
         try {
             rabbitTemplate.convertAndSend(TourApiRabbitMQConfig.EXCHANGE_NAME, TourApiRabbitMQConfig.ROUTING_KEY, message);
             log.info("[TourApiSyncProducer] 지역 동기화 메시지 큐 발행 완료: areaCode={}, adminId={}", areaCode, adminId);
         } catch (Exception e) {
-            syncStatusManager.releaseLock();
+            syncStatusManager.markFailed(e.getMessage());
             log.error("[TourApiSyncProducer] 큐 메시지 발행 실패: {}", e.getMessage());
             throw e;
         }
@@ -41,12 +42,12 @@ public class TourApiSyncProducer {
             throw new CustomException(SpotErrorCode.SYNC_ALREADY_IN_PROGRESS);
         }
 
-        TourApiSyncMessage message = TourApiSyncMessage.ofAll(adminId);
+        TourApiSyncMessage message = TourApiSyncMessage.ofAll(syncStatusManager.currentJobId(), adminId);
         try {
             rabbitTemplate.convertAndSend(TourApiRabbitMQConfig.EXCHANGE_NAME, TourApiRabbitMQConfig.ROUTING_KEY, message);
             log.info("[TourApiSyncProducer] 전국 전체 동기화 메시지 큐 발행 완료: adminId={}", adminId);
         } catch (Exception e) {
-            syncStatusManager.releaseLock();
+            syncStatusManager.markFailed(e.getMessage());
             log.error("[TourApiSyncProducer] 큐 메시지 발행 실패: {}", e.getMessage());
             throw e;
         }
@@ -58,12 +59,13 @@ public class TourApiSyncProducer {
             throw new CustomException(SpotErrorCode.SYNC_ALREADY_IN_PROGRESS);
         }
 
-        TourApiSyncMessage message = TourApiSyncMessage.ofSample(countPerType, adminId);
+        TourApiSyncMessage message = TourApiSyncMessage.ofSample(
+                syncStatusManager.currentJobId(), countPerType, adminId);
         try {
             rabbitTemplate.convertAndSend(TourApiRabbitMQConfig.EXCHANGE_NAME, TourApiRabbitMQConfig.ROUTING_KEY, message);
             log.info("[TourApiSyncProducer] 샘플 동기화 메시지 큐 발행 완료: countPerType={}, adminId={}", countPerType, adminId);
         } catch (Exception e) {
-            syncStatusManager.releaseLock();
+            syncStatusManager.markFailed(e.getMessage());
             log.error("[TourApiSyncProducer] 큐 메시지 발행 실패: {}", e.getMessage());
             throw e;
         }

@@ -34,7 +34,17 @@ public record TourApiSyncStatusResponse(
         LocalDateTime lastCompletedAt,
 
         @Schema(description = "최근 발생한 에러 메시지 (실패 시)", example = "null")
-        String lastError
+        String lastError,
+
+        @Schema(description = "동기화 작업 식별자")
+        String jobId,
+
+        @Schema(description = "전체 파이프라인 상태", example = "IN_PROGRESS")
+        TourApiSyncStageStatus overallStatus,
+
+        TourApiSyncStageResponse spot,
+        TourApiSyncStageResponse pet,
+        TourApiSyncStageResponse accessibility
 ) {
     public static TourApiSyncStatusResponse idle(LocalDateTime lastCompletedAt, String lastError) {
         return new TourApiSyncStatusResponse(
@@ -47,7 +57,12 @@ public record TourApiSyncStatusResponse(
                 "대기 중 (진행 중인 동기화 작업 없음)",
                 null,
                 lastCompletedAt,
-                lastError
+                lastError,
+                null,
+                TourApiSyncStageStatus.COMPLETED,
+                null,
+                null,
+                null
         );
     }
 }

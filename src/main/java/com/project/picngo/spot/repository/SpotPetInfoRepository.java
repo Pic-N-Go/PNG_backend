@@ -12,6 +12,8 @@ import java.util.Set;
 public interface SpotPetInfoRepository extends JpaRepository<SpotPetInfo, Long> {
     Optional<SpotPetInfo> findBySpotId(Long spotId);
 
+    boolean existsBySpotId(Long spotId);
+
     @Query("select info.spot.id from SpotPetInfo info where info.spot.id in :spotIds")
     Set<Long> findExistingSpotIds(@Param("spotIds") Collection<Long> spotIds);
 }

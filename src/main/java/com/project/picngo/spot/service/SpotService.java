@@ -92,6 +92,8 @@ public class SpotService {
     private final ReviewRepository reviewRepository;
     private final SpotPhotoRepository spotPhotoRepository;
     private final BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository;
+    private final SpotPetInfoRepository spotPetInfoRepository;
+    private final SpotAccessibilityInfoRepository spotAccessibilityInfoRepository;
     private final MeterRegistry meterRegistry;
     private final SearchProperties searchProperties;
     private final EmbeddingClient embeddingClient;
@@ -109,6 +111,8 @@ public class SpotService {
             ReviewRepository reviewRepository,
             SpotPhotoRepository spotPhotoRepository,
             BookmarkCollectionSpotRepository bookmarkCollectionSpotRepository,
+            SpotPetInfoRepository spotPetInfoRepository,
+            SpotAccessibilityInfoRepository spotAccessibilityInfoRepository,
             MeterRegistry meterRegistry,
             SearchProperties searchProperties,
             @Nullable EmbeddingClient embeddingClient,
@@ -123,6 +127,8 @@ public class SpotService {
         this.reviewRepository = reviewRepository;
         this.spotPhotoRepository = spotPhotoRepository;
         this.bookmarkCollectionSpotRepository = bookmarkCollectionSpotRepository;
+        this.spotPetInfoRepository = spotPetInfoRepository;
+        this.spotAccessibilityInfoRepository = spotAccessibilityInfoRepository;
         this.meterRegistry = meterRegistry;
         this.searchProperties = searchProperties;
         this.embeddingClient = embeddingClient;
@@ -149,6 +155,8 @@ public class SpotService {
                 reviewRepository,
                 spotPhotoRepository,
                 bookmarkCollectionSpotRepository,
+                null,
+                null,
                 meterRegistry,
                 searchProperties,
                 embeddingClient,
@@ -180,6 +188,8 @@ public class SpotService {
                 && bookmarkCollectionSpotRepository.existsByCollection_UserIdAndSpotId(userId, spotId);
         Long myReviewId = userId == null ? null
                 : reviewRepository.findIdsBySpotIdAndUserId(spotId, userId).stream().findFirst().orElse(null);
+        boolean hasPetInfo = spotPetInfoRepository.existsBySpotId(spotId);
+        boolean hasAccessibilityInfo = spotAccessibilityInfoRepository.existsBySpotId(spotId);
 
         SpotDetailResponse.PhotoAwardRef photoAwardRef = null;
         if (photoAwardRepository != null) {
@@ -193,6 +203,7 @@ public class SpotService {
                 spot, reviewTags,
                 avgRating != null ? Math.round(avgRating * 10) / 10.0 : 0.0,
                 reviewCount, photoCount, isBookmarked, myReviewId,
+                hasPetInfo, hasAccessibilityInfo,
                 photoAwardRef
         );
     }

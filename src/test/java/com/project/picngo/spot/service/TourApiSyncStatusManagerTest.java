@@ -1,6 +1,7 @@
 package com.project.picngo.spot.service;
 
 import com.project.picngo.spot.dto.TourApiSyncStatusResponse;
+import com.project.picngo.spot.dto.TourApiSyncStageStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,5 +71,47 @@ class TourApiSyncStatusManagerTest {
         assertThat(status.isRunning()).isFalse();
         assertThat(status.lastError()).isEqualTo("네트워크 타임아웃 발생");
         assertThat(status.statusMessage()).contains("동기화 실패");
+    }
+
+    @Test
+    @DisplayName("Spot, 펫, 무장애가 모두 완료되어야 전체 파이프라인이 완료된다")
+    void completesOnlyAfterEveryStageCompletes() {
+        statusManager.tryLock("전국 동기화", null);
+        String jobId = statusManager.currentJobId();
+
+        statusManager.markSpotCompleted(jobId, 100);
+        assertThat(statusManager.isRunning()).isTrue();
+        assertThat(statusManager.getStatus().spot().status())
+                .isEqualTo(TourApiSyncStageStatus.COMPLETED);
+
+        statusManager.markStageCompleted(
+                jobId, TourApiSyncStatusManager.Stage.PET, 4, "반려동물 정보 동기화 완료");
+        assertThat(statusManager.isRunning()).isTrue();
+
+        statusManager.markStageCompleted(
+                jobId, TourApiSyncStatusManager.Stage.ACCESSIBILITY, 4, "무장애 정보 동기화 완료");
+
+        TourApiSyncStatusResponse status = statusManager.getStatus();
+        assertThat(status.isRunning()).isFalse();
+        assertThat(status.overallStatus()).isEqualTo(TourApiSyncStageStatus.COMPLETED);
+        assertThat(status.lastCompletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("이전 jobId의 늦은 상태 갱신은 현재 작업에 반영하지 않는다")
+    void ignoresStaleJobUpdate() {
+        statusManager.tryLock("첫 번째 동기화", null);
+        String oldJobId = statusManager.currentJobId();
+        statusManager.markFailed("첫 번째 작업 실패");
+
+        statusManager.tryLock("두 번째 동기화", null);
+        String currentJobId = statusManager.currentJobId();
+        statusManager.markStageCompleted(
+                oldJobId, TourApiSyncStatusManager.Stage.PET, 4, "늦게 도착한 완료 메시지");
+
+        TourApiSyncStatusResponse status = statusManager.getStatus();
+        assertThat(status.jobId()).isEqualTo(currentJobId);
+        assertThat(status.pet().status()).isEqualTo(TourApiSyncStageStatus.PENDING);
+        assertThat(status.isRunning()).isTrue();
     }
 }

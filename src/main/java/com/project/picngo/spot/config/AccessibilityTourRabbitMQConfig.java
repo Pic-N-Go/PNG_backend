@@ -15,6 +15,7 @@ public class AccessibilityTourRabbitMQConfig {
     public static final String EXCHANGE = "accessibilitytour.sync.exchange";
     public static final String KEY = "accessibilitytour.sync.key";
     public static final String DLQ = "accessibilitytour.sync.dlq";
+    public static final String DLQ_STATUS = "accessibilitytour.sync.dlq.status";
     public static final String DLX = "accessibilitytour.sync.dlx";
     public static final String DEAD_KEY = "accessibilitytour.sync.dead";
 
@@ -57,6 +58,21 @@ public class AccessibilityTourRabbitMQConfig {
             DirectExchange accessibilityTourDlx
     ) {
         return BindingBuilder.bind(accessibilityTourDlq)
+                .to(accessibilityTourDlx)
+                .with(DEAD_KEY);
+    }
+
+    @Bean
+    Queue accessibilityTourDlqStatus() {
+        return QueueBuilder.durable(DLQ_STATUS).build();
+    }
+
+    @Bean
+    Binding accessibilityTourDeadStatusBinding(
+            Queue accessibilityTourDlqStatus,
+            DirectExchange accessibilityTourDlx
+    ) {
+        return BindingBuilder.bind(accessibilityTourDlqStatus)
                 .to(accessibilityTourDlx)
                 .with(DEAD_KEY);
     }

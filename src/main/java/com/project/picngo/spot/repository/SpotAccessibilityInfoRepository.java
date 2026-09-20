@@ -13,6 +13,8 @@ public interface SpotAccessibilityInfoRepository extends JpaRepository<SpotAcces
 
     Optional<SpotAccessibilityInfo> findBySpotId(Long spotId);
 
+    boolean existsBySpotId(Long spotId);
+
     @Query("select info.spot.id from SpotAccessibilityInfo info where info.spot.id in :spotIds")
     Set<Long> findExistingSpotIds(@Param("spotIds") Collection<Long> spotIds);
 }
