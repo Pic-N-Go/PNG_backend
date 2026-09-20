@@ -62,6 +62,29 @@ class AirQualityClientTest {
     }
 
     @Test
+    @DisplayName("오존과 미세먼지가 모두 정상인 관측소를 1순위로 선택한다")
+    void prefersStationWithBothPm10AndOzone() {
+        // 첫 번째 관측소는 미세먼지는 있지만 오존이 "-" (강원도 사례)
+        // 두 번째 관측소는 미세먼지와 오존 모두 정상
+        String body = """
+                {"response":{"body":{"items":[
+                  {"stationName":"춘천1","pm10Value":"25","pm25Value":"15","o3Value":"-","o3Grade":""},
+                  {"stationName":"원주2","pm10Value":"28","pm25Value":"17","o3Value":"0.025","o3Grade":"1"}
+                ]}}}
+                """;
+        server.enqueue(new MockResponse()
+                .setBody(body)
+                .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));
+
+        Item item = client.getAirQuality("강원");
+
+        assertThat(item).isNotNull();
+        assertThat(item.stationName()).isEqualTo("원주2");
+        assertThat(item.o3Value()).isEqualTo("0.025");
+        assertThat(item.pm10Value()).isEqualTo("28");
+    }
+
+    @Test
     @DisplayName("API 오류면 null (예외 삼킴)")
     void errorReturnsNull() {
         server.enqueue(new MockResponse().setResponseCode(500));

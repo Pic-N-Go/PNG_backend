@@ -5,6 +5,7 @@ import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ExternalApiErrorCode;
 import com.project.picngo.external.config.ExternalApiCircuitBreakerConfig;
 import com.project.picngo.external.dto.GoldenHourResponse;
+import com.project.picngo.external.dto.KmaMidWeatherApiResponse;
 import com.project.picngo.external.dto.KmaWeatherApiResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import okhttp3.mockwebserver.Dispatcher;
@@ -204,5 +205,49 @@ class WeatherClientTest {
         // 호스트별로 나눴기 때문에 일출일몰은 멀쩡히 동작해야 한다.
         GoldenHourResponse goldenHour = weatherClient.getGoldenHour(37.56, 126.97, "2026-07-02");
         assertThat(goldenHour.sunriseTime()).isEqualTo("10:30:00 PM");
+    }
+
+    @Test
+    @DisplayName("기상청 중기예보 정상 조회 시 파싱하여 DTO를 반환한다")
+    void 기상청_중기예보조회_성공() {
+        String mockMidTermResponse = """
+            {
+              "response": {
+                "header": {
+                  "resultCode": "00",
+                  "resultMsg": "NORMAL_SERVICE"
+                },
+                "body": {
+                  "dataType": "JSON",
+                  "items": {
+                    "item": [
+                      {
+                        "regId": "11D20000",
+                        "wf3Am": "맑음",
+                        "wf3Pm": "구름많음",
+                        "wf4Am": "맑음",
+                        "wf4Pm": "맑음"
+                      }
+                    ]
+                  },
+                  "pageNo": 1,
+                  "numOfRows": 10,
+                  "totalCount": 1
+                }
+              }
+            }
+        """;
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(200)
+                .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .setBody(mockMidTermResponse));
+
+        KmaMidWeatherApiResponse response = weatherClient.getMidTermForecast("11D20000", "202609200600");
+
+        assertThat(response).isNotNull();
+        assertThat(response.response().header().resultCode()).isEqualTo("00");
+        assertThat(response.response().body().items().item()).hasSize(1);
+        assertThat(response.response().body().items().item().get(0).wf3Am()).isEqualTo("맑음");
     }
 }

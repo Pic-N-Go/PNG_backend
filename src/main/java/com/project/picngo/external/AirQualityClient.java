@@ -70,10 +70,15 @@ public class AirQualityClient {
             if (response != null && response.response() != null
                     && response.response().body() != null
                     && response.response().body().items() != null) {
-                return response.response().body().items().stream()
-                        .filter(i -> i.pm10Value() != null && !i.pm10Value().equals("-"))
+                var items = response.response().body().items();
+                // 1순위: 미세먼지(PM10)와 오존(O3) 모두 정상 측정값이 있는 관측소
+                // 2순위: 미세먼지만이라도 정상 측정값이 있는 관측소
+                // 3순위: 목록의 첫 관측소 (결측치라도 null 대신 반환)
+                return items.stream()
+                        .filter(i -> isValidValue(i.pm10Value()) && isValidValue(i.o3Value()))
                         .findFirst()
-                        .orElse(null);
+                        .or(() -> items.stream().filter(i -> isValidValue(i.pm10Value())).findFirst())
+                        .orElseGet(() -> items.isEmpty() ? null : items.get(0));
             }
         } catch (CallNotPermittedException e) {
             // 원래도 실패 시 null을 돌려주던 구조라 서킷 open도 같은 폴백을 탄다.
@@ -84,5 +89,9 @@ public class AirQualityClient {
             log.warn("에어코리아 API 호출 실패 sidoName={}: {}", sidoName, e.getMessage());
         }
         return null;
+    }
+
+    private boolean isValidValue(String val) {
+        return val != null && !val.isBlank() && !"-".equals(val.trim());
     }
 }
