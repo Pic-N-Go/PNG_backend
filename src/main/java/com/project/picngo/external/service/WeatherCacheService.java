@@ -38,23 +38,30 @@ public class WeatherCacheService {
         String cachedData = redisTemplate.opsForValue().get(key);
         if (cachedData != null) {
             try {
-                log.info("캐시 히트(Cache Hit) 발생: 단기예보 - {}", key);
+                log.info("캐시 히트(Cache Hit) 발생: 7일 통합예보(단기+중기) - {}", key);
                 return objectMapper.readValue(cachedData, new com.fasterxml.jackson.core.type.TypeReference<List<WeatherForecastResponse>>() {});
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                log.warn("Redis 단기예보 파싱 실패 (key: {})", key, e);
+                log.warn("Redis 7일 통합예보 파싱 실패 (key: {})", key, e);
             }
         }
 
-        List<WeatherForecastResponse> freshData = weatherForecastService.getCombined7DayForecast(lat, lng, date);
-        
-        if (freshData != null && !freshData.isEmpty()) {
+        WeatherForecastService.CombinedForecastResult result =
+                weatherForecastService.getCombined7DayForecastResult(lat, lng, date);
+        List<WeatherForecastResponse> freshData = result.forecasts();
+
+        // 단기·중기 어느 한쪽이라도 반쪽으로 온 결과는 캐시에 저장하지 않는다.
+        // 저장하면 TTL(3시간) 동안 모든 요청이 그 구멍(가까운 날 또는 D+3 이후 공백)을 그대로 돌려받는다.
+        if (freshData != null && !freshData.isEmpty() && result.complete()) {
             try {
                 redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(freshData), TTL_HOURS, java.util.concurrent.TimeUnit.HOURS);
             } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                log.warn("Redis 단기예보 저장 실패 (key: {})", key, e);
+                log.warn("Redis 7일 통합예보 저장 실패 (key: {})", key, e);
             }
+        } else if (!result.complete()) {
+            log.warn("예보 병합이 불완전하여 캐시 저장을 건너뜁니다 (key: {}, 단기={}, 중기={}). 다음 요청에서 재조회합니다.",
+                    key, result.shortTermMerged(), result.midTermMerged());
         }
-        
+
         return freshData;
     }
 
