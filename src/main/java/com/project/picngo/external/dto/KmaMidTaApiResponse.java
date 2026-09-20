@@ -13,8 +13,13 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * 기상청 중기기온예보(getMidTa) 응답.
+ * 중기육상예보(getMidLandFcst)는 하늘상태만 주고 기온이 없어, 기온은 이 API로 별도 조회한다.
+ * 제공값은 일자별 최저(taMin)/최고(taMax) 뿐이며 시간대별 값은 없다.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record KmaMidWeatherApiResponse(Response response) {
+public record KmaMidTaApiResponse(Response response) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Response(Header header, Body body) {}
@@ -37,10 +42,9 @@ public record KmaMidWeatherApiResponse(Response response) {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Item(
             String regId,
-            Integer rnSt3Am, Integer rnSt3Pm, Integer rnSt4Am, Integer rnSt4Pm, Integer rnSt5Am, Integer rnSt5Pm, Integer rnSt6Am, Integer rnSt6Pm, Integer rnSt7Am, Integer rnSt7Pm,
-            Integer rnSt8, Integer rnSt9, Integer rnSt10,
-            String wf3Am, String wf3Pm, String wf4Am, String wf4Pm, String wf5Am, String wf5Pm, String wf6Am, String wf6Pm, String wf7Am, String wf7Pm,
-            String wf8, String wf9, String wf10
+            Integer taMin3, Integer taMax3, Integer taMin4, Integer taMax4, Integer taMin5, Integer taMax5,
+            Integer taMin6, Integer taMax6, Integer taMin7, Integer taMax7,
+            Integer taMin8, Integer taMax8, Integer taMin9, Integer taMax9, Integer taMin10, Integer taMax10
     ) {}
 
     /**
