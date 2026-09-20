@@ -18,6 +18,8 @@ spring:
     # V2부터 실행한다. 빈 DB에는 해당되지 않아 V1부터 정상 실행된다.
     baseline-on-migrate: true
     baseline-version: 1
+    # Windows/Mac 간 줄바꿈(CRLF vs LF) 차이로 인한 마이그레이션 체크섬 불일치 에러 방지
+    validate-on-migrate: false
 
   sql:
     init:

@@ -144,6 +144,67 @@ class WeatherMatchServiceTest {
     }
 
     @Nested
+    @DisplayName("일출/일몰 - 아침/저녁 날씨로 근사 매칭")
+    class SunriseSunset {
+
+        @Test
+        @DisplayName("SUNRISE(05~07): 단기예보는 아침 슬롯으로 정밀 매칭한다")
+        void sunrisePreciseMorning() {
+            List<WeatherForecastResponse> forecast = List.of(
+                    f(DATE, "0600", "CLEAR"),  // 일출 무렵 = 맑음
+                    f(DATE, "1800", "RAINY")   // 저녁은 비 (무시돼야 함)
+            );
+            assertThat(sut.matches(forecast, DATE, TimeCondition.SUNRISE, Set.of(WeatherCondition.CLEAR)))
+                    .isTrue();
+            assertThat(sut.matches(forecast, DATE, TimeCondition.SUNRISE, Set.of(WeatherCondition.RAINY)))
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("SUNSET(17~19): 단기예보는 저녁 슬롯으로 정밀 매칭한다")
+        void sunsetPreciseEvening() {
+            List<WeatherForecastResponse> forecast = List.of(
+                    f(DATE, "0600", "CLEAR"),  // 아침은 맑음 (무시돼야 함)
+                    f(DATE, "1800", "CLOUDY")  // 일몰 무렵 = 흐림
+            );
+            assertThat(sut.matches(forecast, DATE, TimeCondition.SUNSET, Set.of(WeatherCondition.CLOUDY)))
+                    .isTrue();
+            assertThat(sut.matches(forecast, DATE, TimeCondition.SUNSET, Set.of(WeatherCondition.CLEAR)))
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("SUNRISE는 중기예보에서 오전(1000)으로 폴백 매칭된다")
+        void sunriseFallsBackToAm() {
+            List<WeatherForecastResponse> midTermOnly = List.of(
+                    f(DATE, "1000", "CLEAR"),   // 오전
+                    f(DATE, "1400", "RAINY"),   // 오후
+                    f(DATE, "1800", "RAINY")
+            );
+            assertThat(sut.matches(midTermOnly, DATE, TimeCondition.SUNRISE, Set.of(WeatherCondition.CLEAR)))
+                    .isTrue();
+            // 오후(비)로는 매칭되면 안 된다
+            assertThat(sut.matches(midTermOnly, DATE, TimeCondition.SUNRISE, Set.of(WeatherCondition.RAINY)))
+                    .isFalse();
+        }
+
+        @Test
+        @DisplayName("SUNSET은 중기예보에서 오후(1400/1800)로 폴백 매칭된다")
+        void sunsetFallsBackToPm() {
+            List<WeatherForecastResponse> midTermOnly = List.of(
+                    f(DATE, "1000", "CLEAR"),   // 오전
+                    f(DATE, "1400", "RAINY"),   // 오후
+                    f(DATE, "1800", "RAINY")
+            );
+            assertThat(sut.matches(midTermOnly, DATE, TimeCondition.SUNSET, Set.of(WeatherCondition.RAINY)))
+                    .isTrue();
+            // 오전(맑음)으로는 매칭되면 안 된다
+            assertThat(sut.matches(midTermOnly, DATE, TimeCondition.SUNSET, Set.of(WeatherCondition.CLEAR)))
+                    .isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("matches - 공통 규칙")
     class CommonRules {
 

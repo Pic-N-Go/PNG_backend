@@ -4,6 +4,7 @@ import com.project.picngo.common.util.LatXLngYConverter;
 import com.project.picngo.external.dto.GoldenHourResponse;
 import com.project.picngo.external.dto.KmaWeatherApiResponse;
 import com.project.picngo.external.dto.KmaMidWeatherApiResponse;
+import com.project.picngo.external.dto.KmaMidTaApiResponse;
 import com.project.picngo.external.dto.SunriseSunsetApiResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
 import com.project.picngo.common.exception.CustomException;
@@ -201,6 +202,39 @@ public class WeatherClient {
             throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         } catch (Exception e) {
             log.warn("기상청 중기예보 에러 발생: {}", e.getMessage());
+            throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
+        }
+    }
+
+    public KmaMidTaApiResponse getMidTermTemperature(String regId, String tmFc) {
+        try {
+            String urlStr = kmaBaseUrl + "/MidFcstInfoService/getMidTa"
+                    + "?serviceKey=" + serviceKey
+                    + "&pageNo=1"
+                    + "&numOfRows=10"
+                    + "&dataType=JSON"
+                    + "&regId=" + regId
+                    + "&tmFc=" + tmFc;
+            log.debug("[KMA MidTa API Request] URL: {}", urlStr);
+            java.net.URI uri = new java.net.URI(urlStr);
+
+            // 단기예보와 같은 기상청 호스트라 서킷을 공유한다.
+            Supplier<KmaMidTaApiResponse> call = CircuitBreaker.decorateSupplier(kmaCircuitBreaker, () ->
+                    kmaWebClient.get()
+                            .uri(uri)
+                            .retrieve()
+                            .bodyToMono(KmaMidTaApiResponse.class)
+                            .retryWhen(Retry.backoff(1, Duration.ofMillis(500))
+                                    .doBeforeRetry(retrySignal -> log.warn("기상청 중기기온예보 에러 발생, 재시도합니다... ({}회차)", retrySignal.totalRetries() + 1)))
+                            .timeout(KMA_TIMEOUT)
+                            .block());
+
+            return call.get();
+        } catch (CallNotPermittedException e) {
+            log.warn("⚡ [기상청 중기기온예보 서킷 open - 즉시 실패] regId: {}", regId);
+            throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
+        } catch (Exception e) {
+            log.warn("기상청 중기기온예보 에러 발생: {}", e.getMessage());
             throw new CustomException(ExternalApiErrorCode.WEATHER_API_ERROR);
         }
     }

@@ -20,6 +20,9 @@ import java.util.Set;
  * - 단기예보(1~3일)는 시간별 데이터가 있으므로 시간대 윈도우로 <b>정밀 매칭</b>한다.<br>
  * - 중기예보(3~7일)는 오전/오후(AM/PM)만 제공하므로, 시간대를 반나절 슬롯으로 <b>근사 매칭</b>한다.
  * (기상청 오전/오후 예보 정의와 일치: 새벽·오전 → 오전, 오후·야간 → 오후)
+ * <p>
+ * 일출(SUNRISE)·일몰(SUNSET)은 그 시각의 날씨(아침/저녁)로 근사 매칭한다. 알림 발송 스케줄러는
+ * 이 둘을 골든아워 전용 경로로 따로 처리하므로 이 매핑은 출사알림 프리뷰 화면에만 영향을 준다.
  */
 @Slf4j
 @Component
@@ -91,21 +94,24 @@ public class WeatherMatchService {
     private int[] hourWindow(TimeCondition timeCondition) {
         return switch (timeCondition) {
             case DAWN -> new int[]{4, 6};
+            case SUNRISE -> new int[]{5, 7};   // 일출 = 아침 날씨로 근사
             case MORNING -> new int[]{7, 11};
             case AFTERNOON -> new int[]{12, 16};
+            case SUNSET -> new int[]{17, 19};  // 일몰 = 저녁 날씨로 근사
             case NIGHT -> new int[]{19, 23};
-            default -> null; // SUNRISE/SUNSET/NONE 등은 이 서비스의 대상이 아님
+            default -> null; // NONE 등은 이 서비스의 대상이 아님
         };
     }
 
     /**
      * 중기예보(오전/오후만 존재) Fallback용 슬롯.
      * WeatherForecastService.extractMidTerm이 오전=1000, 오후=1400·1800으로 매핑하므로 그에 맞춘다.
+     * 일출(SUNRISE)은 아침(AM), 일몰(SUNSET)은 저녁(PM) 날씨로 근사한다.
      */
     private Set<String> amPmSlots(TimeCondition timeCondition) {
         return switch (timeCondition) {
-            case DAWN, MORNING -> Set.of("1000");            // 오전(AM)
-            case AFTERNOON, NIGHT -> Set.of("1400", "1800"); // 오후(PM)
+            case DAWN, SUNRISE, MORNING -> Set.of("1000");           // 오전(AM)
+            case AFTERNOON, SUNSET, NIGHT -> Set.of("1400", "1800"); // 오후(PM)
             default -> Set.of();
         };
     }
