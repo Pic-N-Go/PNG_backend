@@ -57,23 +57,24 @@ class TourApiSyncConsumerTest {
     }
 
     @Test
-    @DisplayName("동기화 중 예외 발생 시 markFailed 호출, 감사로그 실패 기록 및 락 해제 검증")
+    @DisplayName("동기화 중 예외 발생 시 현재 작업을 재시도 상태로 변경한다")
     void consumeFailureHandlesError() {
-        TourApiSyncMessage message = TourApiSyncMessage.ofAll(100L);
+        TourApiSyncMessage message = TourApiSyncMessage.ofAll("job-1", 100L);
         given(tourApiSyncService.syncAll()).willThrow(new RuntimeException("API 서버 오류"));
 
         assertThatThrownBy(() -> tourApiSyncConsumer.consume(message))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("API 서버 오류");
 
-        verify(syncStatusManager).markFailed("API 서버 오류");
+        verify(syncStatusManager).markStageRetrying(
+                "job-1", TourApiSyncStatusManager.Stage.SPOT, "API 서버 오류");
         verify(adminAuditLogService).record(eq(100L), eq(AdminActionType.TOUR_API_SYNC), anyString(), eq("ALL_AREAS"), contains("API 서버 오류"), isNull());
     }
 
     @Test
     @DisplayName("후속 메시지 발행 실패 시 예외를 전파하여 RabbitMQ 재시도를 요청한다")
     void propagateAddonMessagePublicationFailure() {
-        TourApiSyncMessage message = TourApiSyncMessage.ofSample(3, 100L);
+        TourApiSyncMessage message = TourApiSyncMessage.ofSample("job-1", 3, 100L);
         given(tourApiSyncService.syncSample(3)).willReturn(0);
         willThrow(new RuntimeException("RabbitMQ 발행 오류"))
                 .given(petTourSyncProducer)
@@ -83,6 +84,7 @@ class TourApiSyncConsumerTest {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("RabbitMQ 발행 오류");
 
-        verify(syncStatusManager).markFailed("RabbitMQ 발행 오류");
+        verify(syncStatusManager).markStageRetrying(
+                "job-1", TourApiSyncStatusManager.Stage.SPOT, "RabbitMQ 발행 오류");
     }
 }

@@ -65,7 +65,11 @@ public class TourApiSyncConsumer {
         } catch (RuntimeException e) {
             log.error("[TourApiSyncConsumer] 동기화 작업 실패: scope={}, areaCode={}, cause={}",
                     message.syncType(), message.areaCode(), e.getMessage(), e);
-            syncStatusManager.markFailed(e.getMessage());
+            syncStatusManager.markStageRetrying(
+                    message.jobId(),
+                    TourApiSyncStatusManager.Stage.SPOT,
+                    e.getMessage()
+            );
             recordAuditLog(message.adminId(), getTarget(message),
                     String.format("한국관광공사 TourAPI 비동기 동기화 실패 (오류: %s)", e.getMessage()));
             throw e;

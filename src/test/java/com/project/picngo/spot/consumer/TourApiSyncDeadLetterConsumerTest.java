@@ -26,6 +26,18 @@ class TourApiSyncDeadLetterConsumerTest {
     private TourApiSyncDeadLetterConsumer consumer;
 
     @Test
+    void marksSpotStageFailedWhenRetriesAreExhausted() {
+        TourApiSyncMessage message = TourApiSyncMessage.ofAll("job-1", 1L);
+
+        consumer.consumeSpotFailure(message);
+
+        verify(statusManager).markStageFailed(
+                org.mockito.ArgumentMatchers.eq("job-1"),
+                org.mockito.ArgumentMatchers.eq(TourApiSyncStatusManager.Stage.SPOT),
+                contains("최종 실패"));
+    }
+
+    @Test
     void marksPetStageFailedWhenRetriesAreExhausted() {
         PetTourSyncMessage message = new PetTourSyncMessage(
                 "job-1", List.of(12), 1_000, null, 1L,
