@@ -162,4 +162,59 @@ class WeatherForecastServiceTest {
         long countDay20 = result.stream().filter(r -> "20260920".equals(r.date())).count();
         assertThat(countDay20).isEqualTo(1); // 단기예보 1개만 존재
     }
+
+    @Test
+    @DisplayName("D+3일차에 단기예보가 1800만 갖고 있을 때 누락된 1000과 1400 슬롯을 중기예보가 보완한다")
+    void getCombined7DayForecastSupplementsMissingSlotsOnDay3() {
+        // given: D+3(20260923)에 1800 단기예보만 있는 상황
+        List<WeatherForecastResponse> shortTerms = List.of(
+                new WeatherForecastResponse("20260920", "1200", "CLEAR", 22.0),
+                new WeatherForecastResponse("20260923", "1800", "CLEAR", 20.0) // D+3 저녁만 존재
+        );
+        given(weatherClient.getShortTermForecast(anyDouble(), anyDouble(), anyString()))
+                .willReturn(shortTerms);
+
+        KmaMidWeatherApiResponse.Item midItem = new KmaMidWeatherApiResponse.Item(
+                "11D20000",
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null,
+                "맑음", "구름많음", // Day 3 (20260923) - 1000=맑음, 1400/1800=구름많음
+                "맑음", "맑음",
+                "맑음", "맑음",
+                "맑음", "맑음",
+                "맑음", "맑음",
+                null, null, null
+        );
+        KmaMidWeatherApiResponse midResponse = new KmaMidWeatherApiResponse(
+                new KmaMidWeatherApiResponse.Response(
+                        new KmaMidWeatherApiResponse.Header("00", "NORMAL_SERVICE"),
+                        new KmaMidWeatherApiResponse.Body("JSON", new KmaMidWeatherApiResponse.Items(List.of(midItem)), 1, 10, 1)
+                )
+        );
+        given(weatherClient.getMidTermForecast(anyString(), anyString()))
+                .willReturn(midResponse);
+
+        // when
+        List<WeatherForecastResponse> result = service.getCombined7DayForecast(38.20, 128.59, "20260920");
+
+        // then: D+3(20260923) 날짜에 대해 1000(중기), 1400(중기), 1800(단기) 3슬롯이 모두 존재해야 함
+        List<WeatherForecastResponse> day3Slots = result.stream()
+                .filter(r -> "20260923".equals(r.date()))
+                .toList();
+
+        assertThat(day3Slots).hasSize(3);
+
+        WeatherForecastResponse slot1000 = day3Slots.stream().filter(r -> "1000".equals(r.time())).findFirst().orElse(null);
+        WeatherForecastResponse slot1400 = day3Slots.stream().filter(r -> "1400".equals(r.time())).findFirst().orElse(null);
+        WeatherForecastResponse slot1800 = day3Slots.stream().filter(r -> "1800".equals(r.time())).findFirst().orElse(null);
+
+        assertThat(slot1000).isNotNull();
+        assertThat(slot1000.weatherStatus()).isEqualTo("CLEAR");
+
+        assertThat(slot1400).isNotNull();
+        assertThat(slot1400.weatherStatus()).isEqualTo("CLOUDY");
+
+        assertThat(slot1800).isNotNull();
+        assertThat(slot1800.temperature()).isEqualTo(20.0); // 단기예보의 1800 슬롯이 보존됨
+    }
 }

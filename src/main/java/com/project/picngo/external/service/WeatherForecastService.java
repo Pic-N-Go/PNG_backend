@@ -32,15 +32,15 @@ public class WeatherForecastService {
      */
     public List<WeatherForecastResponse> getCombined7DayForecast(Double lat, Double lng, String date) {
         List<WeatherForecastResponse> combined = new ArrayList<>();
-        Set<String> shortTermDates = new HashSet<>();
+        Set<String> existingSlots = new HashSet<>();
 
         try {
             // 1. 단기예보 (시간별)
             List<WeatherForecastResponse> shortTerm = weatherClient.getShortTermForecast(lat, lng, date);
             if (shortTerm != null) {
-                combined.addAll(shortTerm);
                 for (WeatherForecastResponse st : shortTerm) {
-                    shortTermDates.add(st.date());
+                    combined.add(st);
+                    existingSlots.add(st.date() + "_" + st.time());
                 }
             }
         } catch (Exception e) {
@@ -64,12 +64,13 @@ public class WeatherForecastService {
                 KmaMidWeatherApiResponse.Item item = midTermResponse.response().body().items().item().get(0);
                 LocalDate fcstBaseDate = LocalDate.parse(tmFc.substring(0, 8), DATE_FMT);
 
-                // 중기 예보는 발표일 기준 Day 3 ~ Day 7 (단기예보와 겹치지 않는 날짜만 추가)
-                addMidTermIfNotPresent(combined, shortTermDates, extractMidTerm(item, fcstBaseDate, 3, item.wf3Am(), item.wf3Pm()));
-                addMidTermIfNotPresent(combined, shortTermDates, extractMidTerm(item, fcstBaseDate, 4, item.wf4Am(), item.wf4Pm()));
-                addMidTermIfNotPresent(combined, shortTermDates, extractMidTerm(item, fcstBaseDate, 5, item.wf5Am(), item.wf5Pm()));
-                addMidTermIfNotPresent(combined, shortTermDates, extractMidTerm(item, fcstBaseDate, 6, item.wf6Am(), item.wf6Pm()));
-                addMidTermIfNotPresent(combined, shortTermDates, extractMidTerm(item, fcstBaseDate, 7, item.wf7Am(), item.wf7Pm()));
+                // 중기 예보는 발표일 기준 Day 3 ~ Day 7
+                // (D+3 등 단기예보에 특정 시간대만 잘려 있는 경우, 누락된 아침/점심/저녁 슬롯을 중기예보가 보완)
+                addMidTermIfNotPresent(combined, existingSlots, extractMidTerm(item, fcstBaseDate, 3, item.wf3Am(), item.wf3Pm()));
+                addMidTermIfNotPresent(combined, existingSlots, extractMidTerm(item, fcstBaseDate, 4, item.wf4Am(), item.wf4Pm()));
+                addMidTermIfNotPresent(combined, existingSlots, extractMidTerm(item, fcstBaseDate, 5, item.wf5Am(), item.wf5Pm()));
+                addMidTermIfNotPresent(combined, existingSlots, extractMidTerm(item, fcstBaseDate, 6, item.wf6Am(), item.wf6Pm()));
+                addMidTermIfNotPresent(combined, existingSlots, extractMidTerm(item, fcstBaseDate, 7, item.wf7Am(), item.wf7Pm()));
             }
 
         } catch (Exception e) {
@@ -79,10 +80,12 @@ public class WeatherForecastService {
         return combined;
     }
 
-    private void addMidTermIfNotPresent(List<WeatherForecastResponse> combined, Set<String> shortTermDates, List<WeatherForecastResponse> midTerms) {
+    private void addMidTermIfNotPresent(List<WeatherForecastResponse> combined, Set<String> existingSlots, List<WeatherForecastResponse> midTerms) {
         for (WeatherForecastResponse mt : midTerms) {
-            if (!shortTermDates.contains(mt.date())) {
+            String slotKey = mt.date() + "_" + mt.time();
+            if (!existingSlots.contains(slotKey)) {
                 combined.add(mt);
+                existingSlots.add(slotKey);
             }
         }
     }
