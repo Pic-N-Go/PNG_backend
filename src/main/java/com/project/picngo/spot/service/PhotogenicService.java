@@ -42,6 +42,11 @@ public class PhotogenicService {
     private static final DateTimeFormatter HHMM = DateTimeFormatter.ofPattern("HHmm");
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
     private static final int NON_LEAP_YEAR = 2001; // MonthDay 거리 계산용 임의 기준 연도 (윤년 2/29 이슈 회피)
+    // 시즌 점수 하한(평상시 점수) 비율. 시즌 기간을 벗어나도 이 비율만큼은 유지해
+    // "시즌 아님 = 무조건 0점"이 총점을 깎는 UX 문제를 피한다. (기간 경계에서 절벽 대신 이 값으로 수렴)
+    private static final double SEASON_BASELINE_RATIO = 0.25;
+    // 지역에 활성 시즌 이벤트가 하나도 없을 때 평상시 점수 산출에 쓰는 기준 만점 (data.sql 기준 시즌 만점 20).
+    private static final int DEFAULT_SEASON_MAX_SCORE = 20;
 
     private final SpotRepository spotRepository;
     private final SeasonEventRepository seasonEventRepository;
@@ -204,8 +209,11 @@ public class PhotogenicService {
         List<SeasonEvent> events = seasonEventRepository.findActiveByRegion(region);
         MonthDay today = MonthDay.from(date);
 
-        return events.stream()
+        List<SeasonEvent> eligible = events.stream()
                 .filter(e -> e.isEligibleForCat3(cat3))
+                .toList();
+
+        return eligible.stream()
                 .filter(e -> isInRange(today, MonthDay.parse(e.getMonthDayStart(), MM_DD),
                         MonthDay.parse(e.getMonthDayEnd(), MM_DD)))
                 // 겹치는 이벤트 중 오늘이 "피크 구간"인 쪽을 우선, 그 다음 피크 중심일과 가까운 쪽을 우선
@@ -219,7 +227,19 @@ public class PhotogenicService {
                     int pct = (int) Math.round(score * 100.0 / e.getMaxScore());
                     return new FactorInfo(e.getName() + " " + pct + "%", score);
                 })
-                .orElse(new FactorInfo("해당 없음", 0));
+                // 시즌 기간 밖(비수기)이라도 0점 대신 평상시 baseline 점수를 준다.
+                .orElseGet(() -> new FactorInfo("평상시", baselineSeasonScore(eligible)));
+    }
+
+    /** 지역 시즌 만점의 SEASON_BASELINE_RATIO(25%)를 평상시 점수로 준다. 활성 이벤트가 없으면 기본 만점 기준. */
+    private int baselineSeasonScore(List<SeasonEvent> eligible) {
+        int maxScore = eligible.stream()
+                .map(SeasonEvent::getMaxScore)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .max()
+                .orElse(DEFAULT_SEASON_MAX_SCORE);
+        return (int) Math.round(SEASON_BASELINE_RATIO * maxScore);
     }
 
     private long peakCenterDistance(MonthDay today, SeasonEvent event) {
@@ -230,14 +250,45 @@ public class PhotogenicService {
         return Math.abs(ChronoUnit.DAYS.between(refToday, peakCenter));
     }
 
+    /**
+     * 시즌 기간 내 점수를 선형으로 보간한다. (호출부에서 today가 [start, end] 안임이 보장됨)
+     * - 피크 구간(peakStart~peakEnd): 만점
+     * - 시작~피크: baseline(만점의 25%)에서 만점으로 선형 상승
+     * - 피크~종료: 만점에서 baseline으로 선형 하강
+     * 경계(start/end)에서 baseline으로 수렴해 비수기 평상시 점수와 자연스럽게 이어진다.
+     */
     private int calculateSeasonScore(MonthDay today, SeasonEvent event) {
-        MonthDay peakStart = MonthDay.parse(event.getMonthDayPeakStart(), MM_DD);
-        MonthDay peakEnd = MonthDay.parse(event.getMonthDayPeakEnd(), MM_DD);
+        int max = event.getMaxScore();
+        int baseline = (int) Math.round(SEASON_BASELINE_RATIO * max);
 
-        if (!today.isBefore(peakStart) && !today.isAfter(peakEnd)) {
-            return event.getMaxScore();
+        LocalDate t = today.atYear(NON_LEAP_YEAR);
+        LocalDate start = MonthDay.parse(event.getMonthDayStart(), MM_DD).atYear(NON_LEAP_YEAR);
+        LocalDate peakStart = MonthDay.parse(event.getMonthDayPeakStart(), MM_DD).atYear(NON_LEAP_YEAR);
+        LocalDate peakEnd = MonthDay.parse(event.getMonthDayPeakEnd(), MM_DD).atYear(NON_LEAP_YEAR);
+        LocalDate end = MonthDay.parse(event.getMonthDayEnd(), MM_DD).atYear(NON_LEAP_YEAR);
+
+        // 피크 구간: 만점
+        if (!t.isBefore(peakStart) && !t.isAfter(peakEnd)) {
+            return max;
         }
-        return event.getMaxScore() / 2;
+
+        if (t.isBefore(peakStart)) {
+            // 상승 구간 [start, peakStart): baseline -> max
+            long span = ChronoUnit.DAYS.between(start, peakStart);
+            if (span <= 0) return max;
+            double frac = clamp01((double) ChronoUnit.DAYS.between(start, t) / span);
+            return (int) Math.round(baseline + (max - baseline) * frac);
+        } else {
+            // 하강 구간 (peakEnd, end]: max -> baseline
+            long span = ChronoUnit.DAYS.between(peakEnd, end);
+            if (span <= 0) return baseline;
+            double frac = clamp01((double) ChronoUnit.DAYS.between(peakEnd, t) / span);
+            return (int) Math.round(max - (max - baseline) * frac);
+        }
+    }
+
+    private double clamp01(double v) {
+        return Math.max(0.0, Math.min(1.0, v));
     }
 
     private boolean isInRange(MonthDay target, MonthDay start, MonthDay end) {
