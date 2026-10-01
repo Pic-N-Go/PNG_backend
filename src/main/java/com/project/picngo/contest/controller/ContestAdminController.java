@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,13 +24,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.project.picngo.common.image.dto.ImageUploadResult;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,26 +45,14 @@ public class ContestAdminController implements ContestAdminControllerApiSpec {
     private final AdminAuditLogService adminAuditLogService;
 
     @Override
-    @PostMapping(value = "/theme-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Map<String, String>> uploadThemeImage(
-            @AuthenticationPrincipal CustomUserDetails adminUserDetails,
-            @RequestPart("image") MultipartFile image
-    ) {
-        ImageUploadResult result = contestService.uploadThemeImage(image);
-        return ResponseEntity.ok(Map.of(
-                "key", result.key(),
-                "imageUrl", result.url()
-        ));
-    }
-
-    @Override
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ContestResponse> createContest(
             @AuthenticationPrincipal CustomUserDetails adminUserDetails,
-            @Valid @RequestBody ContestCreateRequest request
+            @Valid @RequestPart("request") ContestCreateRequest request,
+            @RequestPart(value = "themeImage", required = false) MultipartFile themeImage
     ) {
         Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
-        ContestResponse response = contestService.createContest(adminId, request);
+        ContestResponse response = contestService.createContest(adminId, request, themeImage);
 
         try {
             adminAuditLogService.record(
@@ -93,14 +78,15 @@ public class ContestAdminController implements ContestAdminControllerApiSpec {
     }
 
     @Override
-    @PatchMapping("/{contestId}")
+    @PatchMapping(value = "/{contestId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AdminContestDetailResponse> updateContest(
             @AuthenticationPrincipal CustomUserDetails adminUserDetails,
             @PathVariable Long contestId,
-            @Valid @RequestBody ContestUpdateRequest request
+            @Valid @RequestPart("request") ContestUpdateRequest request,
+            @RequestPart(value = "themeImage", required = false) MultipartFile themeImage
     ) {
         Long adminId = adminUserDetails != null ? adminUserDetails.getId() : null;
-        AdminContestDetailResponse response = contestService.updateContest(contestId, request);
+        AdminContestDetailResponse response = contestService.updateContest(contestId, request, themeImage);
 
         try {
             adminAuditLogService.record(
