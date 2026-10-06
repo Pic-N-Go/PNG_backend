@@ -1,6 +1,7 @@
 package com.project.picngo.contest.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
@@ -20,6 +21,11 @@ public record ContestCreateRequest(
         String description,
 
         @Size(max = 500, message = "외부 테마 이미지 URL은 최대 500자까지 입력할 수 있습니다.")
+        @Pattern(
+                regexp = "^https?://.+$",
+                flags = Pattern.Flag.CASE_INSENSITIVE,
+                message = "외부 테마 이미지 URL은 http:// 또는 https://로 시작해야 합니다."
+        )
         String externalThemeImageUrl,
 
         /**
