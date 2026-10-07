@@ -2,7 +2,6 @@ package com.project.picngo.contest.service;
 
 import com.project.picngo.common.exception.CustomException;
 import com.project.picngo.common.exception.code.ContestErrorCode;
-import com.project.picngo.common.exception.code.ImageErrorCode;
 import com.project.picngo.common.exception.code.SpotErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.common.image.dto.ImageUploadResult;
@@ -51,12 +50,15 @@ import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -66,11 +68,13 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ContestService {
@@ -108,9 +112,17 @@ public class ContestService {
     // 기간은 받지 않는다 — 출품 2주·투표 2주·투표 종료 익일 09:00 발표는 Contest.create()의 규칙이고
     // 사람이 정하는 건 테마뿐이다. 손으로 INSERT하던 때는 이 규칙을 지킬 방법이 없었다.
     @Transactional
-    public ContestResponse createContest(Long userId, ContestCreateRequest request) {
+    public ContestResponse createContest(Long userId, ContestCreateRequest request, MultipartFile themeImage) {
         User user = getUser(userId);
         LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        boolean hasThemeImageFile = themeImage != null && !themeImage.isEmpty();
+        boolean hasExternalThemeImageUrl = request.externalThemeImageUrl() != null
+                && !request.externalThemeImageUrl().isBlank();
+
+        if (hasThemeImageFile && hasExternalThemeImageUrl) {
+            throw new CustomException(ContestErrorCode.MULTIPLE_THEME_IMAGE_SOURCES);
+        }
 
         // 직전 회차의 발표 시각에 이어 붙인다. 겹치게 두면 집계 중 구간에서
         // getCurrentContest가 새 회차를 골라 발표 대기 중인 직전 회차가 어디에서도 안 잡힌다.
@@ -132,16 +144,39 @@ public class ContestService {
             throw new CustomException(ContestErrorCode.CONTEST_START_IN_PAST);
         }
 
-        Contest contest = contestRepository.save(Contest.create(
-                request.title(),
-                request.description(),
-                request.themeImageUrl(),
-                submitStartAt,
-                request.maxEntriesPerUser() != null ? request.maxEntriesPerUser() : DEFAULT_MAX_ENTRIES_PER_USER,
-                request.voteLimit() != null ? request.voteLimit() : DEFAULT_VOTE_LIMIT
-        ));
+        String uploadedThemeImageKey = null;
+        boolean rollbackCleanupRegistered = false;
+        String themeImageValue = hasExternalThemeImageUrl
+                ? request.externalThemeImageUrl().trim()
+                : null;
 
-        return toContestResponse(contest, user, now);
+        try {
+            if (hasThemeImageFile) {
+                ImageUploadResult uploadResult = imageStorageService.upload(themeImage, "contests/themes");
+                uploadedThemeImageKey = uploadResult.key();
+                rollbackCleanupRegistered = deleteThemeImageAfterRollback(uploadedThemeImageKey);
+                themeImageValue = uploadedThemeImageKey;
+            }
+
+            Contest contest = contestRepository.save(Contest.create(
+                    request.title(),
+                    request.description(),
+                    themeImageValue,
+                    submitStartAt,
+                    request.maxEntriesPerUser() != null ? request.maxEntriesPerUser() : DEFAULT_MAX_ENTRIES_PER_USER,
+                    request.voteLimit() != null ? request.voteLimit() : DEFAULT_VOTE_LIMIT
+            ));
+
+            return toContestResponse(contest, user, now);
+        } catch (RuntimeException exception) {
+            if (uploadedThemeImageKey != null && !rollbackCleanupRegistered) {
+                deleteThemeImageQuietly(
+                        uploadedThemeImageKey,
+                        "콘테스트 생성 실패 후 테마 이미지 삭제 실패"
+                );
+            }
+            throw exception;
+        }
     }
 
     // 다음 예정 콘테스트 조회 (없으면 null)
@@ -943,19 +978,29 @@ public class ContestService {
         );
     }
 
-    // 관리자용 콘테스트 테마 대표 사진 업로드
-    public ImageUploadResult uploadThemeImage(MultipartFile image) {
-        if (image == null || image.isEmpty()) {
-            throw new CustomException(ImageErrorCode.IMAGE_FILE_EMPTY);
-        }
-        return imageStorageService.upload(image, "contests/themes");
-    }
-
     // 관리자용 콘테스트 정보 및 일정 수정
     @Transactional
-    public AdminContestDetailResponse updateContest(Long contestId, ContestUpdateRequest request) {
+    public AdminContestDetailResponse updateContest(
+            Long contestId,
+            ContestUpdateRequest request,
+            MultipartFile themeImage
+    ) {
         Contest contest = getContestById(contestId);
         LocalDateTime now = LocalDateTime.now(Contest.ZONE);
+
+        boolean hasThemeImageFile = themeImage != null && !themeImage.isEmpty();
+        boolean hasExternalThemeImageUrl = request.externalThemeImageUrl() != null
+                && !request.externalThemeImageUrl().isBlank();
+        boolean removeThemeImage = Boolean.TRUE.equals(request.removeThemeImage());
+
+        int imageChangeRequestCount = 0;
+        if (hasThemeImageFile) imageChangeRequestCount++;
+        if (hasExternalThemeImageUrl) imageChangeRequestCount++;
+        if (removeThemeImage) imageChangeRequestCount++;
+
+        if (imageChangeRequestCount > 1) {
+            throw new CustomException(ContestErrorCode.MULTIPLE_THEME_IMAGE_SOURCES);
+        }
 
         if (request.submitStartAt() != null) {
             // 출품이 이미 시작되었거나 지난 콘테스트는 시작일을 변경할 수 없다
@@ -979,10 +1024,90 @@ public class ContestService {
             }
         }
 
-        contest.update(request.title(), request.description(), request.themeImageUrl(), request.submitStartAt());
-        contestRepository.save(contest);
+        String previousThemeImageValue = contest.getThemeImageUrl();
+        String uploadedThemeImageKey = null;
+        boolean rollbackCleanupRegistered = false;
+        String newThemeImageValue = null;
+        boolean changeThemeImage = imageChangeRequestCount == 1;
 
-        return getAdminContestDetail(contestId);
+        try {
+            if (hasThemeImageFile) {
+                ImageUploadResult uploadResult = imageStorageService.upload(themeImage, "contests/themes");
+                uploadedThemeImageKey = uploadResult.key();
+                rollbackCleanupRegistered = deleteThemeImageAfterRollback(uploadedThemeImageKey);
+                newThemeImageValue = uploadedThemeImageKey;
+            } else if (hasExternalThemeImageUrl) {
+                newThemeImageValue = request.externalThemeImageUrl().trim();
+            }
+
+            contest.update(request.title(), request.description(), request.submitStartAt());
+
+            if (changeThemeImage) {
+                contest.updateThemeImage(newThemeImageValue);
+            }
+
+            contestRepository.save(contest);
+            AdminContestDetailResponse response = getAdminContestDetail(contestId);
+
+            if (changeThemeImage && !Objects.equals(previousThemeImageValue, newThemeImageValue)) {
+                deleteThemeImageAfterCommit(previousThemeImageValue);
+            }
+
+            return response;
+        } catch (RuntimeException exception) {
+            if (uploadedThemeImageKey != null && !rollbackCleanupRegistered) {
+                deleteThemeImageQuietly(
+                        uploadedThemeImageKey,
+                        "콘테스트 수정 실패 후 새 테마 이미지 삭제 실패"
+                );
+            }
+            throw exception;
+        }
+    }
+
+    private boolean deleteThemeImageAfterRollback(String themeImageValue) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    deleteThemeImageQuietly(
+                            themeImageValue,
+                            "콘테스트 저장 롤백 후 새 테마 이미지 삭제 실패"
+                    );
+                }
+            }
+        });
+        return true;
+    }
+
+    private void deleteThemeImageAfterCommit(String themeImageValue) {
+        if (themeImageValue == null || themeImageValue.isBlank()) {
+            return;
+        }
+
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            deleteThemeImageQuietly(themeImageValue, "이전 콘테스트 테마 이미지 삭제 실패");
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                deleteThemeImageQuietly(themeImageValue, "이전 콘테스트 테마 이미지 삭제 실패");
+            }
+        });
+    }
+
+    private void deleteThemeImageQuietly(String themeImageValue, String failureMessage) {
+        try {
+            imageStorageService.delete(themeImageValue);
+        } catch (RuntimeException exception) {
+            log.warn("{}. value={}", failureMessage, themeImageValue, exception);
+        }
     }
 
     // 콘테스트 출품 시작 알림 발송 (스케줄러 또는 관리자 수동 호출)

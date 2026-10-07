@@ -143,15 +143,12 @@ public class Contest {
      * 콘테스트 정보 및 일정 수정.
      * submitStartAt이 주어지면 출품 2주, 투표 2주, 결과 발표 익일 09:00 일정도 함께 재계산된다.
      */
-    public void update(String title, String description, String themeImageUrl, LocalDateTime submitStartAt) {
+    public void update(String title, String description, LocalDateTime submitStartAt) {
         if (title != null && !title.isBlank()) {
             this.title = title;
         }
         if (description != null) {
             this.description = description;
-        }
-        if (themeImageUrl != null) {
-            this.themeImageUrl = themeImageUrl;
         }
         if (submitStartAt != null) {
             this.submitStartAt = submitStartAt;
@@ -164,6 +161,10 @@ public class Contest {
                     .plusDays(1)
                     .atTime(RESULT_ANNOUNCE_TIME);
         }
+    }
+
+    public void updateThemeImage(String themeImageValue) {
+        this.themeImageUrl = themeImageValue;
     }
 
     public ContestPhase getPhase(LocalDateTime now) {
