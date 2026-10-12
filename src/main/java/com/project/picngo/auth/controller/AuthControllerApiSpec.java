@@ -31,6 +31,13 @@ public interface AuthControllerApiSpec {
 	@Operation(summary = "탈퇴 계정 복구 (카카오)", description = "소셜 계정은 비밀번호가 없어 카카오 accessToken으로 본인 확인 후 복구합니다.")
 	ResponseEntity<TokenResponse> restoreWithKakao(@Valid @RequestBody KakaoLoginRequest request);
 
+	@Operation(summary = "Apple 로그인", description = "Sign in with Apple에서 발급받은 identityToken(JWT)의 서명·발급자·대상을 검증하고, 가입 이력이 없으면 소셜 회원을 생성한 뒤 서비스 액세스 토큰을 반환합니다.\n\n"
+			+ "토큰이 유효하지 않으면 401 APPLE_IDENTITY_TOKEN_INVALID, 탈퇴 대기 중인 계정이면 403 ACCOUNT_WITHDRAWN을 반환합니다.")
+	ResponseEntity<TokenResponse> loginWithApple(@Valid @RequestBody AppleLoginRequest request);
+
+	@Operation(summary = "탈퇴 계정 복구 (Apple)", description = "Apple identityToken으로 본인 확인 후 복구합니다.")
+	ResponseEntity<TokenResponse> restoreWithApple(@Valid @RequestBody AppleLoginRequest request);
+
 	@Operation(summary = "이메일 인증 코드 발송", description = "아직 가입되지 않은 이메일 주소로 인증 코드를 발송합니다.")
 	ResponseEntity<EmailVerificationResponse> sendEmailVerificationCode(@Valid @RequestBody EmailVerificationRequest request);
 

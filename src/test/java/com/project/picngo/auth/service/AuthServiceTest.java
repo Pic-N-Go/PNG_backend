@@ -1,6 +1,8 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.common.image.service.ImageStorageService;
+import com.project.picngo.auth.dto.AppleLoginRequest;
+import com.project.picngo.auth.dto.AppleProfile;
 import com.project.picngo.auth.dto.KakaoLoginRequest;
 import com.project.picngo.auth.dto.KakaoProfile;
 import com.project.picngo.auth.dto.PasswordResetCodeRequest;
@@ -37,6 +39,9 @@ class AuthServiceTest {
 
     @Mock
     private KakaoAuthClient kakaoAuthClient;
+
+    @Mock
+    private AppleAuthClient appleAuthClient;
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
@@ -151,6 +156,28 @@ class AuthServiceTest {
         when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
 
         return authService.loginWithKakao(new KakaoLoginRequest("kakao-access-token"));
+    }
+
+    /** Apple은 닉네임·사진을 주지 않으므로 null로 넘겨 UserService의 대체 닉네임 경로를 타게 한다. */
+    @Test
+    @DisplayName("Apple 신규 가입이면 APPLE 제공자로 계정을 만들고 isNewUser를 전파한다")
+    void createsAppleUserAndPropagatesIsNewUser() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(user.getEmail()).thenReturn("a@privaterelay.appleid.com");
+        when(appleAuthClient.getProfile("apple-identity-token"))
+                .thenReturn(new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"));
+        when(userService.getOrCreateSocialUser(
+                "a@privaterelay.appleid.com", null, null, SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(new UserService.SocialUserResult(user, true));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+        when(jwtTokenProvider.getAccessTokenExpirationSeconds()).thenReturn(60L);
+        when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
+
+        TokenResponse response = authService.loginWithApple(new AppleLoginRequest("apple-identity-token"));
+
+        assertThat(response.isNewUser()).isTrue();
     }
 
     @Test

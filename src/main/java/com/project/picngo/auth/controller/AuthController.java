@@ -41,6 +41,16 @@ public class AuthController implements AuthControllerApiSpec {
 		return ResponseEntity.ok(authService.restoreWithKakao(request));
 	}
 
+	@PostMapping("/login/apple")
+	public ResponseEntity<TokenResponse> loginWithApple(@Valid @RequestBody AppleLoginRequest request) {
+		return ResponseEntity.ok(authService.loginWithApple(request));
+	}
+
+	@PostMapping("/restore/apple")
+	public ResponseEntity<TokenResponse> restoreWithApple(@Valid @RequestBody AppleLoginRequest request) {
+		return ResponseEntity.ok(authService.restoreWithApple(request));
+	}
+
 	@PostMapping("/email/verify")
 	public ResponseEntity<EmailVerificationResponse> sendEmailVerificationCode(@Valid @RequestBody EmailVerificationRequest request) {
 		return ResponseEntity.ok(authService.sendEmailVerificationCode(request));

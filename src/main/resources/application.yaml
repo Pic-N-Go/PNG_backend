@@ -120,6 +120,12 @@ congestion:
     key: ${CONGESTION_SERVICE_KEY:${PUBLIC_DATA_SERVICE_KEY:}}
     base-url: ${CONGESTION_BASE_URL:https://apis.data.go.kr/B551011/TatsCnctrRateService}
 
+apple:
+  auth:
+    jwks-url: https://appleid.apple.com/auth/keys
+    # identity token의 aud와 대조한다. iOS 앱 번들 ID와 같아야 한다.
+    client-id: ${APPLE_CLIENT_ID:com.picngo.app}
+
 kakao:
   rest:
     api:
