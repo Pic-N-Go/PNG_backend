@@ -142,6 +142,12 @@ class FlywayMigrationOnMySqlTest {
                     + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'spot_tag'"))
                     .as("spot_tag 테이블은 V19에 의해 삭제되어야 한다")
                     .isZero();
+
+            assertThat(count("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                    + "WHERE TABLE_SCHEMA = '" + SCHEMA + "' AND TABLE_NAME = 'users' "
+                    + "AND COLUMN_NAME = 'provider' AND COLUMN_TYPE = \"enum('APPLE','KAKAO','LOCAL')\""))
+                    .as("users.provider는 V26에 의해 APPLE을 받을 수 있어야 한다")
+                    .isEqualTo(1);
         } finally {
             exec("DROP DATABASE IF EXISTS " + SCHEMA);
         }

@@ -21,7 +21,10 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Date;
 
@@ -40,13 +43,21 @@ class AppleAuthClientTest {
     private MockWebServer server;
     private AppleAuthClient client;
     private KeyPair appleKey;
+    private Instant now;
 
     @BeforeEach
     void setUp() throws Exception {
         server = new MockWebServer();
         server.start();
         appleKey = rsaKeyPair();
-        client = new AppleAuthClient(RestClient.builder(), server.url("/auth/keys").toString(), CLIENT_ID);
+        now = Instant.now();
+        // 시계를 테스트가 쥐고 있어야 키 재조회 간격을 기다리지 않고 넘길 수 있다.
+        Clock clock = new Clock() {
+            @Override public Instant instant() { return now; }
+            @Override public java.time.ZoneId getZone() { return ZoneOffset.UTC; }
+            @Override public Clock withZone(java.time.ZoneId zone) { return this; }
+        };
+        client = new AppleAuthClient(RestClient.builder(), server.url("/auth/keys").toString(), CLIENT_ID, clock);
     }
 
     @AfterEach
@@ -128,14 +139,90 @@ class AppleAuthClientTest {
     }
 
     @Test
-    @DisplayName("Apple 공개 키를 못 받아오면 502로 구분해 알린다")
-    void reportsKeyFetchFailure() {
-        server.enqueue(new MockResponse().setResponseCode(500));
+    @DisplayName("만료(exp)가 없는 토큰은 거부한다")
+    void rejectsTokenWithoutExpiration() {
+        enqueueJwks(appleKey);
 
-        CustomException exception = assertThrows(CustomException.class,
-                () -> client.getProfile(token().signWith(appleKey.getPrivate()).compact()));
+        assertInvalid(token().expiration(null).signWith(appleKey.getPrivate()).compact());
+    }
 
-        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.APPLE_KEYS_FETCH_FAILED);
+    /** 첫 키 조회 전에 kid 없는 토큰이 오면 NPE(500)가 아니라 401이어야 한다. */
+    @Test
+    @DisplayName("kid가 없는 토큰은 거부한다")
+    void rejectsTokenWithoutKeyId() {
+        assertInvalid(Jwts.builder()
+                .issuer("https://appleid.apple.com")
+                .claim("aud", CLIENT_ID)
+                .subject("001234.abcdef.5678")
+                .expiration(Date.from(Instant.now().plusSeconds(600)))
+                .signWith(appleKey.getPrivate())
+                .compact());
+        assertThat(server.getRequestCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("Apple 공개 키를 못 받아오면 502로 구분해 알리고, 장애 중에는 요청마다 다시 호출하지 않는다")
+    void reportsKeyFetchFailureWithoutHammeringApple() {
+        server.enqueue(new MockResponse().setResponseCode(503));
+        String token = token().signWith(appleKey.getPrivate()).compact();
+
+        for (int i = 0; i < 5; i++) {
+            assertKeyFetchFailed(token);
+        }
+
+        assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("JWKS가 아닌 응답은 토큰 오류가 아니라 키 조회 실패로 알린다")
+    void reportsMalformedJwksAsKeyFetchFailure() {
+        server.enqueue(new MockResponse()
+                .setBody("<html>maintenance</html>")
+                .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_HTML_VALUE));
+
+        assertKeyFetchFailed(token().signWith(appleKey.getPrivate()).compact());
+    }
+
+    @Test
+    @DisplayName("Apple이 키를 교체하면 재조회 간격이 지난 뒤 새 키로 서명된 토큰을 받는다")
+    void acceptsRotatedKeyAfterRefetchInterval() throws Exception {
+        enqueueJwks(appleKey);
+        client.getProfile(token().signWith(appleKey.getPrivate()).compact());
+
+        KeyPair rotated = rsaKeyPair();
+        String newToken = token().header().keyId("rotated").and().signWith(rotated.getPrivate()).compact();
+
+        // 간격 안에서는 다시 받아오지 않는다 — 조작된 kid로 외부 호출을 유발할 수 없다.
+        assertInvalid(newToken);
+        assertThat(server.getRequestCount()).isEqualTo(1);
+
+        now = now.plus(Duration.ofMinutes(2));
+        enqueueJwks(rotated, "rotated");
+
+        assertThat(client.getProfile(newToken).providerId()).isEqualTo("001234.abcdef.5678");
+        assertThat(server.getRequestCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("동시에 첫 로그인이 몰려도 공개 키는 한 번만 받아온다")
+    void fetchesKeysOnceUnderConcurrentFirstLogins() throws Exception {
+        enqueueJwks(appleKey);
+        String token = token().signWith(appleKey.getPrivate()).compact();
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(10);
+        try {
+            java.util.List<java.util.concurrent.Future<AppleProfile>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                results.add(pool.submit(() -> client.getProfile(token)));
+            }
+            for (java.util.concurrent.Future<AppleProfile> result : results) {
+                assertThat(result.get().providerId()).isEqualTo("001234.abcdef.5678");
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(server.getRequestCount()).isEqualTo(1);
     }
 
     @Test
@@ -148,6 +235,11 @@ class AppleAuthClientTest {
         client.getProfile(token);
 
         assertThat(server.getRequestCount()).isEqualTo(1);
+    }
+
+    private void assertKeyFetchFailed(String identityToken) {
+        CustomException exception = assertThrows(CustomException.class, () -> client.getProfile(identityToken));
+        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.APPLE_KEYS_FETCH_FAILED);
     }
 
     private void assertInvalid(String identityToken) {
@@ -168,10 +260,14 @@ class AppleAuthClientTest {
     }
 
     private void enqueueJwks(KeyPair keyPair) {
+        enqueueJwks(keyPair, KEY_ID);
+    }
+
+    private void enqueueJwks(KeyPair keyPair, String keyId) {
         RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
         String body = """
                 {"keys":[{"kty":"RSA","kid":"%s","use":"sig","alg":"RS256","n":"%s","e":"%s"}]}
-                """.formatted(KEY_ID, base64Url(publicKey.getModulus()), base64Url(publicKey.getPublicExponent()));
+                """.formatted(keyId, base64Url(publicKey.getModulus()), base64Url(publicKey.getPublicExponent()));
         server.enqueue(new MockResponse()
                 .setBody(body)
                 .addHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE));

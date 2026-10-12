@@ -160,7 +160,7 @@ public class UserService {
 	) {
 		return userRepository.findByProviderAndProviderId(provider, providerId)
 			.map(user -> {
-				// 탈퇴 계정은 토큰을 받지 못한다. 복구는 /auth/restore/social로만 가능하다.
+				// 탈퇴 계정은 토큰을 받지 못한다. 복구는 /auth/restore/social(카카오), /auth/restore/apple로만 가능하다.
 				if (user.isWithdrawn()) {
 					throw new CustomException(AuthErrorCode.ACCOUNT_WITHDRAWN);
 				}

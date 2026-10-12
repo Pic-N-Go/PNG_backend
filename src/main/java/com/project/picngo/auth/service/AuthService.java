@@ -24,7 +24,6 @@ public class AuthService {
 
 	private final UserService userService;
 	private final KakaoAuthClient kakaoAuthClient;
-	private final AppleAuthClient appleAuthClient;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final EmailVerificationService emailVerificationService;
 	private final PasswordEncoder passwordEncoder;
@@ -108,9 +107,12 @@ public class AuthService {
 		return createTokenResponse(result.user(), result.newUser());
 	}
 
+	/**
+	 * 토큰 검증(AppleAuthClient)은 컨트롤러가 먼저 끝내고 결과만 넘긴다. Apple 공개 키 조회가
+	 * 이 트랜잭션 안에서 일어나면, Apple이 느릴 때 대기하는 요청마다 DB 커넥션을 붙잡는다.
+	 */
 	@Transactional
-	public TokenResponse loginWithApple(AppleLoginRequest request) {
-		AppleProfile profile = appleAuthClient.getProfile(request.identityToken());
+	public TokenResponse loginWithApple(AppleProfile profile) {
 		// Apple은 닉네임·프로필 사진을 주지 않는다. 닉네임은 대체값으로 만들어 두고 온보딩에서 받는다.
 		UserService.SocialUserResult result = userService.getOrCreateSocialUser(
 			profile.email(),
@@ -124,8 +126,7 @@ public class AuthService {
 	}
 
 	@Transactional
-	public TokenResponse restoreWithApple(AppleLoginRequest request) {
-		AppleProfile profile = appleAuthClient.getProfile(request.identityToken());
+	public TokenResponse restoreWithApple(AppleProfile profile) {
 		User user = userService.findByProviderAndProviderId(SocialProvider.APPLE, profile.providerId())
 				.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 

@@ -1,7 +1,6 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.common.image.service.ImageStorageService;
-import com.project.picngo.auth.dto.AppleLoginRequest;
 import com.project.picngo.auth.dto.AppleProfile;
 import com.project.picngo.auth.dto.KakaoLoginRequest;
 import com.project.picngo.auth.dto.KakaoProfile;
@@ -39,9 +38,6 @@ class AuthServiceTest {
 
     @Mock
     private KakaoAuthClient kakaoAuthClient;
-
-    @Mock
-    private AppleAuthClient appleAuthClient;
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
@@ -165,8 +161,6 @@ class AuthServiceTest {
         User user = org.mockito.Mockito.mock(User.class);
         when(user.getId()).thenReturn(1L);
         when(user.getEmail()).thenReturn("a@privaterelay.appleid.com");
-        when(appleAuthClient.getProfile("apple-identity-token"))
-                .thenReturn(new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"));
         when(userService.getOrCreateSocialUser(
                 "a@privaterelay.appleid.com", null, null, SocialProvider.APPLE, "apple-sub-1"))
                 .thenReturn(new UserService.SocialUserResult(user, true));
@@ -175,9 +169,37 @@ class AuthServiceTest {
         when(jwtTokenProvider.getAccessTokenExpirationSeconds()).thenReturn(60L);
         when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
 
-        TokenResponse response = authService.loginWithApple(new AppleLoginRequest("apple-identity-token"));
+        TokenResponse response = authService.loginWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"));
 
         assertThat(response.isNewUser()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Apple 탈퇴 계정은 APPLE 제공자와 sub로 찾아 복구한다")
+    void restoresWithdrawnAppleAccount() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(userService.findByProviderAndProviderId(SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(java.util.Optional.of(user));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+
+        TokenResponse response = authService.restoreWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"));
+
+        verify(userService).restore(user);
+        assertThat(response.isNewUser()).isFalse();
+    }
+
+    @Test
+    @DisplayName("가입한 적 없는 Apple 계정은 복구할 수 없다")
+    void rejectsRestoreForUnknownAppleAccount() {
+        when(userService.findByProviderAndProviderId(SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(java.util.Optional.empty());
+
+        assertThrows(CustomException.class, () -> authService.restoreWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com")));
     }
 
     @Test
