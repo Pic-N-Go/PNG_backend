@@ -1,5 +1,6 @@
 package com.project.picngo.user.controller;
 
+import com.project.picngo.auth.service.AppleTokenClient;
 import com.project.picngo.auth.service.CustomUserDetails;
 import com.project.picngo.spot.dto.MyReviewListResponse;
 import com.project.picngo.spot.dto.ReviewedSpotResponse;
@@ -25,6 +26,7 @@ public class UserController implements UserControllerApiSpec {
 
 	private final UserService userService;
 	private final ReviewService reviewService;
+	private final AppleTokenClient appleTokenClient;
 
 	@GetMapping("/me/reviews")
 	public ResponseEntity<MyReviewListResponse> myReviews(
@@ -98,11 +100,15 @@ public class UserController implements UserControllerApiSpec {
 	}
 
 	// 회원 탈퇴 API (소프트 삭제 — 30일 이내 /auth/restore로 복구 가능)
+	//
+	// Apple 계정은 탈퇴 시 토큰을 폐기해야 한다(App Store 가이드라인 5.1.1(v)). 폐기는 트랜잭션이
+	// 끝난 뒤에 하고, 실패해도 삼킨다(AppleTokenClient.revoke) — 탈퇴는 모든 사용자가 쓰는
+	// 경로라 Apple 장애가 카카오·일반 계정 탈퇴까지 막으면 안 된다.
 	@DeleteMapping("/me")
 	public ResponseEntity<Void> withdraw(
 			@AuthenticationPrincipal CustomUserDetails userDetails
 	){
-		userService.withdraw(userDetails.getId());
+		appleTokenClient.revoke(userService.withdraw(userDetails.getId()));
 		return ResponseEntity.noContent().build();
 	}
 
