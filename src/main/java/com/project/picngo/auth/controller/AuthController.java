@@ -2,6 +2,7 @@ package com.project.picngo.auth.controller;
 
 import com.project.picngo.auth.dto.*;
 import com.project.picngo.auth.service.AppleAuthClient;
+import com.project.picngo.auth.service.AppleTokenClient;
 import com.project.picngo.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ public class AuthController implements AuthControllerApiSpec {
 
 	private final AuthService authService;
 	private final AppleAuthClient appleAuthClient;
+	private final AppleTokenClient appleTokenClient;
 
 	@PostMapping("/register")
 	public ResponseEntity<TokenResponse> signUp(@Valid @RequestBody SignUpRequest request) {
@@ -46,12 +48,18 @@ public class AuthController implements AuthControllerApiSpec {
 	// Apple 토큰 검증은 외부 호출(공개 키 조회)을 포함하므로 서비스의 DB 트랜잭션 밖에서 끝낸다.
 	@PostMapping("/login/apple")
 	public ResponseEntity<TokenResponse> loginWithApple(@Valid @RequestBody AppleLoginRequest request) {
-		return ResponseEntity.ok(authService.loginWithApple(appleAuthClient.getProfile(request.identityToken())));
+		return ResponseEntity.ok(authService.loginWithApple(
+			appleAuthClient.getProfile(request.identityToken()),
+			appleTokenClient.exchangeRefreshToken(request.authorizationCode())
+		));
 	}
 
 	@PostMapping("/restore/apple")
 	public ResponseEntity<TokenResponse> restoreWithApple(@Valid @RequestBody AppleLoginRequest request) {
-		return ResponseEntity.ok(authService.restoreWithApple(appleAuthClient.getProfile(request.identityToken())));
+		return ResponseEntity.ok(authService.restoreWithApple(
+			appleAuthClient.getProfile(request.identityToken()),
+			appleTokenClient.exchangeRefreshToken(request.authorizationCode())
+		));
 	}
 
 	@PostMapping("/email/verify")

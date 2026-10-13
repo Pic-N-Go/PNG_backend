@@ -110,9 +110,13 @@ public class AuthService {
 	/**
 	 * 토큰 검증(AppleAuthClient)은 컨트롤러가 먼저 끝내고 결과만 넘긴다. Apple 공개 키 조회가
 	 * 이 트랜잭션 안에서 일어나면, Apple이 느릴 때 대기하는 요청마다 DB 커넥션을 붙잡는다.
+	 * appleRefreshToken(토큰 교환 결과)도 같은 이유로 컨트롤러에서 받아 온다.
+	 *
+	 * appleRefreshToken은 탈퇴 시 Apple 토큰을 폐기하는 데 쓴다(가이드라인 5.1.1(v)).
+	 * 교환에 실패했으면 null이 오고, 그때는 기존 값을 지우지 않는다 — 로그인은 막지 않는다.
 	 */
 	@Transactional
-	public TokenResponse loginWithApple(AppleProfile profile) {
+	public TokenResponse loginWithApple(AppleProfile profile, String appleRefreshToken) {
 		// Apple은 닉네임·프로필 사진을 주지 않는다. 닉네임은 대체값으로 만들어 두고 온보딩에서 받는다.
 		UserService.SocialUserResult result = userService.getOrCreateSocialUser(
 			profile.email(),
@@ -121,16 +125,19 @@ public class AuthService {
 			SocialProvider.APPLE,
 			profile.providerId()
 		);
+		result.user().updateAppleRefreshToken(appleRefreshToken);
 
 		return createTokenResponse(result.user(), result.newUser());
 	}
 
 	@Transactional
-	public TokenResponse restoreWithApple(AppleProfile profile) {
+	public TokenResponse restoreWithApple(AppleProfile profile, String appleRefreshToken) {
 		User user = userService.findByProviderAndProviderId(SocialProvider.APPLE, profile.providerId())
 				.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
 
 		userService.restore(user);
+		// 복구도 Apple 인증을 새로 거치므로 토큰을 갱신해 둔다. 안 하면 다시 탈퇴할 때 폐기할 게 없다.
+		user.updateAppleRefreshToken(appleRefreshToken);
 		return createTokenResponse(user, false);
 	}
 

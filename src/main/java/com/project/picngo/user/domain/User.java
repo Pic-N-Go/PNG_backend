@@ -83,6 +83,14 @@ public class User extends BaseTimeEntity {
 	@Column(name = "provider_id", length = 100)
 	private String providerId;
 
+	/**
+	 * Apple 탈퇴 시 토큰을 폐기하려면(가이드라인 5.1.1(v)) Apple이 준 refresh token이 있어야 한다.
+	 * 로그인 때 받는 authorizationCode는 5분이면 만료돼 탈퇴까지 들고 있을 수 없어, 로그인 시점에
+	 * 교환해 둔다. APPLE 가입자에게만 값이 있고, 교환에 실패하면 null로 남는다(로그인은 막지 않는다).
+	 */
+	@Column(name = "apple_refresh_token", length = 500)
+	private String appleRefreshToken;
+
 	@ElementCollection(fetch = FetchType.LAZY)
 	@CollectionTable(
 			name = "user_spot_categories",
@@ -265,6 +273,7 @@ public class User extends BaseTimeEntity {
 		this.nickname = PURGED_NICKNAME_PREFIX + this.id;
 		this.password = null;
 		this.providerId = null;
+		this.appleRefreshToken = null;
 		this.profileImageUrl = null;
 		this.socialProfileImageUrl = null;
 		this.bio = null;
@@ -275,6 +284,13 @@ public class User extends BaseTimeEntity {
 	public boolean isPurged() {
 		return this.nickname != null && this.nickname.startsWith(PURGED_NICKNAME_PREFIX)
 				&& this.password == null && this.providerId == null;
+	}
+
+	/** 로그인·복구 때마다 새로 교환한 값으로 덮어쓴다. 교환에 실패한 null은 기존 값을 지우지 않는다. */
+	public void updateAppleRefreshToken(String appleRefreshToken) {
+		if (appleRefreshToken != null) {
+			this.appleRefreshToken = appleRefreshToken;
+		}
 	}
 
 	public void updateRole(Role role) {

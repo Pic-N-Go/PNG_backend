@@ -170,9 +170,28 @@ class AuthServiceTest {
         when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
 
         TokenResponse response = authService.loginWithApple(
-                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"));
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), "apple-refresh-token");
 
+        verify(user).updateAppleRefreshToken("apple-refresh-token");
         assertThat(response.isNewUser()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Apple 토큰 교환에 실패해도(null) 로그인은 그대로 끝난다")
+    void completesAppleLoginWithoutRefreshToken() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(user.getEmail()).thenReturn("a@privaterelay.appleid.com");
+        when(userService.getOrCreateSocialUser(
+                "a@privaterelay.appleid.com", null, null, SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(new UserService.SocialUserResult(user, false));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+
+        TokenResponse response = authService.loginWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), null);
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
     }
 
     @Test
@@ -186,9 +205,11 @@ class AuthServiceTest {
         when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
 
         TokenResponse response = authService.restoreWithApple(
-                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"));
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), "apple-refresh-token");
 
         verify(userService).restore(user);
+        // 복구도 Apple 인증을 새로 거친다 — 갱신하지 않으면 다시 탈퇴할 때 폐기할 토큰이 없다.
+        verify(user).updateAppleRefreshToken("apple-refresh-token");
         assertThat(response.isNewUser()).isFalse();
     }
 
@@ -199,7 +220,7 @@ class AuthServiceTest {
                 .thenReturn(java.util.Optional.empty());
 
         assertThrows(CustomException.class, () -> authService.restoreWithApple(
-                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com")));
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), "apple-refresh-token"));
     }
 
     @Test
