@@ -1,6 +1,7 @@
 package com.project.picngo.auth.controller;
 
 import com.project.picngo.auth.dto.*;
+import com.project.picngo.auth.service.AppleAuthClient;
 import com.project.picngo.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController implements AuthControllerApiSpec {
 
 	private final AuthService authService;
+	private final AppleAuthClient appleAuthClient;
 
 	@PostMapping("/register")
 	public ResponseEntity<TokenResponse> signUp(@Valid @RequestBody SignUpRequest request) {
@@ -39,6 +41,17 @@ public class AuthController implements AuthControllerApiSpec {
 	@PostMapping("/restore/social")
 	public ResponseEntity<TokenResponse> restoreWithKakao(@Valid @RequestBody KakaoLoginRequest request) {
 		return ResponseEntity.ok(authService.restoreWithKakao(request));
+	}
+
+	// Apple 토큰 검증은 외부 호출(공개 키 조회)을 포함하므로 서비스의 DB 트랜잭션 밖에서 끝낸다.
+	@PostMapping("/login/apple")
+	public ResponseEntity<TokenResponse> loginWithApple(@Valid @RequestBody AppleLoginRequest request) {
+		return ResponseEntity.ok(authService.loginWithApple(appleAuthClient.getProfile(request.identityToken())));
+	}
+
+	@PostMapping("/restore/apple")
+	public ResponseEntity<TokenResponse> restoreWithApple(@Valid @RequestBody AppleLoginRequest request) {
+		return ResponseEntity.ok(authService.restoreWithApple(appleAuthClient.getProfile(request.identityToken())));
 	}
 
 	@PostMapping("/email/verify")

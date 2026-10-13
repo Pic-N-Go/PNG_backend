@@ -107,6 +107,33 @@ public class AuthService {
 		return createTokenResponse(result.user(), result.newUser());
 	}
 
+	/**
+	 * 토큰 검증(AppleAuthClient)은 컨트롤러가 먼저 끝내고 결과만 넘긴다. Apple 공개 키 조회가
+	 * 이 트랜잭션 안에서 일어나면, Apple이 느릴 때 대기하는 요청마다 DB 커넥션을 붙잡는다.
+	 */
+	@Transactional
+	public TokenResponse loginWithApple(AppleProfile profile) {
+		// Apple은 닉네임·프로필 사진을 주지 않는다. 닉네임은 대체값으로 만들어 두고 온보딩에서 받는다.
+		UserService.SocialUserResult result = userService.getOrCreateSocialUser(
+			profile.email(),
+			null,
+			null,
+			SocialProvider.APPLE,
+			profile.providerId()
+		);
+
+		return createTokenResponse(result.user(), result.newUser());
+	}
+
+	@Transactional
+	public TokenResponse restoreWithApple(AppleProfile profile) {
+		User user = userService.findByProviderAndProviderId(SocialProvider.APPLE, profile.providerId())
+				.orElseThrow(() -> new CustomException(UserErrorCode.USER_NOT_FOUND));
+
+		userService.restore(user);
+		return createTokenResponse(user, false);
+	}
+
 	public EmailVerificationResponse sendEmailVerificationCode(EmailVerificationRequest request) {
 		if (userService.existsByEmail(request.email())) {
 			throw new CustomException(AuthErrorCode.EMAIL_ALREADY_EXISTS);
