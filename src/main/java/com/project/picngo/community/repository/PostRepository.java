@@ -18,6 +18,13 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("select p from Post p where p.id = :postId")
     java.util.Optional<Post> findByIdForUpdate(@Param("postId") Long postId);
 
+    /**
+     * viewerId는 "지금 보고 있는 사람"이다. 차단한 사용자의 글을 빼는 데만 쓴다(가이드라인 1.2).
+     * authorId(특정 작성자의 글만 보기)와는 다른 값이라 따로 받는다.
+     *
+     * viewerId가 null이면(비로그인) 서브쿼리가 한 건도 못 찾아 아무것도 걸러지지 않는다.
+     * 덕분에 로그인 여부로 분기할 필요가 없다.
+     */
     @EntityGraph(attributePaths = {"author", "spot"})
     @Query("""
             select p from Post p
@@ -26,11 +33,14 @@ public interface PostRepository extends JpaRepository<Post, Long> {
                 or lower(p.content) like lower(concat('%', :keyword, '%'))
                 or lower(coalesce(spot.name, '')) like lower(concat('%', :keyword, '%')))
               and (:authorId is null or p.author.id = :authorId)
+              and not exists (
+                select block.id from UserBlock block
+                where block.blocker.id = :viewerId and block.blocked.id = p.author.id)
             """)
-
     Page<Post> search(
             @Param("keyword") String keyword,
             @Param("authorId") Long authorId,
+            @Param("viewerId") Long viewerId,
             Pageable pageable
     );
 
@@ -89,6 +99,10 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             or lower(p.content) like lower(concat('%', :keyword, '%'))
             or lower(coalesce(spot.name, '')) like lower(concat('%', :keyword, '%'))
         )
+        and not exists (
+            select block.id from UserBlock block
+            where block.blocker.id = :userId and block.blocked.id = p.author.id
+        )
         """)
     Page<Post> searchBookmarked(
             @Param("keyword") String keyword,
@@ -111,6 +125,10 @@ public interface PostRepository extends JpaRepository<Post, Long> {
             :keyword is null
             or lower(p.content) like lower(concat('%', :keyword, '%'))
             or lower(coalesce(spot.name, '')) like lower(concat('%', :keyword, '%'))
+        )
+        and not exists (
+            select block.id from UserBlock block
+            where block.blocker.id = :userId and block.blocked.id = p.author.id
         )
         """)
     Page<Post> searchFollowing(

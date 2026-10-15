@@ -62,14 +62,14 @@ public class PostCommentService {
      */
     public CommentPageResponse getComments(Long postId, Long userId, int page, int size) {
         ensurePostExists(postId);
-        Page<PostComment> result = commentRepository.findByPostIdAndParentIsNull(postId, pageable(page, size, TOP_LEVEL_SORT));
+        Page<PostComment> result = commentRepository.findVisibleTopLevelComments(postId, userId, pageable(page, size, TOP_LEVEL_SORT));
         return toPageResponse(result, userId);
     }
 
     /** 답글은 대화 흐름이라 좋아요와 무관하게 시간순으로 둔다. */
     public CommentPageResponse getReplies(Long postId, Long commentId, Long userId, int page, int size) {
         PostComment parent = findComment(postId, commentId);
-        Page<PostComment> result = commentRepository.findByParentId(parent.getId(), pageable(page, size, OLDEST_FIRST));
+        Page<PostComment> result = commentRepository.findVisibleReplies(parent.getId(), userId, pageable(page, size, OLDEST_FIRST));
         return toPageResponse(result, userId);
     }
 
