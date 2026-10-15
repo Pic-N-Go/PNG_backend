@@ -72,8 +72,8 @@ public class PostService {
         String normalizedKeyword = normalize(keyword);
 
         Page<Post> result = switch (sort) {
-            case MY_POSTS -> postRepository.search(normalizedKeyword, userId, pageable);
-            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, pageable);
+            case MY_POSTS -> postRepository.search(normalizedKeyword, userId, userId, pageable);
+            case POPULAR, LATEST -> postRepository.search(normalizedKeyword, authorId, userId, pageable);
             case FOLLOWING -> postRepository.searchFollowing(normalizedKeyword, userId, pageable);
             case BOOKMARKED -> postRepository.searchBookmarked(normalizedKeyword, userId, pageable);
         };

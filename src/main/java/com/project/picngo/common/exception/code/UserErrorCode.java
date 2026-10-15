@@ -12,6 +12,7 @@ public enum UserErrorCode implements BaseErrorCode {
     INVALID_NICKNAME(HttpStatus.BAD_REQUEST, ValidationRules.NICKNAME_MESSAGE),
     CANNOT_FOLLOW_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 팔로우할 수 없습니다."),
     ALREADY_FOLLOWING(HttpStatus.BAD_REQUEST, "이미 팔로우한 사용자입니다."),
+    CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),
     FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "팔로우 관계를 찾을 수 없습니다."),
     SEARCH_KEYWORD_REQUIRED(HttpStatus.BAD_REQUEST, "검색어를 입력해주세요.");
 

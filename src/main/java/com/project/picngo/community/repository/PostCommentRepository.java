@@ -15,10 +15,43 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PostCommentRepository extends JpaRepository<PostComment, Long> {
-    /** 댓글 목록은 최상위만 준다. 답글은 findByParentId로 따로 조회한다. */
+    /** 댓글 목록은 최상위만 준다. 답글은 findVisibleReplies로 따로 조회한다. */
     @EntityGraph(attributePaths = "author")
-    Page<PostComment> findByPostIdAndParentIsNull(Long postId, Pageable pageable);
+    @Query("""
+        select comment from PostComment comment
+        where comment.post.id = :postId and comment.parent is null
+          and not exists (
+            select block.id from UserBlock block
+            where block.blocker.id = :viewerId and block.blocked.id = comment.author.id)
+        """)
+    Page<PostComment> findVisibleTopLevelComments(
+            @Param("postId") Long postId,
+            @Param("viewerId") Long viewerId,
+            Pageable pageable
+    );
 
+    /**
+     * 차단한 사용자의 답글도 숨긴다. viewerId가 null이면(비로그인) 아무것도 걸러지지 않는다.
+     *
+     * ponytail: 게시글의 댓글 수(commentCount)는 줄이지 않는다. 차단 여부는 보는 사람마다 달라
+     * 저장된 카운트로는 표현할 수 없고, 매번 세면 목록 조회가 비싸진다. "댓글 3개"인데 2개만
+     * 보이는 어긋남이 남지만, 차단한 사람에게만 보이는 차이라 혼란이 작다.
+     */
+    @EntityGraph(attributePaths = "author")
+    @Query("""
+        select comment from PostComment comment
+        where comment.parent.id = :parentId
+          and not exists (
+            select block.id from UserBlock block
+            where block.blocker.id = :viewerId and block.blocked.id = comment.author.id)
+        """)
+    Page<PostComment> findVisibleReplies(
+            @Param("parentId") Long parentId,
+            @Param("viewerId") Long viewerId,
+            Pageable pageable
+    );
+
+    /** 삭제 경로 전용 — 차단 여부와 무관하게 답글을 전부 찾아야 한다. */
     @EntityGraph(attributePaths = "author")
     Page<PostComment> findByParentId(Long parentId, Pageable pageable);
 
