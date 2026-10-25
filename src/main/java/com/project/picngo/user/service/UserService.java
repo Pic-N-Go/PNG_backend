@@ -474,12 +474,22 @@ public class UserService {
 	 * 회원 탈퇴(소프트 삭제). 개인정보는 유예 기간 동안 그대로 남긴다 — 마스킹하면
 	 * 복구할 원본이 사라진다. 실제 파기는 UserPurgeScheduler가 기간 경과 후에 한다.
 	 */
+	/**
+	 * 폐기할 Apple refresh token을 돌려준다(없으면 null). Apple 호출은 호출부가 트랜잭션 밖에서
+	 * 한다 — AuthController가 identity token을 검증하는 것과 같은 이유로, 외부 응답이 늦을 때
+	 * DB 커넥션을 붙잡고 있으면 안 된다.
+	 */
 	@Transactional
-	public void withdraw(Long userId) {
-		getById(userId).withdraw(LocalDateTime.now());
+	public String withdraw(Long userId) {
+		User user = getById(userId);
+		String appleRefreshToken = user.getAppleRefreshToken();
+
+		user.withdraw(LocalDateTime.now());
 		// 재발급 경로를 의도적으로 닫는다. 액세스 토큰은 만료를 기다리지만(최대 1시간),
 		// 리프레시 토큰이 살아 있으면 그 뒤로도 세션이 이어진다.
 		refreshTokenService.revokeAllByUserId(userId);
+
+		return appleRefreshToken;
 	}
 
 	/**
