@@ -53,7 +53,7 @@ class PostRepositoryTest {
         updateCreatedAt(otherPost, LocalDateTime.of(2026, 1, 3, 10, 0));
         entityManager.clear();
 
-        var result = postRepository.search(null, me.getId(), PageRequest.of(0, 20, latestSort()));
+        var result = postRepository.search(null, me.getId(), null, PageRequest.of(0, 20, latestSort()));
 
         assertThat(result.getContent())
                 .extracting(Post::getContent)
@@ -107,7 +107,7 @@ class PostRepositoryTest {
         updateCreatedAt(newest, LocalDateTime.of(2026, 1, 3, 10, 0));
         entityManager.clear();
 
-        var result = postRepository.search(null, null, PageRequest.of(0, 20, latestSort()));
+        var result = postRepository.search(null, null, null, PageRequest.of(0, 20, latestSort()));
 
         assertThat(result.getContent())
                 .extracting(Post::getContent)
@@ -132,7 +132,7 @@ class PostRepositoryTest {
         updateLikeCount(newerPopular, 10);
         entityManager.clear();
 
-        var result = postRepository.search(null, null, PageRequest.of(0, 20, popularSort()));
+        var result = postRepository.search(null, null, null, PageRequest.of(0, 20, popularSort()));
 
         assertThat(result.getContent())
                 .extracting(Post::getContent)

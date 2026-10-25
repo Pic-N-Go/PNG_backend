@@ -99,6 +99,35 @@ public class UserController implements UserControllerApiSpec {
 		return ResponseEntity.noContent().build();
 	}
 
+	// 사용자 차단 API
+	//
+	// App Store 가이드라인 1.2는 UGC·소셜 앱에 "악성 사용자를 차단하는 수단"을 요구한다.
+	// 신고(/reports)만으로는 충족되지 않는다.
+	@PostMapping("/me/blocks/{id}")
+	public ResponseEntity<Void> blockUser(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@PathVariable Long id
+	){
+		userService.blockUser(userDetails.getId(), id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@DeleteMapping("/me/blocks/{id}")
+	public ResponseEntity<Void> unblockUser(
+			@AuthenticationPrincipal CustomUserDetails userDetails,
+			@PathVariable Long id
+	){
+		userService.unblockUser(userDetails.getId(), id);
+		return ResponseEntity.noContent().build();
+	}
+
+	@GetMapping("/me/blocks")
+	public ResponseEntity<List<BlockedUserResponse>> getBlockedUsers(
+			@AuthenticationPrincipal CustomUserDetails userDetails
+	){
+		return ResponseEntity.ok(userService.getBlockedUsers(userDetails.getId()));
+	}
+
 	// 회원 탈퇴 API (소프트 삭제 — 30일 이내 /auth/restore로 복구 가능)
 	//
 	// Apple 계정은 탈퇴 시 토큰을 폐기해야 한다(App Store 가이드라인 5.1.1(v)). 폐기는 트랜잭션이
