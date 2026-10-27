@@ -20,6 +20,7 @@ public enum ContestErrorCode implements BaseErrorCode {
     CANNOT_VOTE_OWN_ENTRY(HttpStatus.CONFLICT, "내 출품작에는 투표할 수 없습니다."),
     ALREADY_REPORTED(HttpStatus.CONFLICT, "이미 신고한 출품작입니다."),
 
+    MULTIPLE_THEME_IMAGE_SOURCES(HttpStatus.BAD_REQUEST, "대표 이미지 파일, 외부 이미지 URL, 이미지 삭제 요청 중 하나만 사용할 수 있습니다."),
     CONTEST_PERIOD_OVERLAP(HttpStatus.CONFLICT, "직전 콘테스트의 결과 발표 전에는 다음 회차를 시작할 수 없습니다."),
     CONTEST_START_IN_PAST(HttpStatus.BAD_REQUEST, "콘테스트 시작 시각은 현재보다 이전일 수 없습니다."),
     CANNOT_MODIFY_STARTED_CONTEST(HttpStatus.CONFLICT, "출품이 시작된 콘테스트의 시작 날짜는 변경할 수 없습니다."),

@@ -21,6 +21,7 @@ import com.project.picngo.spot.domain.Spot;
 import com.project.picngo.spot.repository.SpotRepository;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.repository.FollowRepository;
+import com.project.picngo.user.repository.UserBlockRepository;
 import com.project.picngo.user.repository.UserRepository;
 import com.project.picngo.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,6 +60,7 @@ class CommunityNotificationTest {
     @Mock PostCommentLikeRepository commentLikeRepository;
     @Mock UserRepository userRepository;
     @Mock FollowRepository followRepository;
+    @Mock UserBlockRepository userBlockRepository;
     @Mock SpotRepository spotRepository;
     @Mock ExifExtractor exifExtractor;
     @Mock ImageStorageService imageStorageService;
@@ -105,6 +107,7 @@ class CommunityNotificationTest {
         userService = new UserService(
                 userRepository,
                 followRepository,
+                userBlockRepository,
                 postRepository,
                 passwordEncoder,
                 imageStorageService,

@@ -678,16 +678,16 @@ class PostServiceTest {
     @Test
     @DisplayName("음수 페이지는 0으로, 100을 초과하는 페이지 크기는 100으로 보정한다")
     void pageAndSizeAreNormalizedToSafeRange() {
-        when(postRepository.search(isNull(), isNull(), any(Pageable.class)))
+        when(postRepository.search(isNull(), isNull(), any(), any(Pageable.class)))
                 .thenAnswer(invocation -> {
-                    Pageable pageable = invocation.getArgument(2);
+                    Pageable pageable = invocation.getArgument(3);
                     return new PageImpl<>(List.of(), pageable, 0);
                 });
 
         service.getPosts(null, PostSort.LATEST, "  ", null, -5, 1000);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(postRepository).search(isNull(), isNull(), pageableCaptor.capture());
+        verify(postRepository).search(isNull(), isNull(), any(), pageableCaptor.capture());
         assertEquals(0, pageableCaptor.getValue().getPageNumber());
         assertEquals(100, pageableCaptor.getValue().getPageSize());
     }
@@ -695,12 +695,12 @@ class PostServiceTest {
     @Test
     @DisplayName("내가 쓴 글은 로그인한 작성자 ID로 검색한다")
     void myPostsFiltersByAuthenticatedAuthor() {
-        when(postRepository.search(isNull(), eq(9L), any(Pageable.class)))
-                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(2), 0));
+        when(postRepository.search(isNull(), eq(9L), any(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(3), 0));
 
         service.getPosts(9L, PostSort.MY_POSTS, null, null, 0, 20);
 
-        verify(postRepository).search(isNull(), eq(9L), any(Pageable.class));
+        verify(postRepository).search(isNull(), eq(9L), any(), any(Pageable.class));
     }
 
     @Test
@@ -721,10 +721,10 @@ class PostServiceTest {
     void feedLoadsImagesAndReactionsInBatches() {
         Post firstPost = feedPost(1L);
         Post secondPost = feedPost(2L);
-        when(postRepository.search(isNull(), isNull(), any(Pageable.class)))
+        when(postRepository.search(isNull(), isNull(), any(), any(Pageable.class)))
                 .thenAnswer(invocation -> new PageImpl<>(
                         List.of(firstPost, secondPost),
-                        invocation.getArgument(2),
+                        invocation.getArgument(3),
                         2
                 ));
         when(imageRepository.findAllByPostIds(List.of(1L, 2L))).thenReturn(List.of());
@@ -789,23 +789,23 @@ class PostServiceTest {
     @Test
     @DisplayName("authorId를 주면 그 작성자의 글만 조회한다")
     void authorIdFiltersPostsByAuthor() {
-        when(postRepository.search(isNull(), eq(108L), any(Pageable.class)))
-                .thenAnswer(i -> new PageImpl<>(List.of(), i.getArgument(2), 0));
+        when(postRepository.search(isNull(), eq(108L), any(), any(Pageable.class)))
+                .thenAnswer(i -> new PageImpl<>(List.of(), i.getArgument(3), 0));
 
         service.getPosts(9L, PostSort.LATEST, null, 108L, 0, 20);
 
-        verify(postRepository).search(isNull(), eq(108L), any(Pageable.class));
+        verify(postRepository).search(isNull(), eq(108L), any(), any(Pageable.class));
     }
 
     @Test
     @DisplayName("MY_POSTS는 내 글이라는 뜻이 정해져 있어 authorId를 무시한다")
     void myPostsIgnoresAuthorId() {
-        when(postRepository.search(isNull(), eq(9L), any(Pageable.class)))
-                .thenAnswer(i -> new PageImpl<>(List.of(), i.getArgument(2), 0));
+        when(postRepository.search(isNull(), eq(9L), any(), any(Pageable.class)))
+                .thenAnswer(i -> new PageImpl<>(List.of(), i.getArgument(3), 0));
 
         service.getPosts(9L, PostSort.MY_POSTS, null, 108L, 0, 20);
 
         // authorId(108)가 아니라 로그인 사용자(9)로 조회해야 한다.
-        verify(postRepository).search(isNull(), eq(9L), any(Pageable.class));
+        verify(postRepository).search(isNull(), eq(9L), any(), any(Pageable.class));
     }
 }

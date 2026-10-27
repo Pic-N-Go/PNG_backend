@@ -107,9 +107,37 @@ public interface UserControllerApiSpec {
 	);
 
 	@Operation(
+			summary = "사용자 차단",
+			description = "차단한 사용자의 게시글과 댓글이 목록에서 보이지 않습니다. 차단은 단방향이며 상대에게 알리지 않습니다. "
+					+ "서로 간의 팔로우는 양쪽 모두 해제됩니다. 이미 차단한 사용자를 다시 차단해도 오류 없이 204를 반환합니다."
+	)
+	ResponseEntity<Void> blockUser(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+			@Parameter(description = "차단할 사용자 ID") @PathVariable Long id
+	);
+
+	@Operation(
+			summary = "사용자 차단 해제",
+			description = "차단을 해제합니다. 차단할 때 끊긴 팔로우는 복구되지 않습니다. "
+					+ "차단한 적이 없는 사용자에 대해 호출해도 오류 없이 204를 반환합니다."
+	)
+	ResponseEntity<Void> unblockUser(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails,
+			@Parameter(description = "차단 해제할 사용자 ID") @PathVariable Long id
+	);
+
+	@Operation(
+			summary = "차단 목록 조회",
+			description = "현재 인증된 사용자가 차단한 사용자 목록입니다. 최근 차단한 순서이며, 탈퇴한 사용자는 제외됩니다."
+	)
+	ResponseEntity<List<BlockedUserResponse>> getBlockedUsers(
+			@Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails userDetails
+	);
+
+	@Operation(
 			summary = "회원 탈퇴",
 			description = "소프트 삭제입니다. 30일 동안은 로그인·조회에서 제외되기만 하고 개인정보는 남아 있어 "
-					+ "POST /auth/restore(소셜은 /auth/restore/social)로 복구할 수 있습니다. "
+					+ "POST /auth/restore(카카오는 /auth/restore/social, Apple은 /auth/restore/apple)로 복구할 수 있습니다. "
 					+ "30일이 지나면 배치가 개인정보를 파기하며, 작성한 게시글·댓글은 '탈퇴한 사용자' 이름으로 유지됩니다."
 	)
 	ResponseEntity<Void> withdraw(

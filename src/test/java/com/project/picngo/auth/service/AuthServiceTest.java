@@ -1,6 +1,7 @@
 package com.project.picngo.auth.service;
 
 import com.project.picngo.common.image.service.ImageStorageService;
+import com.project.picngo.auth.dto.AppleProfile;
 import com.project.picngo.auth.dto.KakaoLoginRequest;
 import com.project.picngo.auth.dto.KakaoProfile;
 import com.project.picngo.auth.dto.PasswordResetCodeRequest;
@@ -151,6 +152,75 @@ class AuthServiceTest {
         when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
 
         return authService.loginWithKakao(new KakaoLoginRequest("kakao-access-token"));
+    }
+
+    /** Apple은 닉네임·사진을 주지 않으므로 null로 넘겨 UserService의 대체 닉네임 경로를 타게 한다. */
+    @Test
+    @DisplayName("Apple 신규 가입이면 APPLE 제공자로 계정을 만들고 isNewUser를 전파한다")
+    void createsAppleUserAndPropagatesIsNewUser() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(user.getEmail()).thenReturn("a@privaterelay.appleid.com");
+        when(userService.getOrCreateSocialUser(
+                "a@privaterelay.appleid.com", null, null, SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(new UserService.SocialUserResult(user, true));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+        when(jwtTokenProvider.getAccessTokenExpirationSeconds()).thenReturn(60L);
+        when(jwtTokenProvider.getRefreshTokenExpirationSeconds()).thenReturn(120L);
+
+        TokenResponse response = authService.loginWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), "apple-refresh-token");
+
+        verify(user).updateAppleRefreshToken("apple-refresh-token");
+        assertThat(response.isNewUser()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Apple 토큰 교환에 실패해도(null) 로그인은 그대로 끝난다")
+    void completesAppleLoginWithoutRefreshToken() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(user.getEmail()).thenReturn("a@privaterelay.appleid.com");
+        when(userService.getOrCreateSocialUser(
+                "a@privaterelay.appleid.com", null, null, SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(new UserService.SocialUserResult(user, false));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+
+        TokenResponse response = authService.loginWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), null);
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+    }
+
+    @Test
+    @DisplayName("Apple 탈퇴 계정은 APPLE 제공자와 sub로 찾아 복구한다")
+    void restoresWithdrawnAppleAccount() {
+        User user = org.mockito.Mockito.mock(User.class);
+        when(user.getId()).thenReturn(1L);
+        when(userService.findByProviderAndProviderId(SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(java.util.Optional.of(user));
+        when(jwtTokenProvider.createAccessToken(user)).thenReturn("access-token");
+        when(jwtTokenProvider.createRefreshToken(user)).thenReturn("refresh-token");
+
+        TokenResponse response = authService.restoreWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), "apple-refresh-token");
+
+        verify(userService).restore(user);
+        // 복구도 Apple 인증을 새로 거친다 — 갱신하지 않으면 다시 탈퇴할 때 폐기할 토큰이 없다.
+        verify(user).updateAppleRefreshToken("apple-refresh-token");
+        assertThat(response.isNewUser()).isFalse();
+    }
+
+    @Test
+    @DisplayName("가입한 적 없는 Apple 계정은 복구할 수 없다")
+    void rejectsRestoreForUnknownAppleAccount() {
+        when(userService.findByProviderAndProviderId(SocialProvider.APPLE, "apple-sub-1"))
+                .thenReturn(java.util.Optional.empty());
+
+        assertThrows(CustomException.class, () -> authService.restoreWithApple(
+                new AppleProfile("apple-sub-1", "a@privaterelay.appleid.com"), "apple-refresh-token"));
     }
 
     @Test

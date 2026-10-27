@@ -24,7 +24,7 @@ public record AdminUserResponse(
         @Schema(description = "권한 (USER / ADMIN)", example = "USER")
         Role role,
 
-        @Schema(description = "소셜 제공자 (LOCAL / KAKAO)", example = "LOCAL")
+        @Schema(description = "소셜 제공자 (LOCAL / KAKAO / APPLE)", example = "LOCAL")
         SocialProvider provider,
 
         @Schema(description = "가입 일시")

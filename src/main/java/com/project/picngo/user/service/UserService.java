@@ -15,12 +15,14 @@ import com.project.picngo.common.exception.code.AuthErrorCode;
 import com.project.picngo.common.exception.code.UserErrorCode;
 import com.project.picngo.common.domain.SpotCategory;
 import com.project.picngo.user.domain.Follow;
+import com.project.picngo.user.domain.UserBlock;
 import com.project.picngo.user.domain.SocialProvider;
 import com.project.picngo.user.domain.User;
 import com.project.picngo.user.dto.*;
 import com.project.picngo.community.repository.PostRepository;
 import com.project.picngo.notification.service.NotificationService;
 import com.project.picngo.user.repository.FollowRepository;
+import com.project.picngo.user.repository.UserBlockRepository;
 import com.project.picngo.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +56,7 @@ public class UserService {
 
 	private final UserRepository userRepository;
 	private final FollowRepository followRepository;
+	private final UserBlockRepository userBlockRepository;
 	private final PostRepository postRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final ImageStorageService imageStorageService;
@@ -160,7 +163,7 @@ public class UserService {
 	) {
 		return userRepository.findByProviderAndProviderId(provider, providerId)
 			.map(user -> {
-				// 탈퇴 계정은 토큰을 받지 못한다. 복구는 /auth/restore/social로만 가능하다.
+				// 탈퇴 계정은 토큰을 받지 못한다. 복구는 /auth/restore/social(카카오), /auth/restore/apple로만 가능하다.
 				if (user.isWithdrawn()) {
 					throw new CustomException(AuthErrorCode.ACCOUNT_WITHDRAWN);
 				}
@@ -445,6 +448,55 @@ public class UserService {
 		followRepository.delete(follow);
 	}
 
+	// ── 사용자 차단 ───────────────────────────────────────────────
+
+	/**
+	 * 사용자 차단. App Store 가이드라인 1.2가 UGC·소셜 앱에 요구하는 기능이다.
+	 *
+	 * 차단은 단방향이고 상대에게 알리지 않는다 — 알리면 보복으로 이어진다. 반면 팔로우는
+	 * 양쪽 다 끊는다. 내가 B를 차단해도 B가 나를 팔로우한 채로 두면 내 글이 B 피드에 계속
+	 * 떠서 차단한 의미가 반감된다(인스타그램·X도 같은 방식).
+	 *
+	 * 이미 차단한 상대를 다시 차단해도 오류로 보지 않는다. 목록에서 한 번, 게시글에서 한 번
+	 * 누르는 식으로 중복 요청이 쉽게 생기는데, 결과가 같으므로 실패시킬 이유가 없다.
+	 */
+	@Transactional
+	public void blockUser(Long blockerId, Long blockedId) {
+		User blocker = getById(blockerId);
+		User blocked = getById(blockedId);
+
+		if (blocker.getId().equals(blocked.getId())) {
+			throw new CustomException(UserErrorCode.CANNOT_BLOCK_SELF);
+		}
+		if (userBlockRepository.existsByBlockerAndBlocked(blocker, blocked)) {
+			return;
+		}
+
+		userBlockRepository.save(UserBlock.create(blocker, blocked));
+
+		followRepository.findByFollowerAndFollowing(blocker, blocked)
+				.ifPresent(followRepository::delete);
+		followRepository.findByFollowerAndFollowing(blocked, blocker)
+				.ifPresent(followRepository::delete);
+	}
+
+	/** 차단 해제. 끊었던 팔로우는 되돌리지 않는다 — 다시 팔로우할지는 사용자가 정할 일이다. */
+	@Transactional
+	public void unblockUser(Long blockerId, Long blockedId) {
+		User blocker = getById(blockerId);
+		User blocked = getById(blockedId);
+
+		userBlockRepository.findByBlockerAndBlocked(blocker, blocked)
+				.ifPresent(userBlockRepository::delete);
+	}
+
+	/** 차단 목록. 팔로워/팔로잉 목록과 같이 페이징 없이 돌려준다. */
+	public List<BlockedUserResponse> getBlockedUsers(Long blockerId) {
+		return userBlockRepository.findBlockedUsers(blockerId).stream()
+				.map(block -> BlockedUserResponse.from(block, profileImageUrlOf(block.getBlocked())))
+				.toList();
+	}
+
 	// 팔로워 목록 조회
 	public List<FollowUserResponse> getFollowers(Long userId) {
 		User user = getById(userId);
@@ -474,12 +526,22 @@ public class UserService {
 	 * 회원 탈퇴(소프트 삭제). 개인정보는 유예 기간 동안 그대로 남긴다 — 마스킹하면
 	 * 복구할 원본이 사라진다. 실제 파기는 UserPurgeScheduler가 기간 경과 후에 한다.
 	 */
+	/**
+	 * 폐기할 Apple refresh token을 돌려준다(없으면 null). Apple 호출은 호출부가 트랜잭션 밖에서
+	 * 한다 — AuthController가 identity token을 검증하는 것과 같은 이유로, 외부 응답이 늦을 때
+	 * DB 커넥션을 붙잡고 있으면 안 된다.
+	 */
 	@Transactional
-	public void withdraw(Long userId) {
-		getById(userId).withdraw(LocalDateTime.now());
+	public String withdraw(Long userId) {
+		User user = getById(userId);
+		String appleRefreshToken = user.getAppleRefreshToken();
+
+		user.withdraw(LocalDateTime.now());
 		// 재발급 경로를 의도적으로 닫는다. 액세스 토큰은 만료를 기다리지만(최대 1시간),
 		// 리프레시 토큰이 살아 있으면 그 뒤로도 세션이 이어진다.
 		refreshTokenService.revokeAllByUserId(userId);
+
+		return appleRefreshToken;
 	}
 
 	/**

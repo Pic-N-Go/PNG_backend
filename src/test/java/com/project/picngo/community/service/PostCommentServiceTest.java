@@ -66,13 +66,13 @@ class PostCommentServiceTest {
     @DisplayName("댓글 목록의 음수 페이지와 과도한 페이지 크기를 안전한 범위로 보정한다")
     void commentPageAndSizeAreNormalized() {
         when(postRepository.existsById(1L)).thenReturn(true);
-        when(commentRepository.findByPostIdAndParentIsNull(eq(1L), any(Pageable.class)))
-                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(1), 0));
+        when(commentRepository.findVisibleTopLevelComments(eq(1L), any(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(2), 0));
 
         service.getComments(1L, null, -1, 1000);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(commentRepository).findByPostIdAndParentIsNull(eq(1L), pageableCaptor.capture());
+        verify(commentRepository).findVisibleTopLevelComments(eq(1L), any(), pageableCaptor.capture());
         assertEquals(0, pageableCaptor.getValue().getPageNumber());
         assertEquals(100, pageableCaptor.getValue().getPageSize());
     }
@@ -81,13 +81,13 @@ class PostCommentServiceTest {
     @DisplayName("최상위 댓글은 좋아요 많은 순으로, 동점이면 오래된 순으로 정렬한다")
     void topLevelCommentsAreSortedByLikes() {
         when(postRepository.existsById(1L)).thenReturn(true);
-        when(commentRepository.findByPostIdAndParentIsNull(eq(1L), any(Pageable.class)))
-                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(1), 0));
+        when(commentRepository.findVisibleTopLevelComments(eq(1L), any(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(2), 0));
 
         service.getComments(1L, null, 0, 20);
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(commentRepository).findByPostIdAndParentIsNull(eq(1L), captor.capture());
+        verify(commentRepository).findVisibleTopLevelComments(eq(1L), any(), captor.capture());
         assertEquals(
                 Sort.by(Sort.Order.desc("likeCount"), Sort.Order.asc("createdAt"), Sort.Order.asc("id")),
                 captor.getValue().getSort()
@@ -99,13 +99,13 @@ class PostCommentServiceTest {
     void repliesStaySortedByTime() {
         PostComment parent = new PostComment(mock(Post.class), null, mock(User.class), "parent");
         when(commentRepository.findByIdAndPostId(10L, 1L)).thenReturn(Optional.of(parent));
-        when(commentRepository.findByParentId(eq(parent.getId()), any(Pageable.class)))
-                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(1), 0));
+        when(commentRepository.findVisibleReplies(eq(parent.getId()), any(), any(Pageable.class)))
+                .thenAnswer(invocation -> new PageImpl<>(List.of(), invocation.getArgument(2), 0));
 
         service.getReplies(1L, 10L, null, 0, 20);
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(commentRepository).findByParentId(eq(parent.getId()), captor.capture());
+        verify(commentRepository).findVisibleReplies(eq(parent.getId()), any(), captor.capture());
         assertEquals(Sort.by(Sort.Direction.ASC, "createdAt"), captor.getValue().getSort());
     }
 
@@ -403,7 +403,7 @@ class PostCommentServiceTest {
     void guestListingSkipsLikeLookup() {
         when(postRepository.existsById(1L)).thenReturn(true);
         PostComment comment = new PostComment(mock(Post.class), null, mock(User.class), "c");
-        when(commentRepository.findByPostIdAndParentIsNull(eq(1L), any(Pageable.class)))
+        when(commentRepository.findVisibleTopLevelComments(eq(1L), any(), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(comment)));
 
         var response = service.getComments(1L, null, 0, 20);

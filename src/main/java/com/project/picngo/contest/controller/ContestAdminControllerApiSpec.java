@@ -17,7 +17,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,16 +25,6 @@ import java.util.Map;
 
 @Tag(name = "콘테스트 관리 (Admin)", description = "관리자용 콘테스트 운영 API (회차 개설, 목록, 출품작/신고 관리, 알림 발송)")
 public interface ContestAdminControllerApiSpec {
-
-    @Operation(
-            summary = "콘테스트 테마 대표 사진 업로드",
-            description = "콘테스트 테마 대표 사진을 S3에 업로드하고 이미지 키 및 Presigned URL을 반환합니다.",
-            security = @SecurityRequirement(name = "bearerAuth")
-    )
-    ResponseEntity<Map<String, String>> uploadThemeImage(
-            @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails adminUserDetails,
-            @Parameter(description = "업로드할 테마 사진 파일") @RequestPart("image") MultipartFile image
-    );
 
     @Operation(
             summary = "콘테스트 회차 개설",
@@ -47,7 +36,9 @@ public interface ContestAdminControllerApiSpec {
     )
     ResponseEntity<ContestResponse> createContest(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails adminUserDetails,
-            @Valid @RequestBody ContestCreateRequest request
+            @Valid @RequestPart("request") ContestCreateRequest request,
+            @Parameter(description = "테마 대표 이미지 파일")
+            @RequestPart(value = "themeImage", required = false) MultipartFile themeImage
     );
 
     @Operation(
@@ -58,7 +49,9 @@ public interface ContestAdminControllerApiSpec {
     ResponseEntity<AdminContestDetailResponse> updateContest(
             @Parameter(hidden = true) @AuthenticationPrincipal CustomUserDetails adminUserDetails,
             @Parameter(description = "콘테스트 ID", example = "1") @PathVariable Long contestId,
-            @Valid @RequestBody ContestUpdateRequest request
+            @Valid @RequestPart("request") ContestUpdateRequest request,
+            @Parameter(description = "새 테마 대표 이미지 파일")
+            @RequestPart(value = "themeImage", required = false) MultipartFile themeImage
     );
 
     @Operation(

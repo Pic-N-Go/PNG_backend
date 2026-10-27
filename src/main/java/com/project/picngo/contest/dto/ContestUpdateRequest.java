@@ -1,6 +1,7 @@
 package com.project.picngo.contest.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
@@ -16,9 +17,17 @@ public record ContestUpdateRequest(
         @Size(max = 500, message = "설명은 최대 500자까지 입력할 수 있습니다.")
         String description,
 
-        @Schema(description = "테마 대표 이미지 URL", example = "https://example.com/autumn.jpg")
-        @Size(max = 500, message = "테마 이미지 URL은 최대 500자까지 입력할 수 있습니다.")
-        String themeImageUrl,
+        @Schema(description = "외부 테마 이미지 URL", example = "https://example.com/autumn.jpg")
+        @Size(max = 500, message = "외부 테마 이미지 URL은 최대 500자까지 입력할 수 있습니다.")
+        @Pattern(
+                regexp = "^https?://.+$",
+                flags = Pattern.Flag.CASE_INSENSITIVE,
+                message = "외부 테마 이미지 URL은 http:// 또는 https://로 시작해야 합니다."
+        )
+        String externalThemeImageUrl,
+
+        @Schema(description = "기존 대표 이미지 삭제 여부", example = "false")
+        Boolean removeThemeImage,
 
         @Schema(description = "새로운 출품 시작 시각 (출품 시작 전인 UPCOMING 상태일 때만 변경 가능하며, 변경 시 4주 일정이 자동 재계산됩니다)", example = "2026-10-15T09:00:00")
         LocalDateTime submitStartAt

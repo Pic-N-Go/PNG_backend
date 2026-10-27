@@ -95,7 +95,11 @@ class ContestAdminControllerTest {
     void updateContest() {
         given(adminUserDetails.getId()).willReturn(99L);
         ContestUpdateRequest request = new ContestUpdateRequest(
-                "수정된 단풍전", "수정된 설명", "new-url.jpg", LocalDateTime.now().plusWeeks(1)
+                "수정된 단풍전",
+                "수정된 설명",
+                "https://example.com/new-theme.jpg",
+                false,
+                LocalDateTime.now().plusWeeks(1)
         );
         AdminContestDetailResponse updatedDetail = new AdminContestDetailResponse(
                 1L, "수정된 단풍전", "수정된 설명", "new-url.jpg", ContestPhase.UPCOMING,
@@ -105,9 +109,15 @@ class ContestAdminControllerTest {
                 3, 3, true, false, false, 5L, 0L, 0L, 0L,
                 LocalDateTime.now(), LocalDateTime.now()
         );
-        given(contestService.updateContest(eq(1L), any(ContestUpdateRequest.class))).willReturn(updatedDetail);
+        given(contestService.updateContest(eq(1L), any(ContestUpdateRequest.class), isNull()))
+                .willReturn(updatedDetail);
 
-        ResponseEntity<AdminContestDetailResponse> response = controller.updateContest(adminUserDetails, 1L, request);
+        ResponseEntity<AdminContestDetailResponse> response = controller.updateContest(
+                adminUserDetails,
+                1L,
+                request,
+                null
+        );
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
