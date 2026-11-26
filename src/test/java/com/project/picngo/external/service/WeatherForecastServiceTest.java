@@ -4,14 +4,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.KmaMidWeatherApiResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,11 +25,20 @@ import static org.mockito.BDDMockito.given;
 @ExtendWith(MockitoExtension.class)
 class WeatherForecastServiceTest {
 
+    // 2026-09-20 13:00 KST로 고정: 중기예보 발표시각이 당일 06시가 되어 D+3 = 20260923이 된다.
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            ZonedDateTime.of(2026, 9, 20, 13, 0, 0, 0, ZoneId.of("Asia/Seoul")).toInstant(),
+            ZoneId.of("Asia/Seoul"));
+
     @Mock
     private WeatherClient weatherClient;
 
-    @InjectMocks
     private WeatherForecastService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new WeatherForecastService(weatherClient, FIXED_CLOCK);
+    }
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
