@@ -4,10 +4,11 @@ import com.project.picngo.external.WeatherClient;
 import com.project.picngo.external.dto.KmaMidTaApiResponse;
 import com.project.picngo.external.dto.KmaMidWeatherApiResponse;
 import com.project.picngo.external.dto.WeatherForecastResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -20,13 +21,24 @@ import java.util.Set;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class WeatherForecastService {
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private final WeatherClient weatherClient;
+    // 중기예보 발표시각(tmFc)을 "지금" 기준으로 고른다. 테스트가 실제 날짜에 따라 깨지지 않도록 시계를 주입받는다.
+    private final Clock clock;
+
+    @Autowired
+    public WeatherForecastService(WeatherClient weatherClient) {
+        this(weatherClient, Clock.system(KST));
+    }
+
+    WeatherForecastService(WeatherClient weatherClient, Clock clock) {
+        this.weatherClient = weatherClient;
+        this.clock = clock;
+    }
 
     /**
      * 단기예보(가까운 날)가 "완전한 것"으로 인정되려면 최소 이만큼의 서로 다른 날짜를 가져야 한다.
@@ -90,7 +102,7 @@ public class WeatherForecastService {
 
         try {
             // 2. 중기예보 (일별) - 최신 유효 발표시각(tmFc) 동적 계산
-            LocalDateTime now = LocalDateTime.now(KST);
+            LocalDateTime now = LocalDateTime.now(clock);
             String tmFc = calculateLatestMidTermTmFc(now);
             String regId = getMidTermRegionCode(lat, lng);
 
