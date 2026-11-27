@@ -5,6 +5,7 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -65,8 +66,11 @@ public class FcmConfig {
         return null;
     }
 
+    // firebaseApp()이 null을 반환하면 스프링은 FirebaseApp 빈이 "없는" 것으로 본다.
+    // 파라미터로 바로 받으면 null 검사에 닿기 전에 기동이 실패하므로, 있으면 쓰고 없으면 건너뛰도록 ObjectProvider로 받는다.
     @Bean
-    public FirebaseMessaging firebaseMessaging(FirebaseApp firebaseApp) {
+    public FirebaseMessaging firebaseMessaging(ObjectProvider<FirebaseApp> firebaseAppProvider) {
+        FirebaseApp firebaseApp = firebaseAppProvider.getIfAvailable();
         if (firebaseApp == null) {
             log.warn("🔥 FirebaseApp이 초기화되지 않아 FirebaseMessaging 빈 생성을 건너뜁니다.");
             return null;
