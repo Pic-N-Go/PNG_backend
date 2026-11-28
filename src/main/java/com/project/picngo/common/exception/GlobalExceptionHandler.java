@@ -19,14 +19,29 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
+import com.project.picngo.common.alert.ServerErrorAlerter;
 import com.project.picngo.common.exception.code.CommonErrorCode;
 import com.project.picngo.common.exception.code.CourseErrorCode;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // 처리되지 않은 500 에러를 디스코드로 알린다. 단위 테스트처럼 직접 생성하면 null이라 알림을 건너뛴다.
+    private final ServerErrorAlerter serverErrorAlerter;
+
+    public GlobalExceptionHandler() {
+        this(null);
+    }
+
+    @Autowired
+    public GlobalExceptionHandler(ServerErrorAlerter serverErrorAlerter) {
+        this.serverErrorAlerter = serverErrorAlerter;
+    }
 
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException e) {
@@ -139,12 +154,13 @@ public class GlobalExceptionHandler {
      * 같이 400으로 삼키면 스택트레이스까지 사라져 조사할 단서가 없어진다.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+    public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException e, HttpServletRequest request) {
         Throwable cause = e.getMostSpecificCause();
         boolean duplicateEntry = cause instanceof SQLException sqlException
                 && sqlException.getErrorCode() == MYSQL_DUPLICATE_ENTRY;
         if (!duplicateEntry) {
-            return handleException(e);
+            // 서버 버그이므로 디스코드 알림 대상이기도 하다.
+            return handleException(e, request);
         }
 
         // 메시지는 찍지 않는다 — MySQL 1062 메시지에는 충돌한 값이 그대로 들어 있어
@@ -188,9 +204,14 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(CommonErrorCode.ENDPOINT_NOT_FOUND));
     }
 
+    // 예상하지 못한 예외(NPE, 쿼리 오류 등)만 디스코드로 알린다.
+    // 의도해서 던지는 CustomException(5xx 포함)은 원인을 이미 알고 있어 제외하고, 건수는 Grafana가 센다.
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception e) {
+    public ResponseEntity<ErrorResponse> handleException(Exception e, HttpServletRequest request) {
         log.error("Exception: {}", e.getMessage(), e);
+        if (serverErrorAlerter != null) {
+            serverErrorAlerter.alert(e, request.getMethod(), request.getRequestURI());
+        }
         return ResponseEntity
                 .status(CommonErrorCode.INTERNAL_SERVER_ERROR.getStatus())
                 .body(ErrorResponse.of(CommonErrorCode.INTERNAL_SERVER_ERROR));
