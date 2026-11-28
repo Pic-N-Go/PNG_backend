@@ -40,3 +40,10 @@ management:
         # 헬스체크/메트릭만 열도록 미리 자리를 잡아둔다. 전부(*) 노출은 금지.
         include: health, prometheus
 
+# 처리되지 않은 500 에러를 디스코드로 알린다(ServerErrorAlerter).
+# 운영 프로필에만 둔다 - 로컬 개발 중 난 에러가 팀 채널로 가지 않게 하기 위해서다.
+# 값이 비어 있으면 알림은 꺼진 채로 앱은 정상 기동한다.
+alert:
+  discord:
+    webhook-url: ${DISCORD_WEBHOOK_URL:}
+

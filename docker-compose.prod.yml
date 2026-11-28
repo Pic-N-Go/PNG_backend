@@ -57,6 +57,8 @@ services:
       AWS_S3_BUCKET: ${AWS_S3_BUCKET}
       AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES: ${AWS_S3_PRESIGNED_URL_EXPIRATION_MINUTES}
       WEBSOCKET_ALLOWED_ORIGIN_PATTERNS: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
+      # 처리되지 않은 500 에러 디스코드 알림(ServerErrorAlerter). 비어 있으면 알림만 꺼지고 앱은 정상 기동한다.
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
       # 검색 설정.
       #
       # --env-file은 이 파일 안의 ${...}를 치환할 뿐, 컨테이너 안으로 전달하지 않는다.

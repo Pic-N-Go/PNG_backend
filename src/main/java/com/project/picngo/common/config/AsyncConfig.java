@@ -29,4 +29,22 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * 500 에러 디스코드 알림 전송 전용 스레드풀.
+     * 위의 워밍업 풀과 달리, 꽉 차면 요청 스레드가 대신 보내지 않고 알림을 버린다(DiscardPolicy).
+     * 장애로 에러가 쏟아질 때 알림 전송 때문에 사용자 응답까지 느려지면 안 되기 때문이다.
+     * 같은 에러는 10분에 한 번만 보내므로 평소에는 큐가 거의 비어 있다.
+     */
+    @Bean(name = "errorAlertExecutor")
+    public ThreadPoolTaskExecutor errorAlertExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("error-alert-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
+        executor.initialize();
+        return executor;
+    }
 }
