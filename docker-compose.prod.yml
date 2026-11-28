@@ -196,8 +196,13 @@ services:
     logging: *default-logging
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # monitoring/grafana/provisioning 의 알림 설정이 읽는 값
+      PROMETHEUS_URL: http://prometheus:9090
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
     volumes:
       - grafana-data:/var/lib/grafana
+      # 데이터 출처·디스코드 알림 규칙을 파일로 관리한다(화면에서 만든 설정이 날아가도 재배포로 복구됨).
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
       # Grafana는 관리 도구라 임시로 열어둔다. 운영 확정되면 SSH 터널이나
       # VPN으로만 접근하도록 이 포트 노출도 제거하는 게 안전하다.

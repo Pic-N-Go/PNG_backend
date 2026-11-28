@@ -51,6 +51,14 @@ services:
       - "8082:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      # monitoring/grafana/provisioning 의 알림 설정이 읽는 값
+      - PROMETHEUS_URL=http://png-prometheus:9090
+      # 로컬은 앱이 꺼져 있는 때가 많아 실제 채널로 보내면 "서버 다운"이 계속 울린다.
+      # 그래서 운영용 DISCORD_WEBHOOK_URL을 읽지 않고, 전송 테스트가 필요할 때만 LOCAL_DISCORD_WEBHOOK_URL을 채운다.
+      # 비어 있으면 보내지지 않는 가짜 주소를 써서 알림 설정 로딩만 성공시킨다.
+      - DISCORD_WEBHOOK_URL=${LOCAL_DISCORD_WEBHOOK_URL:-https://discord.invalid/local-alerts-disabled}
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - png-prometheus
     restart: always

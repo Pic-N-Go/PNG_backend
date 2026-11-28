@@ -1,0 +1,24 @@
+# 디스코드 알림 메시지 형식. Grafana 기본 형식(영어 라벨 나열) 대신 한국어로 핵심만 보여준다.
+# 시각은 Grafana 컨테이너 기준(UTC)이 아니라 한국 시간으로 표시한다.
+apiVersion: 1
+
+templates:
+  - orgId: 1
+    name: picngo-discord
+    template: |
+      {{ define "picngo.discord.title" -}}
+      {{ if eq .Status "firing" }}🚨 [장애 발생]{{ else }}✅ [해결됨]{{ end }} {{ .CommonLabels.alertname }}
+      {{- end }}
+
+      {{ define "picngo.discord.message" -}}
+      {{ range .Alerts -}}
+      **{{ if eq .Labels.severity "critical" }}🔴 긴급{{ else }}🟠 주의{{ end }} · {{ .Labels.alertname }}**
+      > {{ .Annotations.summary }}
+      {{ .Annotations.description }}
+      • 시작: {{ .StartsAt | tz "Asia/Seoul" | date "2006-01-02 15:04:05" }}
+      {{- if eq .Status "resolved" }}
+      • 해결: {{ .EndsAt | tz "Asia/Seoul" | date "2006-01-02 15:04:05" }}
+      {{- end }}
+
+      {{ end -}}
+      {{- end }}

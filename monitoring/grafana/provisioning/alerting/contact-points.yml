@@ -1,0 +1,18 @@
+# 알림을 받을 곳: 디스코드 채널.
+# 웹훅 URL은 그 채널에 누구나 글을 쓸 수 있는 비밀값이라 파일에 적지 않고 환경변수로 받는다.
+# (운영: .env.prod / 로컬: .env 의 DISCORD_WEBHOOK_URL)
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: discord-alerts
+    receivers:
+      - uid: picngo-discord
+        type: discord
+        settings:
+          url: $DISCORD_WEBHOOK_URL
+          # 메시지 형식은 templates.yml 참고
+          title: '{{ template "picngo.discord.title" . }}'
+          message: '{{ template "picngo.discord.message" . }}'
+        # 문제가 해결되면 "해결됨" 메시지도 받는다.
+        disableResolveMessage: false

@@ -1,0 +1,12 @@
+# 어떤 알림을 어디로, 얼마나 자주 보낼지.
+# 모든 알림을 디스코드로 보내되, 해결되기 전까지 같은 알림은 4시간에 한 번만 다시 보낸다(알림 피로 방지).
+# 주의: 이 파일은 Grafana의 알림 정책 전체를 덮어쓴다. 화면에서 정책을 바꾸지 말고 이 파일을 고친다.
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: discord-alerts
+    group_by: ['alertname']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
