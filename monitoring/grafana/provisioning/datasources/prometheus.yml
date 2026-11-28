@@ -1,0 +1,14 @@
+# 알림 규칙이 가리킬 Prometheus 데이터 출처.
+# 규칙은 데이터 출처를 uid로 찾기 때문에, 화면에서 만든 데이터 출처(uid가 매번 달라짐)가 아니라
+# uid를 고정한 이 데이터 출처를 쓴다. 이름은 화면에서 만든 기존 것과 겹치지 않게 짓는다.
+# 주소는 환경마다 컨테이너 이름이 달라서(운영 prometheus, 로컬 png-prometheus) 환경변수로 받는다.
+apiVersion: 1
+
+datasources:
+  - name: PicNGo Prometheus (alerting)
+    uid: picngo-prometheus
+    type: prometheus
+    access: proxy
+    url: $PROMETHEUS_URL
+    isDefault: false
+    editable: false
